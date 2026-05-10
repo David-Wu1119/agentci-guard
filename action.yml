@@ -1,0 +1,26 @@
+name: AgentCI Guard
+description: Scan GitHub Actions workflows for unsafe AI coding-agent usage.
+author: David Wu
+inputs:
+  path:
+    description: Repository path to scan.
+    required: false
+    default: "."
+  sarif:
+    description: SARIF output path.
+    required: false
+    default: "agentci-results.sarif"
+  fail-on:
+    description: Minimum severity that fails the action. One of none, low, medium, high, critical.
+    required: false
+    default: "high"
+runs:
+  using: node20
+  main: dist/cli.js
+  args:
+    - scan
+    - ${{ inputs.path }}
+    - --sarif
+    - ${{ inputs.sarif }}
+    - --fail-on
+    - ${{ inputs.fail-on }}

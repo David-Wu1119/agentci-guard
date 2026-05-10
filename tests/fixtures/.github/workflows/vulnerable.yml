@@ -1,0 +1,28 @@
+name: vulnerable-ai-agent
+on:
+  pull_request_target:
+    types: [opened, synchronize]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Run Claude Code on PR
+        uses: anthropics/claude-code-action@v1
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          prompt: |
+            Review this PR:
+            ${{ github.event.pull_request.body }}
+      - name: Shell fallback for AI agent
+        run: |
+          npx claude-code "${{ github.event.pull_request.title }}"

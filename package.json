@@ -1,0 +1,71 @@
+{
+  "name": "agentci-guard",
+  "version": "0.1.0",
+  "description": "CLI and GitHub Action that detects unsafe AI coding-agent usage in CI/CD workflows.",
+  "type": "module",
+  "bin": {
+    "agentci": "./dist/cli.js",
+    "agentci-guard": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "action.yml",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md",
+    "docs",
+    "examples"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "check": "npm run typecheck && npm test && npm run build",
+    "format:check": "prettier \"**/*.{md,json,yml,yaml,ts}\" --check",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run check",
+    "agentci": "tsx src/cli.ts"
+  },
+  "keywords": [
+    "github-actions",
+    "ai-agent",
+    "ci-security",
+    "prompt-injection",
+    "supply-chain-security",
+    "sarif",
+    "llm-security"
+  ],
+  "homepage": "https://github.com/David-Wu1119/agentci-guard#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/David-Wu1119/agentci-guard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/David-Wu1119/agentci-guard/issues"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.18.0"
+  },
+  "packageManager": "pnpm@10.11.0",
+  "dependencies": {
+    "commander": "^14.0.2",
+    "fast-glob": "^3.3.3",
+    "picocolors": "^1.1.1",
+    "yaml": "^2.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.3",
+    "prettier": "^3.8.3",
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.15"
+  }
+}
