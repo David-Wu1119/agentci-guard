@@ -1,0 +1,16 @@
+name: vuln
+on:
+  pull_request_target:
+    types: [opened]
+
+permissions:
+  contents: write
+
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Claude Code
+        uses: anthropics/claude-code-action@v1
+        with:
+          prompt: ${{ github.event.pull_request.body }}

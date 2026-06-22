@@ -15,6 +15,7 @@ type ScanOptions = {
   json?: boolean;
   markdown?: string;
   sarif?: string;
+  config?: string;
   failOn: "none" | Severity;
 };
 
@@ -34,13 +35,17 @@ async function main(): Promise<void> {
     .option("--markdown <path>", "Write a Markdown report.")
     .option("--sarif <path>", "Write SARIF output.")
     .option(
+      "--config <path>",
+      "Path to an agentci config JSON file (default: agentci.config.json in the scan path).",
+    )
+    .option(
       "--fail-on <severity>",
       "Fail at or above severity: none, low, medium, high, critical.",
       "high",
     )
     .action(async (target: string, options: ScanOptions) => {
       const failOn = parseFailOn(options.failOn);
-      const result = await scanRepository(target);
+      const result = await scanRepository(target, { configPath: options.config });
 
       if (options.sarif)
         await fs.writeFile(

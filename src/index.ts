@@ -1,3 +1,4 @@
+export * from "./config.js";
 export * from "./detect.js";
 export * from "./report.js";
 export * from "./rules.js";

@@ -9,6 +9,7 @@ import {
   looksLikeAiUsage,
 } from "./detect.js";
 import { RULES, SEVERITY_ORDER } from "./rules.js";
+import { loadConfig, matchesPath, parseInlineIgnores } from "./config.js";
 import type {
   Finding,
   ScanOptions,
@@ -32,10 +33,15 @@ export async function scanRepository(
 ): Promise<ScanResult> {
   const cwd = options.cwd ?? process.cwd();
   const scanRoot = path.resolve(cwd, root);
+  const config = await loadConfig(scanRoot, options.configPath);
   const workflows = await loadWorkflowFiles(scanRoot);
-  const findings = workflows.flatMap((workflow) =>
-    scanWorkflow(workflow, scanRoot),
-  );
+  const findings = workflows
+    .flatMap((workflow) => scanWorkflow(workflow, scanRoot))
+    .filter(
+      (finding) =>
+        !config.ignore.includes(finding.rule_id) &&
+        !config.ignorePaths.some((glob) => matchesPath(glob, finding.file)),
+    );
   return {
     scanned_at: new Date().toISOString(),
     root: scanRoot,
@@ -206,7 +212,11 @@ export function scanWorkflow(workflow: WorkflowFile, root: string): Finding[] {
     }
   }
 
-  return dedupe(findings);
+  const ignores = parseInlineIgnores(workflow.raw);
+  const visible = ignores.all
+    ? []
+    : findings.filter((finding) => !ignores.rules.has(finding.rule_id));
+  return dedupe(visible);
 }
 
 export function hasFindingAtOrAbove(

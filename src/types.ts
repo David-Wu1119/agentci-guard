@@ -16,6 +16,8 @@ export type Finding = {
 
 export type ScanOptions = {
   cwd: string;
+  /** Explicit path to an agentci config JSON file (overrides discovery). */
+  configPath?: string;
 };
 
 export type WorkflowFile = {

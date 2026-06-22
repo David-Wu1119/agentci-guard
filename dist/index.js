@@ -1,3 +1,52 @@
+// src/config.ts
+import fs from "fs/promises";
+import path from "path";
+var EMPTY = { ignore: [], ignorePaths: [] };
+var CONFIG_FILENAMES = ["agentci.config.json", ".agentcirc.json"];
+async function loadConfig(root, explicitPath) {
+  const candidates = explicitPath ? [path.resolve(explicitPath)] : CONFIG_FILENAMES.map((name) => path.join(root, name));
+  for (const file of candidates) {
+    let raw;
+    try {
+      raw = await fs.readFile(file, "utf8");
+    } catch {
+      continue;
+    }
+    const parsed = JSON.parse(raw);
+    return {
+      ignore: toStringArray(parsed.ignore),
+      ignorePaths: toStringArray(parsed.ignorePaths)
+    };
+  }
+  return EMPTY;
+}
+function toStringArray(value) {
+  return Array.isArray(value) ? value.map((item) => String(item)) : [];
+}
+function parseInlineIgnores(raw) {
+  const rules = /* @__PURE__ */ new Set();
+  let all = false;
+  for (const line of raw.split("\n")) {
+    if (/#\s*agentci-ignore-all\b/i.test(line)) {
+      all = true;
+      continue;
+    }
+    const match = /#\s*agentci-ignore\s+([^\n]+)/i.exec(line);
+    if (!match) continue;
+    const spec = match[1].split("--")[0];
+    for (const id of spec.split(/[\s,]+/)) {
+      if (id) rules.add(id);
+    }
+  }
+  return { all, rules };
+}
+function matchesPath(glob, target) {
+  const pattern = glob.split("**").map(
+    (part) => part.split("*").map((segment) => segment.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join("[^/]*")
+  ).join(".*");
+  return new RegExp(`^${pattern}$`).test(target);
+}
+
 // src/detect.ts
 var AI_AGENT_PATTERNS = [
   // Known AI coding-agent GitHub Actions (matched in `uses:`)
@@ -289,16 +338,17 @@ function sarifLevel(severity) {
 }
 
 // src/scanner.ts
-import path from "path";
+import path2 from "path";
 import fg from "fast-glob";
 import YAML from "yaml";
-import fs from "fs/promises";
+import fs2 from "fs/promises";
 async function scanRepository(root, options = {}) {
   const cwd = options.cwd ?? process.cwd();
-  const scanRoot = path.resolve(cwd, root);
+  const scanRoot = path2.resolve(cwd, root);
+  const config = await loadConfig(scanRoot, options.configPath);
   const workflows = await loadWorkflowFiles(scanRoot);
-  const findings = workflows.flatMap(
-    (workflow) => scanWorkflow(workflow, scanRoot)
+  const findings = workflows.flatMap((workflow) => scanWorkflow(workflow, scanRoot)).filter(
+    (finding) => !config.ignore.includes(finding.rule_id) && !config.ignorePaths.some((glob) => matchesPath(glob, finding.file))
   );
   return {
     scanned_at: (/* @__PURE__ */ new Date()).toISOString(),
@@ -316,7 +366,7 @@ async function loadWorkflowFiles(root) {
   });
   const workflows = [];
   for (const file of entries.sort()) {
-    const raw = await fs.readFile(file, "utf8");
+    const raw = await fs2.readFile(file, "utf8");
     try {
       workflows.push({ path: file, raw, document: YAML.parse(raw) });
     } catch (error) {
@@ -333,7 +383,7 @@ async function loadWorkflowFiles(root) {
 }
 function scanWorkflow(workflow, root) {
   const doc = isRecord(workflow.document) ? workflow.document : {};
-  const file = path.relative(root, workflow.path);
+  const file = path2.relative(root, workflow.path);
   const findings = [];
   if ("__parse_error" in doc) {
     findings.push(
@@ -446,7 +496,9 @@ function scanWorkflow(workflow, root) {
       }
     }
   }
-  return dedupe(findings);
+  const ignores = parseInlineIgnores(workflow.raw);
+  const visible = ignores.all ? [] : findings.filter((finding) => !ignores.rules.has(finding.rule_id));
+  return dedupe(visible);
 }
 function hasFindingAtOrAbove(findings, severity) {
   return findings.some(
@@ -536,8 +588,11 @@ export {
   containsUntrustedGitHubContext,
   hasFindingAtOrAbove,
   isPinnedAction,
+  loadConfig,
   loadWorkflowFiles,
   looksLikeAiUsage,
+  matchesPath,
+  parseInlineIgnores,
   renderMarkdownReport,
   renderTextReport,
   scanRepository,
