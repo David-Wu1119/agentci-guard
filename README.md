@@ -118,7 +118,7 @@ npm pack --dry-run
 
 AgentCI Guard is a static scanner. It does not sandbox workflows or prove that an agent is safe. It identifies high-risk patterns that should receive human review before AI agents are allowed to run with privileged CI/CD context.
 
-See [Threat Model](docs/threat-model.md).
+See [Threat Model](docs/threat-model.md) and [Real-World Findings](docs/real-world-findings.md) (a scan of 75 public repos that run AI agents in CI).
 
 ## License
 

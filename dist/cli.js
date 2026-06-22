@@ -46,8 +46,8 @@ var init_rules = __esm({
       "agentci/ai-with-secrets": {
         id: "agentci/ai-with-secrets",
         title: "AI agent job has access to secrets",
-        severity: "high",
-        why: "Secrets mounted into an AI-agent job can be exfiltrated if untrusted prompt content influences tool use, shell commands, or generated output.",
+        severity: "medium",
+        why: "Secrets mounted into an AI-agent job can be exfiltrated if untrusted prompt content influences tool use, shell commands, or generated output. Most AI actions require a provider key, so this is a baseline exposure to review rather than a vulnerability on its own \u2014 it becomes high-risk when combined with untrusted input or write permissions (see agentci/untrusted-ai-write-token).",
         fix: [
           "Do not expose secrets to agent jobs that process untrusted content.",
           "Use short-lived scoped tokens.",
@@ -442,7 +442,9 @@ function scanWorkflow(workflow, root) {
     const jobUsesAi = looksLikeAiUsage(jobText);
     const jobHasWrite = hasWritePermission(jobPermissions);
     const jobHasSecrets = containsSecretReference(jobText);
-    const jobHasUntrusted = containsUntrustedGitHubContext(jobText);
+    const jobHasUntrusted = containsUntrustedGitHubContext(
+      JSON.stringify(stripGuards(rawJob))
+    );
     if (jobUsesAi && isPullRequestTarget) {
       findings.push(
         makeFinding("agentci/pull-request-target-ai", {
@@ -486,7 +488,8 @@ function scanWorkflow(workflow, root) {
       const stepUses = typeof rawStep.uses === "string" ? rawStep.uses : "";
       const stepRun = typeof rawStep.run === "string" ? rawStep.run : "";
       const stepUsesAi = looksLikeAiUsage(stepText);
-      if (stepUsesAi && containsUntrustedGitHubContext(stepText)) {
+      const stepUntrustedText = JSON.stringify(stripGuards(rawStep));
+      if (stepUsesAi && containsUntrustedGitHubContext(stepUntrustedText)) {
         findings.push(
           makeFinding("agentci/untrusted-input-in-prompt", {
             file,
@@ -582,8 +585,30 @@ function normalizePermissions(raw) {
     )
   );
 }
+var SENSITIVE_WRITE_SCOPES = /* @__PURE__ */ new Set([
+  "contents",
+  "pull-requests",
+  "issues",
+  "packages",
+  "deployments"
+]);
 function hasWritePermission(permissions) {
-  return Object.values(permissions).some((value) => value === "write") || permissions.contents === "write" || permissions["pull-requests"] === "write";
+  return Object.entries(permissions).some(([scope, level]) => {
+    if (level !== "write" && level !== "write-all") return false;
+    return level === "write-all" || SENSITIVE_WRITE_SCOPES.has(scope);
+  });
+}
+function stripGuards(value) {
+  if (Array.isArray(value)) return value.map(stripGuards);
+  if (isRecord(value)) {
+    const out = {};
+    for (const [key, val] of Object.entries(value)) {
+      if (key === "if") continue;
+      out[key] = stripGuards(val);
+    }
+    return out;
+  }
+  return value;
 }
 function isRecord(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
