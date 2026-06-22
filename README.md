@@ -57,7 +57,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: David-Wu1119/agentci-guard@main
+      - uses: David-Wu1119/agentci-guard@v0
         with:
           path: .
           sarif: agentci-results.sarif
@@ -73,7 +73,7 @@ jobs:
 The action sets `findings`, `critical`, `high`, `medium`, `low`, and `sarif-path` so later steps can react:
 
 ```yaml
-      - uses: David-Wu1119/agentci-guard@main # pin to a released tag, e.g. @v0, once published
+      - uses: David-Wu1119/agentci-guard@v0
         id: agentci
         with:
           fail-on: none
