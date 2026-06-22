@@ -36,8 +36,8 @@ export const RULES: Record<string, RuleDefinition> = {
   "agentci/ai-with-secrets": {
     id: "agentci/ai-with-secrets",
     title: "AI agent job has access to secrets",
-    severity: "high",
-    why: "Secrets mounted into an AI-agent job can be exfiltrated if untrusted prompt content influences tool use, shell commands, or generated output.",
+    severity: "medium",
+    why: "Secrets mounted into an AI-agent job can be exfiltrated if untrusted prompt content influences tool use, shell commands, or generated output. Most AI actions require a provider key, so this is a baseline exposure to review rather than a vulnerability on its own — it becomes high-risk when combined with untrusted input or write permissions (see agentci/untrusted-ai-write-token).",
     fix: [
       "Do not expose secrets to agent jobs that process untrusted content.",
       "Use short-lived scoped tokens.",

@@ -107,7 +107,12 @@ export function scanWorkflow(workflow: WorkflowFile, root: string): Finding[] {
     const jobUsesAi = looksLikeAiUsage(jobText);
     const jobHasWrite = hasWritePermission(jobPermissions);
     const jobHasSecrets = containsSecretReference(jobText);
-    const jobHasUntrusted = containsUntrustedGitHubContext(jobText);
+    // Untrusted event content inside an `if:` condition is a guard (e.g.
+    // `contains(github.event.comment.body, '@claude')`), not a value that
+    // reaches the agent. Only treat it as a sink when it appears elsewhere.
+    const jobHasUntrusted = containsUntrustedGitHubContext(
+      JSON.stringify(stripGuards(rawJob)),
+    );
 
     if (jobUsesAi && isPullRequestTarget) {
       findings.push(
@@ -156,8 +161,9 @@ export function scanWorkflow(workflow: WorkflowFile, root: string): Finding[] {
       const stepUses = typeof rawStep.uses === "string" ? rawStep.uses : "";
       const stepRun = typeof rawStep.run === "string" ? rawStep.run : "";
       const stepUsesAi = looksLikeAiUsage(stepText);
+      const stepUntrustedText = JSON.stringify(stripGuards(rawStep));
 
-      if (stepUsesAi && containsUntrustedGitHubContext(stepText)) {
+      if (stepUsesAi && containsUntrustedGitHubContext(stepUntrustedText)) {
         findings.push(
           makeFinding("agentci/untrusted-input-in-prompt", {
             file,
@@ -279,12 +285,42 @@ function normalizePermissions(raw: unknown): Record<string, string> {
   );
 }
 
+// Write scopes that actually let an agent alter the repository — code,
+// releases, PRs, issues, packages, deployments. Scopes like `id-token`
+// (OIDC), `actions`, `checks`, `statuses`, `pages`, and `security-events`
+// grant `write` but do not let a prompt-injected agent modify the repo, so
+// they must not trip the AI-write-token / broad-write rules.
+const SENSITIVE_WRITE_SCOPES = new Set([
+  "contents",
+  "pull-requests",
+  "issues",
+  "packages",
+  "deployments",
+]);
+
 function hasWritePermission(permissions: Record<string, string>): boolean {
-  return (
-    Object.values(permissions).some((value) => value === "write") ||
-    permissions.contents === "write" ||
-    permissions["pull-requests"] === "write"
-  );
+  return Object.entries(permissions).some(([scope, level]) => {
+    if (level !== "write" && level !== "write-all") return false;
+    // `permissions: write-all` normalizes to contents:write-all (all scopes).
+    return level === "write-all" || SENSITIVE_WRITE_SCOPES.has(scope);
+  });
+}
+
+/**
+ * Deep-clone a workflow node with every `if:` condition removed. Untrusted
+ * event references inside an `if:` are guards, not values that reach the agent.
+ */
+function stripGuards(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stripGuards);
+  if (isRecord(value)) {
+    const out: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value)) {
+      if (key === "if") continue;
+      out[key] = stripGuards(val);
+    }
+    return out;
+  }
+  return value;
 }
 
 function isRecord(value: unknown): value is WorkflowMap {
