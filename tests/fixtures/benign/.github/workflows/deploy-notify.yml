@@ -1,0 +1,18 @@
+# Deploy notification. Uses a third-party action whose slug contains "agent"
+# and a curl with a User-Agent header. No AI agent anywhere.
+# Old detector: flags ai-shell-access on the curl step (false).
+name: deploy-notify
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: datadog/agent-action@v1
+      - name: ping status page
+        run: |
+          curl -H "User-Agent: ci-bot/1.0" https://status.example.com/ping

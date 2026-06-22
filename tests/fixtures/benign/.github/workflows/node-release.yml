@@ -1,0 +1,23 @@
+# Ordinary npm release. Has write perms + a secret token, and runs on a
+# self-hosted runner labelled "build-agent". No AI agent anywhere.
+# Old detector: flags broad-write-permissions + ai-with-secrets (false).
+name: release
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: [self-hosted, build-agent]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+      - run: npm ci && npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,16 +1,42 @@
 // src/detect.ts
-var AI_PATTERNS = [
-  /\bclaude\b/i,
+var AI_AGENT_PATTERNS = [
+  // Known AI coding-agent GitHub Actions (matched in `uses:`)
+  /anthropics\/claude-code(?:-base)?-action/i,
+  /\banthropics\/[\w.-]*claude/i,
+  /\baider-ai\/aider\b/i,
+  /\bsweepai\//i,
+  /(?:all-hands-ai|opendevin)\/(?:openhands|opendevin)/i,
+  /\bcontinuedev\//i,
+  /\bblock\/goose\b|\bgoose-ai\//i,
+  /\bgithub\/copilot[\w-]*agent/i,
+  /\bopenai\/codex[\w-]*/i,
+  // Agent CLIs / tools (product names specific enough to be low false-positive)
   /\bclaude-code\b/i,
-  /\bcodex\b/i,
-  /\bgemini\b/i,
-  /\bopenai\b/i,
-  /\banthropic\b/i,
-  /\bai-agent\b/i,
-  /\bagent\b/i,
-  /\bmcp\b/i,
-  /\bllm\b/i,
-  /\bchatgpt\b/i
+  /@anthropic-ai\/claude-code\b/i,
+  /\bclaude\b/i,
+  // CLI binary + product name; rare as a literal token in non-AI CI
+  /\baider\b/i,
+  /\bchatgpt\b/i,
+  /\bcodex\s+(?:exec|run|--)/i,
+  // openai codex CLI (bare "codex" is too generic)
+  /\bollama\s+run\b/i,
+  /\bcursor-agent\b/i,
+  /\bllm\s+(?:-m|--model)\b/i,
+  // simonw llm CLI (bare "llm" is too generic)
+  // Provider credentials / endpoints / SDKs / model identifiers
+  /\bANTHROPIC_API_KEY\b/i,
+  /\bOPENAI_API_KEY\b/i,
+  /\bGEMINI_API_KEY\b/i,
+  /api\.(?:anthropic|openai)\.com/i,
+  /@anthropic-ai\//i,
+  /\bclaude-(?:3|4|opus|sonnet|haiku)\b/i,
+  /\bgpt-(?:4|4o|5)\b/i,
+  // Explicit agent phrasing
+  /\bai[ -]agents?\b/i,
+  /\bcoding agents?\b/i,
+  /\bautonomous agents?\b/i,
+  /\bllm[ -]agents?\b/i,
+  /\bmodel context protocol\b/i
 ];
 var UNTRUSTED_CONTEXT_PATTERNS = [
   /github\.event\.pull_request\.(body|title|head\.ref|head\.sha)/i,
@@ -39,7 +65,7 @@ var SHELL_PATTERNS = [
   /\bexec\b/i
 ];
 function looksLikeAiUsage(value) {
-  return AI_PATTERNS.some((pattern) => pattern.test(value));
+  return AI_AGENT_PATTERNS.some((pattern) => pattern.test(value));
 }
 function containsUntrustedGitHubContext(value) {
   return UNTRUSTED_CONTEXT_PATTERNS.some((pattern) => pattern.test(value));
@@ -502,6 +528,7 @@ function summarize(findings) {
   };
 }
 export {
+  AI_AGENT_PATTERNS,
   RULES,
   SEVERITY_ORDER,
   containsSecretReference,
