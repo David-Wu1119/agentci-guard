@@ -1,0 +1,14 @@
+name: noisy
+on:
+  pull_request_target:
+
+permissions:
+  contents: write
+
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          prompt: ${{ github.event.pull_request.title }}

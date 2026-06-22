@@ -81,6 +81,28 @@ Fix:
 - Sanitize and summarize untrusted content before passing it to an agent.
 ```
 
+## Suppressing Findings
+
+Real workflows sometimes have a finding you've reviewed and accepted. Two ways to silence one without disabling the whole scan:
+
+**Inline (per file)** — add a comment anywhere in the workflow:
+
+```yaml
+# agentci-ignore agentci/unpinned-ai-action -- mirrored internally, reviewed 2026-06
+# agentci-ignore-all                          -- silence every rule in this file
+```
+
+**Config file** — `agentci.config.json` in the scanned path (or pass `--config <path>`):
+
+```json
+{
+  "ignore": ["agentci/unpinned-ai-action"],
+  "ignorePaths": ["**/generated-*.yml"]
+}
+```
+
+`ignore` suppresses a rule everywhere; `ignorePaths` excludes matching workflow files (`*` within a path segment, `**` across segments). Ignored files are still parsed — they just don't report findings.
+
 ## Development
 
 ```bash

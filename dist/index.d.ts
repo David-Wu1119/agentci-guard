@@ -1,3 +1,27 @@
+type AgentciConfig = {
+    /** Rule ids to suppress everywhere, e.g. "agentci/unpinned-ai-action". */
+    ignore: string[];
+    /** Workflow path globs (relative to scan root) to exclude from reporting. */
+    ignorePaths: string[];
+};
+/** Load config from an explicit path, or by discovery in the scan root. */
+declare function loadConfig(root: string, explicitPath?: string): Promise<AgentciConfig>;
+/**
+ * Inline, file-level suppression directives read from raw workflow text:
+ *   # agentci-ignore <rule-id> [<rule-id> ...] [-- reason]
+ *   # agentci-ignore-all [-- reason]
+ *
+ * Findings are reported at job/step granularity rather than per line, so
+ * suppression is scoped to the whole file. The optional `-- reason` is for
+ * humans and is ignored by the parser.
+ */
+declare function parseInlineIgnores(raw: string): {
+    all: boolean;
+    rules: Set<string>;
+};
+/** Minimal glob match: `*` matches within a path segment, `**` across segments. */
+declare function matchesPath(glob: string, target: string): boolean;
+
 declare const AI_AGENT_PATTERNS: RegExp[];
 declare function looksLikeAiUsage(value: string): boolean;
 declare function containsUntrustedGitHubContext(value: string): boolean;
@@ -21,6 +45,8 @@ type Finding = {
 };
 type ScanOptions = {
     cwd: string;
+    /** Explicit path to an agentci config JSON file (overrides discovery). */
+    configPath?: string;
 };
 type WorkflowFile = {
     path: string;
@@ -101,4 +127,4 @@ declare function loadWorkflowFiles(root: string): Promise<WorkflowFile[]>;
 declare function scanWorkflow(workflow: WorkflowFile, root: string): Finding[];
 declare function hasFindingAtOrAbove(findings: Finding[], severity: Severity): boolean;
 
-export { AI_AGENT_PATTERNS, type Finding, RULES, type RuleDefinition, SEVERITY_ORDER, type SarifLog, type ScanOptions, type ScanResult, type Severity, type WorkflowFile, containsSecretReference, containsShellAccess, containsUntrustedGitHubContext, hasFindingAtOrAbove, isPinnedAction, loadWorkflowFiles, looksLikeAiUsage, renderMarkdownReport, renderTextReport, scanRepository, scanWorkflow, toSarif };
+export { AI_AGENT_PATTERNS, type AgentciConfig, type Finding, RULES, type RuleDefinition, SEVERITY_ORDER, type SarifLog, type ScanOptions, type ScanResult, type Severity, type WorkflowFile, containsSecretReference, containsShellAccess, containsUntrustedGitHubContext, hasFindingAtOrAbove, isPinnedAction, loadConfig, loadWorkflowFiles, looksLikeAiUsage, matchesPath, parseInlineIgnores, renderMarkdownReport, renderTextReport, scanRepository, scanWorkflow, toSarif };

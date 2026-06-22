@@ -116,9 +116,58 @@ var init_rules = __esm({
 });
 
 // src/cli.ts
-import fs2 from "fs/promises";
+import fs3 from "fs/promises";
 import { Command } from "commander";
 import pc2 from "picocolors";
+
+// src/config.ts
+import fs from "fs/promises";
+import path from "path";
+var EMPTY = { ignore: [], ignorePaths: [] };
+var CONFIG_FILENAMES = ["agentci.config.json", ".agentcirc.json"];
+async function loadConfig(root, explicitPath) {
+  const candidates = explicitPath ? [path.resolve(explicitPath)] : CONFIG_FILENAMES.map((name) => path.join(root, name));
+  for (const file of candidates) {
+    let raw;
+    try {
+      raw = await fs.readFile(file, "utf8");
+    } catch {
+      continue;
+    }
+    const parsed = JSON.parse(raw);
+    return {
+      ignore: toStringArray(parsed.ignore),
+      ignorePaths: toStringArray(parsed.ignorePaths)
+    };
+  }
+  return EMPTY;
+}
+function toStringArray(value) {
+  return Array.isArray(value) ? value.map((item) => String(item)) : [];
+}
+function parseInlineIgnores(raw) {
+  const rules = /* @__PURE__ */ new Set();
+  let all = false;
+  for (const line of raw.split("\n")) {
+    if (/#\s*agentci-ignore-all\b/i.test(line)) {
+      all = true;
+      continue;
+    }
+    const match = /#\s*agentci-ignore\s+([^\n]+)/i.exec(line);
+    if (!match) continue;
+    const spec = match[1].split("--")[0];
+    for (const id of spec.split(/[\s,]+/)) {
+      if (id) rules.add(id);
+    }
+  }
+  return { all, rules };
+}
+function matchesPath(glob, target) {
+  const pattern = glob.split("**").map(
+    (part) => part.split("*").map((segment) => segment.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join("[^/]*")
+  ).join(".*");
+  return new RegExp(`^${pattern}$`).test(target);
+}
 
 // src/detect.ts
 var AI_AGENT_PATTERNS = [
@@ -320,17 +369,18 @@ function sarifLevel(severity) {
 }
 
 // src/scanner.ts
-import path from "path";
+import path2 from "path";
 import fg from "fast-glob";
 import YAML from "yaml";
 init_rules();
-import fs from "fs/promises";
+import fs2 from "fs/promises";
 async function scanRepository(root, options = {}) {
   const cwd = options.cwd ?? process.cwd();
-  const scanRoot = path.resolve(cwd, root);
+  const scanRoot = path2.resolve(cwd, root);
+  const config = await loadConfig(scanRoot, options.configPath);
   const workflows = await loadWorkflowFiles(scanRoot);
-  const findings = workflows.flatMap(
-    (workflow) => scanWorkflow(workflow, scanRoot)
+  const findings = workflows.flatMap((workflow) => scanWorkflow(workflow, scanRoot)).filter(
+    (finding) => !config.ignore.includes(finding.rule_id) && !config.ignorePaths.some((glob) => matchesPath(glob, finding.file))
   );
   return {
     scanned_at: (/* @__PURE__ */ new Date()).toISOString(),
@@ -348,7 +398,7 @@ async function loadWorkflowFiles(root) {
   });
   const workflows = [];
   for (const file of entries.sort()) {
-    const raw = await fs.readFile(file, "utf8");
+    const raw = await fs2.readFile(file, "utf8");
     try {
       workflows.push({ path: file, raw, document: YAML.parse(raw) });
     } catch (error) {
@@ -365,7 +415,7 @@ async function loadWorkflowFiles(root) {
 }
 function scanWorkflow(workflow, root) {
   const doc = isRecord(workflow.document) ? workflow.document : {};
-  const file = path.relative(root, workflow.path);
+  const file = path2.relative(root, workflow.path);
   const findings = [];
   if ("__parse_error" in doc) {
     findings.push(
@@ -478,7 +528,9 @@ function scanWorkflow(workflow, root) {
       }
     }
   }
-  return dedupe(findings);
+  const ignores = parseInlineIgnores(workflow.raw);
+  const visible = ignores.all ? [] : findings.filter((finding) => !ignores.rules.has(finding.rule_id));
+  return dedupe(visible);
 }
 function hasFindingAtOrAbove(findings, severity) {
   return findings.some(
@@ -566,21 +618,24 @@ async function main() {
   program.command("scan").description(
     "Scan a repository for unsafe AI-agent GitHub Actions patterns."
   ).argument("[path]", "Repository path.", ".").option("--json", "Print JSON output.", false).option("--markdown <path>", "Write a Markdown report.").option("--sarif <path>", "Write SARIF output.").option(
+    "--config <path>",
+    "Path to an agentci config JSON file (default: agentci.config.json in the scan path)."
+  ).option(
     "--fail-on <severity>",
     "Fail at or above severity: none, low, medium, high, critical.",
     "high"
   ).action(async (target, options) => {
     const failOn = parseFailOn(options.failOn);
-    const result = await scanRepository(target);
+    const result = await scanRepository(target, { configPath: options.config });
     if (options.sarif)
-      await fs2.writeFile(
+      await fs3.writeFile(
         options.sarif,
         `${JSON.stringify(toSarif(result.findings), null, 2)}
 `,
         "utf8"
       );
     if (options.markdown)
-      await fs2.writeFile(
+      await fs3.writeFile(
         options.markdown,
         renderMarkdownReport(result),
         "utf8"

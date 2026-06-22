@@ -1,0 +1,4 @@
+{
+  "ignore": ["agentci/unpinned-ai-action"],
+  "ignorePaths": ["**/noisy.yml"]
+}
