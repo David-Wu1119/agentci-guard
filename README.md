@@ -18,7 +18,11 @@ It focuses on one high-risk pattern: untrusted GitHub event content reaching an 
 ## CLI Quickstart
 
 ```bash
-pnpm add github:David-Wu1119/agentci-guard
+# Run without installing
+npx agentci-guard scan .
+
+# Or install globally
+npm install -g agentci-guard
 
 agentci scan .
 agentci scan . --json
