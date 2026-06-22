@@ -132,6 +132,16 @@ function isPinnedAction(uses) {
 
 // src/report.ts
 import pc from "picocolors";
+function formatGithubOutputs(result, sarifPath) {
+  return [
+    `findings=${result.findings.length}`,
+    `critical=${result.summary.critical}`,
+    `high=${result.summary.high}`,
+    `medium=${result.summary.medium}`,
+    `low=${result.summary.low}`,
+    `sarif-path=${sarifPath ?? ""}`
+  ].join("\n") + "\n";
+}
 function renderTextReport(result) {
   const lines = [
     "AgentCI Guard scan",
@@ -611,6 +621,7 @@ export {
   containsSecretReference,
   containsShellAccess,
   containsUntrustedGitHubContext,
+  formatGithubOutputs,
   hasFindingAtOrAbove,
   isPinnedAction,
   loadConfig,

@@ -254,6 +254,16 @@ function isPinnedAction(uses) {
 
 // src/report.ts
 import pc from "picocolors";
+function formatGithubOutputs(result, sarifPath) {
+  return [
+    `findings=${result.findings.length}`,
+    `critical=${result.summary.critical}`,
+    `high=${result.summary.high}`,
+    `medium=${result.summary.medium}`,
+    `low=${result.summary.low}`,
+    `sarif-path=${sarifPath ?? ""}`
+  ].join("\n") + "\n";
+}
 function renderTextReport(result) {
   const lines = [
     "AgentCI Guard scan",
@@ -667,6 +677,12 @@ async function main() {
       );
     if (options.json) console.log(JSON.stringify(result, null, 2));
     else console.log(renderTextReport(result));
+    if (process.env.GITHUB_OUTPUT)
+      await fs3.appendFile(
+        process.env.GITHUB_OUTPUT,
+        formatGithubOutputs(result, options.sarif),
+        "utf8"
+      );
     if (failOn !== "none" && hasFindingAtOrAbove(result.findings, failOn)) {
       process.exitCode = 2;
     }

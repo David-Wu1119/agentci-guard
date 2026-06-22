@@ -1,6 +1,26 @@
 import pc from "picocolors";
 import type { Finding, ScanResult } from "./types.js";
 
+/**
+ * Render the GitHub Actions `$GITHUB_OUTPUT` lines for a scan, so downstream
+ * steps can branch on the result (e.g. comment on a PR when critical > 0).
+ */
+export function formatGithubOutputs(
+  result: ScanResult,
+  sarifPath?: string,
+): string {
+  return (
+    [
+      `findings=${result.findings.length}`,
+      `critical=${result.summary.critical}`,
+      `high=${result.summary.high}`,
+      `medium=${result.summary.medium}`,
+      `low=${result.summary.low}`,
+      `sarif-path=${sarifPath ?? ""}`,
+    ].join("\n") + "\n"
+  );
+}
+
 export function renderTextReport(result: ScanResult): string {
   const lines = [
     "AgentCI Guard scan",

@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import { Command } from "commander";
 import pc from "picocolors";
 import {
+  formatGithubOutputs,
   renderMarkdownReport,
   renderTextReport,
   scanRepository,
@@ -62,6 +63,13 @@ async function main(): Promise<void> {
 
       if (options.json) console.log(JSON.stringify(result, null, 2));
       else console.log(renderTextReport(result));
+
+      if (process.env.GITHUB_OUTPUT)
+        await fs.appendFile(
+          process.env.GITHUB_OUTPUT,
+          formatGithubOutputs(result, options.sarif),
+          "utf8",
+        );
 
       if (failOn !== "none" && hasFindingAtOrAbove(result.findings, failOn)) {
         process.exitCode = 2;

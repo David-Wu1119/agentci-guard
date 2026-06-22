@@ -107,6 +107,11 @@ type SarifLog = {
     }>;
 };
 
+/**
+ * Render the GitHub Actions `$GITHUB_OUTPUT` lines for a scan, so downstream
+ * steps can branch on the result (e.g. comment on a PR when critical > 0).
+ */
+declare function formatGithubOutputs(result: ScanResult, sarifPath?: string): string;
 declare function renderTextReport(result: ScanResult): string;
 declare function renderMarkdownReport(result: ScanResult): string;
 
@@ -127,4 +132,4 @@ declare function loadWorkflowFiles(root: string): Promise<WorkflowFile[]>;
 declare function scanWorkflow(workflow: WorkflowFile, root: string): Finding[];
 declare function hasFindingAtOrAbove(findings: Finding[], severity: Severity): boolean;
 
-export { AI_AGENT_PATTERNS, type AgentciConfig, type Finding, RULES, type RuleDefinition, SEVERITY_ORDER, type SarifLog, type ScanOptions, type ScanResult, type Severity, type WorkflowFile, containsSecretReference, containsShellAccess, containsUntrustedGitHubContext, hasFindingAtOrAbove, isPinnedAction, loadConfig, loadWorkflowFiles, looksLikeAiUsage, matchesPath, parseInlineIgnores, renderMarkdownReport, renderTextReport, scanRepository, scanWorkflow, toSarif };
+export { AI_AGENT_PATTERNS, type AgentciConfig, type Finding, RULES, type RuleDefinition, SEVERITY_ORDER, type SarifLog, type ScanOptions, type ScanResult, type Severity, type WorkflowFile, containsSecretReference, containsShellAccess, containsUntrustedGitHubContext, formatGithubOutputs, hasFindingAtOrAbove, isPinnedAction, loadConfig, loadWorkflowFiles, looksLikeAiUsage, matchesPath, parseInlineIgnores, renderMarkdownReport, renderTextReport, scanRepository, scanWorkflow, toSarif };
