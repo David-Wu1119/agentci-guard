@@ -64,6 +64,21 @@ jobs:
           sarif_file: agentci-results.sarif
 ```
 
+### Outputs
+
+The action sets `findings`, `critical`, `high`, `medium`, `low`, and `sarif-path` so later steps can react:
+
+```yaml
+      - uses: David-Wu1119/agentci-guard@main # pin to a released tag, e.g. @v0, once published
+        id: agentci
+        with:
+          fail-on: none
+      - if: steps.agentci.outputs.critical != '0'
+        run: echo "::warning::${{ steps.agentci.outputs.critical }} critical finding(s)"
+```
+
+If `agentci.config.json` exists in the scanned path it is picked up automatically (see [Suppressing Findings](#suppressing-findings)).
+
 ## Example Finding
 
 ```text
