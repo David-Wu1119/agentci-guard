@@ -4,6 +4,10 @@ AgentCI Guard is a CLI and GitHub Action that detects unsafe AI coding-agent usa
 
 It focuses on one high-risk pattern: untrusted GitHub event content reaching an AI agent that has secrets, write permissions, shell access, or unsafe checkout behavior.
 
+![AgentCI Guard scanning a vulnerable workflow](docs/demo.svg)
+
+> The animated terminal demo is generated from [`docs/demo.tape`](docs/demo.tape) — run `vhs docs/demo.tape` to produce `docs/demo.gif`.
+
 ## What It Detects
 
 - AI-agent usage in `.github/workflows/*.yml`
