@@ -4,8 +4,8 @@
   "description": "CLI and GitHub Action that detects unsafe AI coding-agent usage in CI/CD workflows.",
   "type": "module",
   "bin": {
-    "agentci": "./dist/cli.js",
-    "agentci-guard": "./dist/cli.js"
+    "agentci": "dist/cli.js",
+    "agentci-guard": "dist/cli.js"
   },
   "exports": {
     ".": {
