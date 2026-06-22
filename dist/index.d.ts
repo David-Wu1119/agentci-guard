@@ -1,3 +1,4 @@
+declare const AI_AGENT_PATTERNS: RegExp[];
 declare function looksLikeAiUsage(value: string): boolean;
 declare function containsUntrustedGitHubContext(value: string): boolean;
 declare function containsSecretReference(value: string): boolean;
@@ -100,4 +101,4 @@ declare function loadWorkflowFiles(root: string): Promise<WorkflowFile[]>;
 declare function scanWorkflow(workflow: WorkflowFile, root: string): Finding[];
 declare function hasFindingAtOrAbove(findings: Finding[], severity: Severity): boolean;
 
-export { type Finding, RULES, type RuleDefinition, SEVERITY_ORDER, type SarifLog, type ScanOptions, type ScanResult, type Severity, type WorkflowFile, containsSecretReference, containsShellAccess, containsUntrustedGitHubContext, hasFindingAtOrAbove, isPinnedAction, loadWorkflowFiles, looksLikeAiUsage, renderMarkdownReport, renderTextReport, scanRepository, scanWorkflow, toSarif };
+export { AI_AGENT_PATTERNS, type Finding, RULES, type RuleDefinition, SEVERITY_ORDER, type SarifLog, type ScanOptions, type ScanResult, type Severity, type WorkflowFile, containsSecretReference, containsShellAccess, containsUntrustedGitHubContext, hasFindingAtOrAbove, isPinnedAction, loadWorkflowFiles, looksLikeAiUsage, renderMarkdownReport, renderTextReport, scanRepository, scanWorkflow, toSarif };
