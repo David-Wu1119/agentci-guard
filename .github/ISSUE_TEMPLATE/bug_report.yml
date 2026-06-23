@@ -1,0 +1,89 @@
+name: Bug report
+description: Report a false positive, false negative, crash, or SARIF/report problem in AgentCI Guard.
+title: "[bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug in **AgentCI Guard**.
+
+        AgentCI Guard is a static scanner: it flags risky **patterns** in workflow YAML, not proven exploits. If you believe you've found a vulnerability that is genuinely exploitable, do **not** post details here — see [SECURITY.md](../../SECURITY.md) and report it privately.
+
+        Please include enough to reproduce. A minimal workflow YAML is by far the most useful thing you can provide.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you run (CLI command or Action), and what went wrong? Note whether this is a false positive, false negative, crash, or SARIF/report problem.
+      placeholder: |
+        Ran `agentci scan .` and got rule agentci/ai-with-secrets on a job that only sets a provider key — looks like a false positive.
+    validations:
+      required: true
+
+  - type: textarea
+    id: workflow-yaml
+    attributes:
+      label: Workflow YAML or minimal repro
+      description: Paste the `.github/workflows/*.yml` that triggered the behavior, or a minimal version that reproduces it. Remove any real secrets.
+      render: yaml
+      placeholder: |
+        name: ai-agent
+        on: [pull_request]
+        permissions:
+          contents: write
+        jobs:
+          agent:
+            runs-on: ubuntu-latest
+            steps:
+              - uses: actions/checkout@v4
+              - uses: anthropics/claude-code-action@main
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect AgentCI Guard to report (or not report)?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What did it actually report? Paste the relevant finding(s) or error output, including rule IDs (e.g. agentci/untrusted-ai-write-token) if shown.
+      render: text
+    validations:
+      required: true
+
+  - type: input
+    id: agentci-version
+    attributes:
+      label: AgentCI version
+      description: Output of `agentci --version`, the npm package version, or the Action ref (e.g. David-Wu1119/agentci-guard@v0).
+      placeholder: "agentci-guard@0.1.0 / David-Wu1119/agentci-guard@v0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: ran-via
+    attributes:
+      label: How did you run it?
+      options:
+        - CLI (npx / npm install -g)
+        - GitHub Action
+        - Programmatic import
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: OS and Node version
+      description: Operating system and `node --version`. For the Action, the runner image (e.g. ubuntu-latest) is fine.
+      placeholder: "macOS 15.5 / Node 22.19.0  —  or  ubuntu-latest (node24)"
+    validations:
+      required: true

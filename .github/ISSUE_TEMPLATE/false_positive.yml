@@ -1,0 +1,183 @@
+name: "False positive"
+description: "A finding fired on a workflow you believe is benign. This is our #1 feedback channel — precision matters."
+title: "[false-positive] <rule> fired on a benign workflow"
+labels: ["false-positive"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping us tighten precision. AgentCI Guard flags **patterns in
+        workflow YAML**, not proven exploits — so a finding can be technically
+        correct about the pattern yet still be benign because of a mitigation a
+        static scanner cannot see (output allowlists, `author_association` gates,
+        fork checks, SHA-pinned actions). Those are exactly the reports we want.
+
+        We take this seriously: the first scan of 75 public repos reported 59
+        criticals, and auditing them against well-configured repos exposed three
+        false-positive classes in the tool itself (`id-token: write` miscounted as
+        repo-write; untrusted content inside an `if:` guard treated as a prompt
+        sink; a provider key in an AI job over-rated). Fixing all three took it
+        from **59 → 13 criticals**. This form is how the next class gets found.
+
+        ⚠️ **Please sanitize before posting.** Remove secrets, tokens, internal
+        hostnames, and anything private. **Do not name any repository as
+        vulnerable** — if you believe a real, exploitable case exists, report it
+        privately per [SECURITY.md](../../SECURITY.md) instead of opening a public
+        issue.
+  - type: checkboxes
+    id: prechecks
+    attributes:
+      label: Before you file
+      options:
+        - label: "I searched existing issues and this false positive isn't already reported."
+          required: true
+        - label: "My snippet is sanitized (no secrets, tokens, private hostnames)."
+          required: true
+        - label: "I am not naming any third-party repository as vulnerable."
+          required: true
+  - type: dropdown
+    id: rule
+    attributes:
+      label: Which rule fired?
+      description: "The rule ID from the finding (e.g. `agentci explain <rule>` describes it)."
+      options:
+        - "agentci/untrusted-ai-write-token"
+        - "agentci/pull-request-target-ai"
+        - "agentci/ai-with-secrets"
+        - "agentci/untrusted-input-in-prompt"
+        - "agentci/ai-shell-access"
+        - "agentci/broad-write-permissions"
+        - "agentci/unpinned-ai-action"
+        - "agentci/unsafe-checkout"
+        - "Multiple / not sure"
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Reported severity
+      description: "The severity AgentCI Guard assigned to this finding."
+      options:
+        - "Critical"
+        - "High"
+        - "Medium"
+        - "Low"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: AgentCI Guard version or commit
+      description: "Output of `agentci --version`, the npm package version, or the Action ref (e.g. David-Wu1119/agentci-guard@v0)."
+      placeholder: "agentci-guard@0.1.0 / David-Wu1119/agentci-guard@v0"
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: How did you run it?
+      options:
+        - "CLI (npx / global install)"
+        - "GitHub Action (David-Wu1119/agentci-guard@v0)"
+        - "Other / both"
+    validations:
+      required: true
+  - type: textarea
+    id: snippet
+    attributes:
+      label: Sanitized workflow snippet
+      description: "The smallest excerpt of `.github/workflows/*.yml` that reproduces the finding. Include the trigger, permissions, and the AI-agent step. Redact secrets."
+      render: yaml
+      placeholder: |
+        on:
+          issue_comment:
+            types: [created]
+        permissions:
+          contents: read
+        jobs:
+          claude:
+            if: github.event.comment.author_association == 'OWNER'
+            runs-on: ubuntu-latest
+            steps:
+              - uses: anthropics/claude-code-action@<sha>
+                with:
+                  anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+    validations:
+      required: true
+  - type: textarea
+    id: finding
+    attributes:
+      label: Exact finding output
+      description: "Paste the finding as AgentCI Guard printed it (the `RULE / File / job / Evidence` block, or the relevant SARIF result)."
+      render: text
+      placeholder: |
+        CRITICAL agentci/untrusted-ai-write-token
+        File: .github/workflows/ai-agent.yml / job: claude
+        Evidence: untrusted trigger + AI usage + write permissions + untrusted GitHub event context
+    validations:
+      required: true
+  - type: textarea
+    id: why-benign
+    attributes:
+      label: Why is this benign / what mitigation did the scanner miss?
+      description: |
+        Explain the author-side mitigation a static scan can't see. Be specific — point at the
+        line that neutralizes the pattern.
+      placeholder: |
+        The job is gated on `author_association == 'OWNER'`, so untrusted comment
+        authors can never trigger the agent. The scanner sees `issue_comment` +
+        write scope and flags it, but the guard makes the untrusted path
+        unreachable.
+    validations:
+      required: true
+  - type: checkboxes
+    id: mitigations
+    attributes:
+      label: Which mitigation(s) apply?
+      description: "Check every author-side control present in your workflow that the finding overlooked."
+      options:
+        - label: "`author_association` gate (OWNER / MEMBER / COLLABORATOR)"
+        - label: "Fork check (e.g. `github.event.pull_request.head.repo.fork == false`)"
+        - label: "Action pinned to a full commit SHA"
+        - label: "Output allowlist / restricted agent tools"
+        - label: "Untrusted content only appears in an `if:` guard, never reaches the prompt"
+        - label: "`id-token: write` (OIDC) miscounted as repository-write scope"
+        - label: "Manual / maintainer approval required before the agent runs"
+        - label: "Other (describe above)"
+  - type: dropdown
+    id: ignore-worked
+    attributes:
+      label: Did `# agentci-ignore` suppression work?
+      description: "Inline `# agentci-ignore <rule>` (or `# agentci-ignore-all`), or an `agentci.config.json` `ignore` entry. See README → Suppressing Findings."
+      options:
+        - "Didn't try suppression yet"
+        - "Yes — `# agentci-ignore <rule>` silenced it as expected"
+        - "Yes — `agentci.config.json` ignore entry silenced it"
+        - "No — suppression did NOT work (this is itself a bug)"
+    validations:
+      required: true
+  - type: textarea
+    id: suppression-detail
+    attributes:
+      label: Suppression details (if it didn't work)
+      description: "If suppression failed, paste the exact comment / config you used and where you placed it, so we can reproduce."
+      placeholder: |
+        # agentci-ignore agentci/unpinned-ai-action -- mirrored internally, reviewed 2026-06
+        Placed at the top of .github/workflows/ai-agent.yml; finding still reported.
+    validations:
+      required: false
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: "What should AgentCI Guard have done — not flag at all, a lower severity, a narrower rule, or respect an existing suppression?"
+      placeholder: "No finding (or downgrade to Medium) when an `author_association == 'OWNER'` gate guards the untrusted trigger."
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else?
+      description: "Optional: OS, Node version, CI runner, or other context. Remember the aggregates-only rule — no naming repos as vulnerable."
+    validations:
+      required: false

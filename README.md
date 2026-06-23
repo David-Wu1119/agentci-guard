@@ -1,8 +1,12 @@
 # AgentCI Guard
 
+[![npm](https://img.shields.io/npm/v/agentci-guard)](https://www.npmjs.com/package/agentci-guard) [![CI](https://github.com/David-Wu1119/agentci-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/David-Wu1119/agentci-guard/actions/workflows/ci.yml) [![license: MIT](https://img.shields.io/npm/l/agentci-guard)](LICENSE)
+
 AgentCI Guard is a CLI and GitHub Action that detects unsafe AI coding-agent usage in CI/CD workflows.
 
 It focuses on one high-risk pattern: untrusted GitHub event content reaching an AI agent that has secrets, write permissions, shell access, or unsafe checkout behavior.
+
+📊 **[Read the write-up](WRITEUP.md)** — I scanned 75 public repos running AI agents in CI and found false positives in my own tool first (criticals: 59 → 13).
 
 ![AgentCI Guard scanning a vulnerable workflow](docs/demo.svg)
 
