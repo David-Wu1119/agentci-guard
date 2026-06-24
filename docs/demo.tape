@@ -17,6 +17,8 @@ Set Theme "Dracula"
 
 # Alias the local build to the published command name (hidden from the recording).
 Hide
+Type "export PS1='$ '"
+Enter
 Type "alias agentci='node dist/cli.js'"
 Enter
 Type "clear"

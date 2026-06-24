@@ -8,9 +8,9 @@ It focuses on one high-risk pattern: untrusted GitHub event content reaching an 
 
 📊 **[Read the write-up](WRITEUP.md)** — I scanned 75 public repos running AI agents in CI and found false positives in my own tool first (criticals: 59 → 13).
 
-![AgentCI Guard scanning a vulnerable workflow](docs/demo.svg)
+![AgentCI Guard scanning a vulnerable workflow](docs/demo.gif)
 
-> The animated terminal demo is generated from [`docs/demo.tape`](docs/demo.tape) — run `vhs docs/demo.tape` to produce `docs/demo.gif`.
+> Regenerate the demo with `vhs docs/demo.tape` (see [`docs/demo.tape`](docs/demo.tape)). A static version is also at [`docs/demo.svg`](docs/demo.svg).
 
 ## What It Detects
 
