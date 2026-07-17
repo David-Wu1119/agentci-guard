@@ -6,7 +6,7 @@ AgentCI Guard is a CLI and GitHub Action that detects unsafe AI coding-agent usa
 
 It focuses on one high-risk pattern: untrusted GitHub event content reaching an AI agent that has secrets, write permissions, shell access, or unsafe checkout behavior.
 
-📊 **[Read the write-up](WRITEUP.md)** — I scanned 75 public repos running AI agents in CI and found false positives in my own tool first (criticals: 59 → 13).
+📊 **[Read the write-up](WRITEUP.md)** — a v0.1 scan of 75 public repos running AI agents in CI, where I found false positives in my own tool first (reported criticals: 59 → 13). The counts are scanner ratings, not confirmed exploits — see the write-up's exploitability triage.
 
 ![AgentCI Guard scanning a vulnerable workflow](docs/demo.gif)
 
@@ -141,7 +141,7 @@ npm pack --dry-run
 
 AgentCI Guard is a static scanner. It does not sandbox workflows or prove that an agent is safe. It identifies high-risk patterns that should receive human review before AI agents are allowed to run with privileged CI/CD context.
 
-See [Threat Model](docs/threat-model.md) and [Real-World Findings](docs/real-world-findings.md) (a scan of 75 public repos that run AI agents in CI).
+See [Threat Model](docs/threat-model.md) and [Real-World Findings](docs/real-world-findings.md) (a v0.1 scan of 75 public repos that run AI agents in CI; the counts are scanner ratings, not confirmed exploits).
 
 ## License
 

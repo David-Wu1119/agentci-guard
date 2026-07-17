@@ -1,8 +1,10 @@
 # Real-World Findings
 
-A scan of public GitHub repositories that run AI coding agents in CI, to (a)
-validate AgentCI Guard against real workflows and (b) get an honest read on how
-common the risky patterns actually are.
+A **v0.1** scan of public GitHub repositories that run AI coding agents in CI, to
+(a) validate AgentCI Guard against real workflows and (b) get an honest read on
+how common the risky patterns actually are. The severity counts below are v0.1
+**scanner ratings** — pattern matches, not confirmed exploits (see "Follow-up:
+exploitability triage").
 
 ## Method
 
@@ -77,3 +79,24 @@ or SHA-pinned actions. Treat a finding as "review this," not "this is hacked."
 
 For that reason, this document reports only aggregates. Genuinely exploitable
 cases should be reported privately to the maintainer, not published.
+
+## Follow-up: exploitability triage
+
+A later hand-triage checked the critical ratings against how
+`anthropics/claude-code-action` actually behaves. It **gates on repository write
+access by default**, so the comment-triggered "critical" matches are not directly
+attacker-reachable, and the configs that *remove* the gate
+(`allowed_non_write_users`, `allowed_bots: '*'`, `pull_request_target` + untrusted
+checkout) appear in ≈0 public repos. The risky pattern is common; confirmed
+exposure is rare. "Eight repositories rated critical" describes v0.1 scanner
+output **before** this triage, not eight confirmed-exploitable repositories. A
+scanner recalibration to model the gate is in local review and **not yet released**.
+
+## Prior art
+
+AgentCI Guard is not the first tool to examine GitHub Actions security and does
+not claim to prove RCE from static evidence. See CodeQL Actions queries, general
+workflow scanners, and prompt-injection / `pull_request_target` tooling (PromptPwnd
+/ OpenGrep rules, prompt-injection scanners, TaintAWI, GitInject). Its narrower
+contribution is an AI-agent-specific ruleset shipped as an npm CLI + GitHub Action
+with SARIF output.

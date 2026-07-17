@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- Clarified the 75-repo real-world findings as **v0.1 scanner ratings** (pattern
+  matches, not confirmed exploits), and added a follow-up exploitability triage:
+  most critical ratings are not attacker-reachable because
+  `anthropics/claude-code-action` gates on repository write access by default;
+  the configs that remove the gate appear in ≈0 public repos.
+- Reframed "59 → 13" as an **78% reduction in reported criticals**, and clarified
+  that "eight critical" means eight repositories that received a critical scanner
+  rating before exploitability triage — not eight confirmed-exploitable repos.
+- Added a **prior-art** note (CodeQL Actions queries, prompt-injection /
+  `pull_request_target` scanners) and removed any implication of proven RCE or
+  first-of-kind novelty.
+
 ## [0.1.0] - 2026-06-22
 
 First public release. AgentCI Guard is a CLI and GitHub Action that detects

@@ -34,7 +34,7 @@ The self-audit drove this home. Our **first scan reported 59 criticals**. Auditi
 2. Untrusted content inside an `if:` guard was treated as a prompt sink.
 3. `ai-with-secrets` was rated high, even though nearly every AI action needs a provider key.
 
-After fixing all three: **59 -> 13 criticals**. Every new detector should be held to that same bar — a specific signal, not a generic word.
+After fixing all three: reported criticals fell **78% (59 -> 13)**. Every new detector should be held to that same bar — a specific signal, not a generic word. (A later exploitability triage found most remaining critical *ratings* are gated by `claude-code-action`'s default write-access check — see `WRITEUP.md`. Treat rule output as scanner ratings, not confirmed exploits.)
 
 ### Responsible-use note
 
