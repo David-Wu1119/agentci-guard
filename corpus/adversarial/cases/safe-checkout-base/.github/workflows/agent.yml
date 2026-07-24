@@ -1,0 +1,9 @@
+name: safe-checkout-base
+on: pull_request_target
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4

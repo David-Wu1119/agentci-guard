@@ -17,6 +17,8 @@ export function formatGithubOutputs(
       `medium=${result.summary.medium}`,
       `low=${result.summary.low}`,
       `sarif-path=${sarifPath ?? ""}`,
+      `diagnostics=${result.diagnostics.length}`,
+      `analysis-complete=${result.analysis_complete}`,
     ].join("\n") + "\n"
   );
 }
@@ -27,6 +29,7 @@ export function renderTextReport(result: ScanResult): string {
     `Workflows: ${result.workflow_count}`,
     `Findings: ${result.findings.length}`,
     `Summary: critical=${result.summary.critical} high=${result.summary.high} medium=${result.summary.medium} low=${result.summary.low}`,
+    `Analysis: ${result.analysis_complete ? "complete" : `partial (${result.diagnostics.length} diagnostic(s))`}`,
     "",
   ];
 
@@ -42,6 +45,15 @@ export function renderTextReport(result: ScanResult): string {
     lines.push("");
   }
 
+  if (result.diagnostics.length > 0) {
+    lines.push("Diagnostics:");
+    for (const diagnostic of result.diagnostics) {
+      lines.push(
+        `- [${diagnostic.kind.toUpperCase()}] ${diagnostic.code} ${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ""}: ${diagnostic.message}`,
+      );
+    }
+  }
+
   return lines.join("\n");
 }
 
@@ -55,8 +67,21 @@ export function renderMarkdownReport(result: ScanResult): string {
     `- High: ${result.summary.high}`,
     `- Medium: ${result.summary.medium}`,
     `- Low: ${result.summary.low}`,
+    `- Analysis complete: ${result.analysis_complete ? "yes" : "no"}`,
+    `- Diagnostics: ${result.diagnostics.length}`,
     "",
     ...result.findings.flatMap(renderFindingMarkdown),
+    ...(result.diagnostics.length > 0
+      ? [
+          "## Diagnostics",
+          "",
+          ...result.diagnostics.map(
+            (diagnostic) =>
+              `- **${diagnostic.code}** — ${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ""}: ${diagnostic.message}`,
+          ),
+          "",
+        ]
+      : []),
     "",
   ].join("\n");
 }
@@ -66,6 +91,7 @@ function renderFindingMarkdown(finding: Finding): string[] {
     `## ${finding.severity.toUpperCase()} ${finding.rule_id}`,
     "",
     `**File:** ${finding.file}`,
+    finding.line ? `**Line:** ${finding.line}` : "",
     finding.job ? `**Job:** ${finding.job}` : "",
     finding.step ? `**Step:** ${finding.step}` : "",
     `**Evidence:** \`${finding.evidence.replace(/`/g, "'")}\``,

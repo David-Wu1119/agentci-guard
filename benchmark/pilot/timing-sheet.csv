@@ -1,0 +1,7 @@
+case_id,stratum,unit_count,annotator_pseudonym,started_at_utc,completed_at_utc,active_minutes,interruption_minutes,notes
+aider-001,agent-diversity-aider-cli,34,,,,,,
+codex-002,agent-diversity-codex-action,28,,,,,,
+cursor-002,agent-diversity-cursor-agent-cli,29,,,,,,
+openhands-004,agent-diversity-openhands,24,,,,,,
+ai-018,ai-enriched,24,,,,,,
+control-059,control,29,,,,,,

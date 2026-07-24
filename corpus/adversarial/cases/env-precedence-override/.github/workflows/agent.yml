@@ -1,0 +1,13 @@
+name: env-precedence-override
+on: push
+permissions:
+  contents: read
+env:
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    env:
+      ANTHROPIC_API_KEY: fixture-placeholder
+    steps:
+      - uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567

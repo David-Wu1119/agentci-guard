@@ -12,12 +12,10 @@ body:
         static scanner cannot see (output allowlists, `author_association` gates,
         fork checks, SHA-pinned actions). Those are exactly the reports we want.
 
-        We take this seriously: the first scan of 75 public repos reported 59
-        criticals, and auditing them against well-configured repos exposed three
-        false-positive classes in the tool itself (`id-token: write` miscounted as
-        repo-write; untrusted content inside an `if:` guard treated as a prompt
-        sink; a provider key in an AI job over-rated). Fixing all three took it
-        from **59 → 13 criticals**. This form is how the next class gets found.
+        The public adversarial corpus locks in known semantic failures, but it
+        cannot establish real-world accuracy. A concrete false-positive report
+        can become a minimized regression case and, when appropriate, an error
+        category in the independently labeled benchmark.
 
         ⚠️ **Please sanitize before posting.** Remove secrets, tokens, internal
         hostnames, and anything private. **Do not name any repository as
@@ -68,8 +66,8 @@ body:
     id: version
     attributes:
       label: AgentCI Guard version or commit
-      description: "Output of `agentci --version`, the npm package version, or the Action ref (e.g. David-Wu1119/agentci-guard@v0)."
-      placeholder: "agentci-guard@0.1.0 / David-Wu1119/agentci-guard@v0"
+      description: "Output of `agentci --version`, the npm package version, or the exact Action ref."
+      placeholder: "agentci-guard@0.1.1 / full Action commit SHA"
     validations:
       required: true
   - type: dropdown
@@ -78,7 +76,7 @@ body:
       label: How did you run it?
       options:
         - "CLI (npx / global install)"
-        - "GitHub Action (David-Wu1119/agentci-guard@v0)"
+        - "GitHub Action"
         - "Other / both"
     validations:
       required: true

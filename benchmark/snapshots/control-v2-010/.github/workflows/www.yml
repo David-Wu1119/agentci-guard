@@ -1,0 +1,119 @@
+name: WWW
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  scan_ruby:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install libcurl
+        run: |
+          sudo apt-get update
+          # dependencies for the curb gem
+          sudo apt-get install -y libcurl4 libcurl4-openssl-dev
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          working-directory: www
+          ruby-version: .ruby-version
+          bundler-cache: true
+
+      - name: Scan for common Rails security vulnerabilities using static analysis
+        run: cd www && bin/brakeman --no-pager
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install libcurl
+        run: |
+          sudo apt-get update
+          # dependencies for the curb gem
+          sudo apt-get install -y libcurl4 libcurl4-openssl-dev
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          working-directory: www
+          ruby-version: .ruby-version
+          bundler-cache: true
+
+      - name: Run RuboCop
+        run: cd www && bin/rubocop -f github
+
+      - name: Install NPM packages
+        run: cd www && npm ci
+
+      - name: Run Prettier
+        run: cd www && npx prettier app/**/*.js --check
+
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Install packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y build-essential git pkg-config google-chrome-stable  redis-server
+          # dependencies for the curb gem
+          sudo apt-get install --no-install-recommends -y libcurl4 libcurl4-openssl-dev
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          working-directory: www
+          ruby-version: .ruby-version
+          bundler-cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: 'www/.nvmrc'
+
+      - name: Install NPM packages
+        run: cd www && npm ci
+
+      - name: Run tests
+        env:
+          RAILS_ENV: test
+          APPLICATION_NAME: Should I Watch This?
+          POSTGRES_HOST: localhost
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          SMTP_SENDER: info@should-i-watch-this.com
+        run: cd www && bin/rails db:test:prepare db:fixtures:load test test:system
+
+      - name: Keep screenshots from failed system tests
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: screenshots
+          path: ${{ github.workspace }}/www/tmp/screenshots
+          if-no-files-found: ignore

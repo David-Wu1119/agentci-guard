@@ -1,0 +1,193 @@
+name: Docs OpenHands accuracy eval
+
+# Dispatch exactly once for a docs PR head when the PR becomes ready for review. Maintainers may
+# explicitly request the same decision path with a `/docs-eval rerun` PR comment; the durable head
+# marker still prevents a second dispatch for an already-claimed SHA. `docs-eval:skip` suppresses
+# dispatch, while `ci:full` makes a non-docs-labeled PR eligible for the full gate surface.
+
+on:
+  pull_request:
+    types: [ready_for_review]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+# The serialized per-PR critical section makes the marker lookup + trigger creation race-safe even
+# when a ready transition and an explicit request arrive together.
+concurrency:
+  group: docs-openhands-eval-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  docs-accuracy:
+    name: Minimax M3 docs accuracy
+    if: >-
+      (github.event_name == 'pull_request' &&
+       github.event.action == 'ready_for_review' &&
+       (contains(github.event.pull_request.labels.*.name, 'type:docs') ||
+        contains(github.event.pull_request.labels.*.name, 'area:docs') ||
+        contains(github.event.pull_request.labels.*.name, 'ci:full'))) ||
+      (github.event_name == 'issue_comment' &&
+       github.event.action == 'created' &&
+       github.event.issue.pull_request &&
+       github.event.comment.body == '/docs-eval rerun' &&
+       contains(fromJson('["OWNER","MEMBER","COLLABORATOR"]'),
+                github.event.comment.author_association) &&
+       (contains(github.event.issue.labels.*.name, 'type:docs') ||
+        contains(github.event.issue.labels.*.name, 'area:docs') ||
+        contains(github.event.issue.labels.*.name, 'ci:full')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      OPENHANDS_MODEL: openrouter/minimax/minimax-m3
+      OPENHANDS_OUTPUT: pr-comment
+      OPENHANDS_ITERATIONS: '100'
+      SKIP_REQUESTED: ${{ contains(github.event.pull_request.labels.*.name, 'docs-eval:skip') || contains(github.event.issue.labels.*.name, 'docs-eval:skip') }}
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - name: Skipped on demand
+        if: env.SKIP_REQUESTED == 'true'
+        env:
+          REQUEST_ACTOR: ${{ github.actor }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+        run: |
+          {
+            echo "## Docs OpenHands accuracy eval"
+            echo
+            echo "**Status:** skipped on demand"
+            echo
+            printf -- '- Who: `@%s`\n' "$REQUEST_ACTOR"
+            echo '- Why: PR carries the `docs-eval:skip` escape-hatch label'
+            printf -- '- PR: `#%s`\n' "$PR_NUMBER"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Require a chainable comment token
+        if: env.SKIP_REQUESTED != 'true'
+        env:
+          CHAIN_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          if [ -z "$CHAIN_TOKEN" ]; then
+            {
+              echo "## Docs OpenHands accuracy eval"
+              echo
+              echo "**Status:** failed before dispatch"
+              echo
+              echo "The repository secret \`PAT_TOKEN\` is unavailable. No trigger was posted."
+              echo "Configure a chainable PAT; \`GITHUB_TOKEN\` comments cannot launch OpenHands."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+      - name: Guard and claim this PR head
+        if: env.SKIP_REQUESTED != 'true'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          PROMPT_PATH: .llm/tools/agentic/openhands/docs-eval-prompt.md
+        with:
+          github-token: ${{ secrets.PAT_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const promptPath = process.env.PROMPT_PATH;
+            const eventName = context.eventName;
+
+            if (!process.env.OPENHANDS_MODEL) {
+              throw new Error('OPENHANDS_MODEL is required.');
+            }
+            if (/(anthropic|claude|openai|gpt|gemini|google)/i.test(process.env.OPENHANDS_MODEL)) {
+              throw new Error(`Closed-model string is prohibited for OpenHands: ${process.env.OPENHANDS_MODEL}`);
+            }
+            if (process.env.OPENHANDS_MODEL !== 'openrouter/minimax/minimax-m3') {
+              throw new Error(
+                `Expected owner-ratified open model openrouter/minimax/minimax-m3; got ${process.env.OPENHANDS_MODEL}`,
+              );
+            }
+            let pr;
+            let issueNumber;
+            if (eventName === 'pull_request') {
+              pr = context.payload.pull_request;
+              issueNumber = pr.number;
+            } else {
+              issueNumber = context.payload.issue.number;
+              const response = await github.rest.pulls.get({ owner, repo, pull_number: issueNumber });
+              pr = response.data;
+            }
+
+            const labels = new Set(pr.labels.map((label) => label.name));
+            if (labels.has('docs-eval:skip')) {
+              await core.summary
+                .addHeading('Docs OpenHands accuracy eval')
+                .addRaw('**Status:** skipped on demand\n')
+                .addList([
+                  `Who: @${context.actor}`,
+                  'Why: PR carries the docs-eval:skip escape-hatch label',
+                  `Head SHA: ${pr.head.sha}`,
+                ])
+                .write();
+              return;
+            }
+
+            // Read evaluator instructions from the trusted base SHA. A PR cannot rewrite the
+            // prompt that judges itself.
+            const promptResponse = await github.rest.repos.getContent({
+              owner,
+              repo,
+              path: promptPath,
+              ref: pr.base.sha,
+            });
+            if (Array.isArray(promptResponse.data) || promptResponse.data.type !== 'file') {
+              throw new Error(`Expected a prompt file at ${promptPath}`);
+            }
+            const prompt = Buffer.from(promptResponse.data.content, 'base64').toString('utf8').trim();
+            if (!prompt.startsWith('use harness\n')) {
+              throw new Error(`${promptPath} must begin with "use harness"`);
+            }
+
+            const headSha = pr.head.sha;
+            const marker = `<!-- docs-openhands-eval head=${headSha} -->`;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: issueNumber,
+              per_page: 100,
+            });
+            const existing = comments.find((comment) => String(comment.body ?? '').includes(marker));
+            if (existing) {
+              await core.summary
+                .addHeading('Docs OpenHands accuracy eval')
+                .addRaw('This head SHA was already claimed; no second evaluator was dispatched.\n')
+                .addList([`Head SHA: ${headSha}`, `Existing trigger: ${existing.html_url}`])
+                .write();
+              return;
+            }
+
+            const triggerLine = [
+              '@openhands-agent',
+              `model=${process.env.OPENHANDS_MODEL}`,
+              `output=${process.env.OPENHANDS_OUTPUT}`,
+              `iterations=${process.env.OPENHANDS_ITERATIONS}`,
+            ].join(' ');
+            const reason = eventName === 'pull_request'
+              ? 'ready-for-review transition'
+              : 'authorized /docs-eval rerun request';
+            const body = `${triggerLine}\n${marker}\n\n${prompt}`;
+            const { data: comment } = await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: issueNumber,
+              body,
+            });
+            await core.summary
+              .addHeading('Docs OpenHands accuracy eval')
+              .addRaw('Claimed this head SHA and posted one guarded Minimax M3 trigger.\n')
+              .addList([
+                `Reason: ${reason}`,
+                `Head SHA: ${headSha}`,
+                `Trigger comment: ${comment.html_url}`,
+                `Iteration budget: ${process.env.OPENHANDS_ITERATIONS}`,
+              ])
+              .write();

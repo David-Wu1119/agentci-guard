@@ -1,0 +1,10 @@
+name: local-reusable-caller
+on: issue_comment
+permissions:
+  issues: write
+jobs:
+  agent:
+    uses: ./.github/workflows/bridge.yml
+    with:
+      request: ${{ github.event.comment.body }}
+      tools: "--allowedTools Bash(git:*)"

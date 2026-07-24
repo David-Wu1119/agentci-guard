@@ -1,0 +1,1011 @@
+{
+  "schema_version": 2,
+  "purpose": "Synthetic adversarial regression corpus; not an accuracy benchmark.",
+  "labeling_policy": "Expected outputs are manually authored from the documented rule contract, not copied from scanner output.",
+  "security_assumptions": {
+    "environment-precedence": {
+      "type": "primary",
+      "title": "GitHub Actions workflow syntax: env",
+      "url": "https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#env",
+      "claim": "Step env overrides job env, and job env overrides workflow env."
+    },
+    "event-expressions": {
+      "type": "primary",
+      "title": "GitHub Actions expressions",
+      "url": "https://docs.github.com/en/actions/reference/evaluate-expressions-in-workflows-and-actions",
+      "claim": "Job and step conditions use boolean expressions and GitHub contexts."
+    },
+    "event-security": {
+      "type": "primary",
+      "title": "Events that trigger workflows",
+      "url": "https://docs.github.com/en/actions/reference/events-that-trigger-workflows",
+      "claim": "Event payloads and pull_request_target execution context determine attacker influence and privilege."
+    },
+    "checkout-protection": {
+      "type": "primary",
+      "title": "Safer pull_request_target defaults for GitHub Actions checkout",
+      "url": "https://github.blog/changelog/2026-06-18-safer-pull_request_target-defaults-for-github-actions-checkout/",
+      "claim": "Current floating supported checkout majors refuse common fork-PR head and merge checkouts unless allow-unsafe-pr-checkout explicitly opts out; immutable and older refs require version-aware treatment."
+    },
+    "permissions": {
+      "type": "primary",
+      "title": "GitHub Actions workflow syntax: permissions",
+      "url": "https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions",
+      "claim": "Workflow and job permissions determine the effective GITHUB_TOKEN capability."
+    },
+    "reusable-workflows": {
+      "type": "primary",
+      "title": "Reuse workflows",
+      "url": "https://docs.github.com/en/actions/how-tos/sharing-automations/reusing-workflows",
+      "claim": "Local reusable workflows inherit caller context subject to explicit inputs, secrets, and permissions."
+    },
+    "project-analysis-contract": {
+      "type": "project",
+      "title": "AgentCI Guard analysis contract",
+      "url": "../../docs/analysis-model.md",
+      "claim": "Unknown permissions, unsupported event conditions, parse failures, and unresolved reusable workflows must be explicit diagnostics."
+    },
+    "project-rule-contract": {
+      "type": "project",
+      "title": "AgentCI Guard rule contract",
+      "url": "../../RULES.md",
+      "claim": "Agent identification, source, sink, capability, permission, pinning, and checkout behavior determine rule outcomes."
+    }
+  },
+  "cases": [
+    {
+      "id": "workflow-env-secret",
+      "path": "cases/workflow-env-secret",
+      "targets": ["workflow environment inheritance"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["push"],
+        "findings": [
+          {
+            "rule_id": "agentci/ai-with-secrets",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "A secret defined at workflow scope reaches an AI step unless a narrower scope replaces it.",
+      "assumption_sources": ["environment-precedence", "project-rule-contract"]
+    },
+    {
+      "id": "job-env-secret",
+      "path": "cases/job-env-secret",
+      "targets": ["job environment inheritance"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["push"],
+        "findings": [
+          {
+            "rule_id": "agentci/ai-with-secrets",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "A secret defined at job scope reaches each AI step unless the step replaces that key.",
+      "assumption_sources": ["environment-precedence", "project-rule-contract"]
+    },
+    {
+      "id": "step-env-secret",
+      "path": "cases/step-env-secret",
+      "targets": ["step environment"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent",
+        "step": "step 1"
+      },
+      "expected": {
+        "reachable_events": ["push"],
+        "findings": [
+          {
+            "rule_id": "agentci/ai-with-secrets",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "A secret explicitly mounted on an AI step is available to that step.",
+      "assumption_sources": ["environment-precedence", "project-rule-contract"]
+    },
+    {
+      "id": "env-precedence-override",
+      "path": "cases/env-precedence-override",
+      "targets": ["job environment override"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["push"],
+        "findings": [],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "A non-secret job value replaces the same workflow-level secret key.",
+      "assumption_sources": ["environment-precedence", "project-rule-contract"]
+    },
+    {
+      "id": "step-env-override",
+      "path": "cases/step-env-override",
+      "targets": ["step environment override"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent",
+        "step": "step 1"
+      },
+      "expected": {
+        "reachable_events": ["push"],
+        "findings": [],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "A non-secret step value replaces the same workflow-level secret key for that step.",
+      "assumption_sources": ["environment-precedence", "project-rule-contract"]
+    },
+    {
+      "id": "run-shell-semantics",
+      "path": "cases/run-shell-semantics",
+      "targets": ["run step shell semantics"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent",
+        "step": "step 1"
+      },
+      "expected": {
+        "reachable_events": ["push"],
+        "findings": [
+          {
+            "rule_id": "agentci/ai-shell-access",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "step": "step 1",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "An AI CLI invoked in run already executes through a shell and therefore has command capability.",
+      "assumption_sources": ["project-rule-contract"]
+    },
+    {
+      "id": "action-prose-no-shell",
+      "path": "cases/action-prose-no-shell",
+      "targets": [
+        "shell capability false positive",
+        "immutable Action pin negative"
+      ],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent",
+        "step": "step 1"
+      },
+      "expected": {
+        "reachable_events": ["push"],
+        "findings": [],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "Prompt prose that mentions enabling shell or commands is not evidence that those tools were configured, and a full 40-hex Action ref is immutable for the pinning predicate.",
+      "assumption_sources": ["project-rule-contract"]
+    },
+    {
+      "id": "misleading-non-agent",
+      "path": "cases/misleading-non-agent",
+      "targets": ["agent identification false positives"],
+      "subject": {
+        "file": ".github/workflows/ci.yml",
+        "job": "publish"
+      },
+      "expected": {
+        "reachable_events": ["pull_request"],
+        "findings": [],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "Generic agent, User-Agent, Python, Node, shell, and non-agent inference credentials are not proof of an AI coding agent.",
+      "assumption_sources": ["project-rule-contract"]
+    },
+    {
+      "id": "event-gated-push",
+      "path": "cases/event-gated-push",
+      "targets": ["event-specific reachability"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["push"],
+        "findings": [],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "The job is reachable only on push, so pull_request_target-specific source and context are unreachable.",
+      "assumption_sources": [
+        "event-expressions",
+        "event-security",
+        "project-rule-contract"
+      ]
+    },
+    {
+      "id": "event-gated-prt",
+      "path": "cases/event-gated-prt",
+      "targets": ["event-specific reachability"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["pull_request_target"],
+        "findings": [
+          {
+            "rule_id": "agentci/pull-request-target-ai",
+            "severity": "critical",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/untrusted-input-in-prompt",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "step": "step 1",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "The job is reachable on pull_request_target and passes attacker-controlled PR content to the agent.",
+      "assumption_sources": [
+        "event-expressions",
+        "event-security",
+        "project-rule-contract"
+      ]
+    },
+    {
+      "id": "event-constant-false",
+      "path": "cases/event-constant-false",
+      "targets": ["constant-false reachability"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": [],
+        "findings": [],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "A job guarded by boolean false is unreachable on every configured event.",
+      "assumption_sources": ["event-expressions", "project-rule-contract"]
+    },
+    {
+      "id": "event-boolean-expression",
+      "path": "cases/event-boolean-expression",
+      "targets": ["boolean event expression", "short-circuit reachability"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["push"],
+        "findings": [],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "The OR and AND expression admits push but makes its pull_request_target branch impossible.",
+      "assumption_sources": [
+        "event-expressions",
+        "event-security",
+        "project-rule-contract"
+      ]
+    },
+    {
+      "id": "negated-event-condition",
+      "path": "cases/negated-event-condition",
+      "targets": ["negated event condition"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["push"],
+        "findings": [],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "Negation removes pull_request_target from the reachable event set.",
+      "assumption_sources": [
+        "event-expressions",
+        "event-security",
+        "project-rule-contract"
+      ]
+    },
+    {
+      "id": "unsupported-event-condition",
+      "path": "cases/unsupported-event-condition",
+      "targets": ["reachability completeness"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["push", "pull_request"],
+        "findings": [],
+        "diagnostics": [
+          {
+            "code": "agentci/analysis-event-condition",
+            "severity": "warning",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          }
+        ],
+        "analysis_complete": false
+      },
+      "rationale": "An unsupported event predicate must remain conservative and make the incomplete reachability analysis visible.",
+      "assumption_sources": ["event-expressions", "project-analysis-contract"]
+    },
+    {
+      "id": "permissions-unknown",
+      "path": "cases/permissions-unknown",
+      "targets": ["repository-dependent permission default"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["push"],
+        "findings": [],
+        "diagnostics": [
+          {
+            "code": "agentci/analysis-permissions-unknown",
+            "severity": "warning",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          }
+        ],
+        "analysis_complete": false
+      },
+      "rationale": "Omitted permissions depend on repository settings, so the scanner must abstain instead of assuming read or write.",
+      "assumption_sources": ["permissions", "project-analysis-contract"]
+    },
+    {
+      "id": "configured-default-read",
+      "path": "cases/configured-default-read",
+      "targets": ["configured permission default"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["push"],
+        "findings": [],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "An explicit read-all repository default closes the otherwise unknown permission boundary.",
+      "assumption_sources": ["permissions", "project-analysis-contract"]
+    },
+    {
+      "id": "job-permissions-none",
+      "path": "cases/job-permissions-none",
+      "targets": ["job permission override"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["pull_request"],
+        "findings": [
+          {
+            "rule_id": "agentci/untrusted-input-in-prompt",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "step": "step 1",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "The untrusted prompt remains a source-to-sink finding, but job-level empty permissions remove token-write findings.",
+      "assumption_sources": ["permissions", "project-rule-contract"]
+    },
+    {
+      "id": "discussion-write",
+      "path": "cases/discussion-write",
+      "targets": ["discussion event", "discussions permission"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["discussion"],
+        "findings": [
+          {
+            "rule_id": "agentci/broad-write-permissions",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/untrusted-ai-write-token",
+            "severity": "critical",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/untrusted-input-in-prompt",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "step": "step 1",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "Discussion body content is untrusted and the discussions write scope gives the influenced agent a relevant write capability.",
+      "assumption_sources": [
+        "event-security",
+        "permissions",
+        "project-rule-contract"
+      ]
+    },
+    {
+      "id": "discussion-comment-write",
+      "path": "cases/discussion-comment-write",
+      "targets": ["discussion comment event", "comment-body source"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["discussion_comment"],
+        "findings": [
+          {
+            "rule_id": "agentci/broad-write-permissions",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/untrusted-ai-write-token",
+            "severity": "critical",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/untrusted-input-in-prompt",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "step": "step 1",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "Discussion comment content is attacker-controlled input and discussions write enables an agent-side effect.",
+      "assumption_sources": [
+        "event-security",
+        "permissions",
+        "project-rule-contract"
+      ]
+    },
+    {
+      "id": "discussion-readonly",
+      "path": "cases/discussion-readonly",
+      "targets": ["discussion comment event", "read-only permission boundary"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent",
+        "step": "step 1"
+      },
+      "expected": {
+        "reachable_events": ["discussion_comment"],
+        "findings": [
+          {
+            "rule_id": "agentci/untrusted-input-in-prompt",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "step": "step 1",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "Discussion comment content remains untrusted, but an explicit discussions read scope must not create write-permission findings.",
+      "assumption_sources": [
+        "event-security",
+        "permissions",
+        "project-rule-contract"
+      ]
+    },
+    {
+      "id": "parse-error",
+      "path": "cases/parse-error",
+      "targets": ["parse failure visibility"],
+      "subject": {
+        "file": ".github/workflows/agent.yml"
+      },
+      "expected": {
+        "reachable_events": [],
+        "findings": [],
+        "diagnostics": [
+          {
+            "code": "agentci/parse-error",
+            "severity": "error",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "line_min": 2
+            }
+          }
+        ],
+        "analysis_complete": false
+      },
+      "rationale": "Malformed YAML cannot be analyzed and must produce an explicit error rather than a clean result.",
+      "assumption_sources": ["project-analysis-contract"]
+    },
+    {
+      "id": "local-reusable",
+      "path": "cases/local-reusable",
+      "targets": [
+        "nested local reusable workflow",
+        "transitive input taint propagation",
+        "transitive capability propagation"
+      ],
+      "subject": {
+        "file": ".github/workflows/reusable.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["issue_comment"],
+        "findings": [
+          {
+            "rule_id": "agentci/ai-shell-access",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/reusable.yml",
+              "job": "agent",
+              "step": "step 1",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/broad-write-permissions",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/reusable.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/untrusted-ai-write-token",
+            "severity": "critical",
+            "location": {
+              "file": ".github/workflows/reusable.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/untrusted-input-in-prompt",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/reusable.yml",
+              "job": "agent",
+              "step": "step 1",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [],
+        "agent_usages": [
+          {
+            "file": ".github/workflows/reusable.yml",
+            "job": "agent",
+            "step": "step 1",
+            "kind": "action",
+            "line_min": 15,
+            "reachable_events": ["issue_comment"],
+            "call_chain": [
+              ".github/workflows/caller.yml#agent",
+              ".github/workflows/bridge.yml#agent"
+            ]
+          }
+        ],
+        "analysis_complete": true
+      },
+      "rationale": "Caller event, permission, untrusted input, and explicit capability context must propagate through a nested local reusable-workflow call chain.",
+      "assumption_sources": [
+        "reusable-workflows",
+        "permissions",
+        "event-security",
+        "project-rule-contract"
+      ]
+    },
+    {
+      "id": "local-reusable-safe",
+      "path": "cases/local-reusable-safe",
+      "targets": [
+        "safe local reusable workflow",
+        "resolved agent usage without findings"
+      ],
+      "subject": {
+        "file": ".github/workflows/reusable.yml",
+        "job": "agent",
+        "step": "step 1"
+      },
+      "expected": {
+        "reachable_events": ["push"],
+        "findings": [],
+        "diagnostics": [],
+        "agent_usages": [
+          {
+            "file": ".github/workflows/reusable.yml",
+            "job": "agent",
+            "step": "step 1",
+            "kind": "action",
+            "line_min": 7,
+            "reachable_events": ["push"],
+            "call_chain": [".github/workflows/caller.yml#agent"]
+          }
+        ],
+        "analysis_complete": true
+      },
+      "rationale": "A pinned agent with a trusted prompt and read-only permissions in a reachable local reusable workflow must be detected without producing a finding.",
+      "assumption_sources": [
+        "reusable-workflows",
+        "permissions",
+        "project-rule-contract"
+      ]
+    },
+    {
+      "id": "local-reusable-cycle",
+      "path": "cases/local-reusable-cycle",
+      "targets": ["reusable workflow cycle"],
+      "subject": {
+        "file": ".github/workflows/b.yml",
+        "job": "call-a"
+      },
+      "expected": {
+        "reachable_events": ["push"],
+        "findings": [],
+        "diagnostics": [
+          {
+            "code": "agentci/analysis-reusable-cycle",
+            "severity": "warning",
+            "location": {
+              "file": ".github/workflows/b.yml",
+              "job": "call-a",
+              "line_min": 2
+            }
+          }
+        ],
+        "analysis_complete": false
+      },
+      "rationale": "A local call cycle prevents complete expansion and must be reported as partial analysis.",
+      "assumption_sources": ["reusable-workflows", "project-analysis-contract"]
+    },
+    {
+      "id": "remote-reusable",
+      "path": "cases/remote-reusable",
+      "targets": ["remote reusable workflow boundary"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["push"],
+        "findings": [],
+        "diagnostics": [
+          {
+            "code": "agentci/analysis-remote-reusable-workflow",
+            "severity": "warning",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          }
+        ],
+        "analysis_complete": false
+      },
+      "rationale": "The scanner does not fetch remote workflow bodies, so the unresolved analysis boundary must be visible.",
+      "assumption_sources": ["reusable-workflows", "project-analysis-contract"]
+    },
+    {
+      "id": "unsafe-checkout-head",
+      "path": "cases/unsafe-checkout-head",
+      "targets": ["privileged checkout semantics"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "inspect",
+        "step": "step 1"
+      },
+      "expected": {
+        "reachable_events": ["pull_request_target"],
+        "findings": [
+          {
+            "rule_id": "agentci/unsafe-checkout",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "inspect",
+              "step": "step 1",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "The step explicitly opts out of actions/checkout v7's unsafe-PR protection while requesting the pull request head.",
+      "assumption_sources": [
+        "checkout-protection",
+        "event-security",
+        "project-rule-contract"
+      ]
+    },
+    {
+      "id": "protected-checkout-head",
+      "path": "cases/protected-checkout-head",
+      "targets": ["backported checkout protection negative"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "inspect",
+        "step": "step 1"
+      },
+      "expected": {
+        "reachable_events": ["pull_request_target"],
+        "findings": [],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "The floating checkout v4 major receives GitHub's current unsafe-fork-PR protection and no opt-out is present, so the requested fork head is refused rather than checked out.",
+      "assumption_sources": [
+        "checkout-protection",
+        "event-security",
+        "project-rule-contract"
+      ]
+    },
+    {
+      "id": "legacy-unprotected-checkout",
+      "path": "cases/legacy-unprotected-checkout",
+      "targets": ["known-unprotected checkout release"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "inspect",
+        "step": "step 1"
+      },
+      "expected": {
+        "reachable_events": ["pull_request_target"],
+        "findings": [
+          {
+            "rule_id": "agentci/unsafe-checkout",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "inspect",
+              "step": "step 1",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "Checkout v1 is explicitly excluded from the protection backport and requests both the fork repository and pull request merge ref.",
+      "assumption_sources": [
+        "checkout-protection",
+        "event-security",
+        "project-rule-contract"
+      ]
+    },
+    {
+      "id": "unknown-checkout-protection",
+      "path": "cases/unknown-checkout-protection",
+      "targets": ["immutable checkout protection uncertainty"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "inspect",
+        "step": "step 1"
+      },
+      "expected": {
+        "reachable_events": ["pull_request_target"],
+        "findings": [],
+        "diagnostics": [
+          {
+            "code": "agentci/analysis-checkout-protection-unknown",
+            "severity": "warning",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "inspect",
+              "line_min": 2
+            }
+          }
+        ],
+        "analysis_complete": false
+      },
+      "rationale": "A fixed checkout SHA can refer to code before or after the protection and the selected action body is not resolved, so the scanner must abstain.",
+      "assumption_sources": ["checkout-protection", "project-analysis-contract"]
+    },
+    {
+      "id": "safe-checkout-base",
+      "path": "cases/safe-checkout-base",
+      "targets": ["base checkout semantics"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "inspect",
+        "step": "step 1"
+      },
+      "expected": {
+        "reachable_events": ["pull_request_target"],
+        "findings": [],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "The default pull_request_target checkout uses the trusted base context rather than an explicit attacker-controlled head ref.",
+      "assumption_sources": [
+        "checkout-protection",
+        "event-security",
+        "project-rule-contract"
+      ]
+    },
+    {
+      "id": "unpinned-ai-action",
+      "path": "cases/unpinned-ai-action",
+      "targets": ["third-party Action pinning"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent",
+        "step": "step 1"
+      },
+      "expected": {
+        "reachable_events": ["push"],
+        "findings": [
+          {
+            "rule_id": "agentci/unpinned-ai-action",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "step": "step 1",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "A third-party AI Action referenced by a mutable tag is not pinned to immutable content.",
+      "assumption_sources": ["project-rule-contract"]
+    },
+    {
+      "id": "reusable-without-caller",
+      "path": "cases/reusable-without-caller",
+      "targets": ["unreferenced reusable workflow boundary"],
+      "subject": {
+        "file": ".github/workflows/reusable.yml",
+        "job": "agent",
+        "step": "step 1"
+      },
+      "expected": {
+        "reachable_events": ["workflow_call"],
+        "findings": [],
+        "diagnostics": [
+          {
+            "code": "agentci/analysis-reusable-without-caller",
+            "severity": "warning",
+            "location": {
+              "file": ".github/workflows/reusable.yml",
+              "line_min": 1
+            }
+          }
+        ],
+        "analysis_complete": false
+      },
+      "rationale": "A workflow_call-only file with no reachable local caller lacks caller events, inputs, secrets, and permission context and must not look complete.",
+      "assumption_sources": ["reusable-workflows", "project-analysis-contract"]
+    },
+    {
+      "id": "explicit-shell-capability",
+      "path": "cases/explicit-shell-capability",
+      "targets": ["explicit action shell capability"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent",
+        "step": "step 1"
+      },
+      "expected": {
+        "reachable_events": ["push"],
+        "findings": [
+          {
+            "rule_id": "agentci/ai-shell-access",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "step": "step 1",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "An action input explicitly enabling Bash is direct shell-capability evidence.",
+      "assumption_sources": ["project-rule-contract"]
+    }
+  ]
+}

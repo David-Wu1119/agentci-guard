@@ -1,0 +1,18 @@
+{
+  "captured_at": "2026-07-25T02:02:30+08:00",
+  "working_tree_commit": "cdba825972d577fe57579836a48a2fec6708c7c3",
+  "published_v0_1_0_commit": "cbaa29ec0ba46ad2b7db0341fafaaf77f5793c8a",
+  "git_describe": "v0.1.0-5-gcdba825",
+  "platform": {
+    "os": "macOS 26.5.1",
+    "build": "25F80",
+    "architecture": "arm64",
+    "kernel": "Darwin 25.5.0"
+  },
+  "tools": {
+    "node": "v26.0.0",
+    "pnpm": "10.11.0",
+    "npm": "11.12.1",
+    "git": "2.54.0"
+  }
+}

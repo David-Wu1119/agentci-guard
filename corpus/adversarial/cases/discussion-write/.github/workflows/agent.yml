@@ -1,0 +1,11 @@
+name: discussion-write
+on: discussion
+permissions:
+  discussions: write
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          prompt: ${{ github.event.discussion.body }}

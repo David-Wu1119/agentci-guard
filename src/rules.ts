@@ -95,9 +95,10 @@ export const RULES: Record<string, RuleDefinition> = {
     title:
       "Workflow checks out untrusted pull request head in a privileged context",
     severity: "high",
-    why: "Checking out attacker-controlled code in a privileged workflow can let malicious build scripts or configuration affect the agent job.",
+    why: "An explicit bypass of GitHub's unsafe-PR checkout protection, or a known-unprotected checkout version, can place attacker-controlled code in a privileged workflow workspace.",
     fix: [
-      "Do not checkout PR head code inside pull_request_target.",
+      "Do not opt out of checkout's unsafe-PR protection.",
+      "Use a current protected actions/checkout release.",
       "Use read-only analysis jobs.",
       "Disable install/build scripts before trust is established.",
     ],

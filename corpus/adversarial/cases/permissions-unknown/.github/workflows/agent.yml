@@ -1,0 +1,7 @@
+name: permissions-unknown
+on: push
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567

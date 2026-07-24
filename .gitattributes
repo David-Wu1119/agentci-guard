@@ -1,0 +1,3 @@
+# Frozen third-party benchmark inputs are byte-for-byte evidence. Do not
+# normalize line endings or apply whitespace cleanup to these snapshots.
+benchmark/snapshots/** -text -whitespace

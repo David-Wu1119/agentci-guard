@@ -16,21 +16,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 10.11.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Audit dependencies
+        run: pnpm audit --audit-level high
+
+      - name: Format
+        run: pnpm format:check
 
       - name: Typecheck
         run: pnpm typecheck
@@ -41,11 +49,100 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: CLI smoke
+      - name: Verify committed Action bundle
         run: |
-          node dist/cli.js scan examples/vulnerable --json --fail-on none
-          node dist/cli.js scan examples/vulnerable --sarif agentci-results.sarif --fail-on none
-          test -f agentci-results.sarif
+          git diff --exit-code -- dist
+          node scripts/verify-action-manifest.mjs
+
+      - name: Action smoke - vulnerable, non-blocking
+        id: vulnerable
+        uses: ./
+        with:
+          path: examples/vulnerable
+          sarif: artifacts/vulnerable.sarif
+          fail-on: none
+
+      - name: Verify vulnerable Action outputs
+        env:
+          EXPECT_FINDINGS: ${{ steps.vulnerable.outputs.findings }}
+          EXPECT_CRITICAL: ${{ steps.vulnerable.outputs.critical }}
+          EXPECT_HIGH: ${{ steps.vulnerable.outputs.high }}
+          EXPECT_MEDIUM: ${{ steps.vulnerable.outputs.medium }}
+          EXPECT_LOW: ${{ steps.vulnerable.outputs.low }}
+          OUTPUT_SARIF_PATH: ${{ steps.vulnerable.outputs.sarif-path }}
+          ANALYSIS_COMPLETE: ${{ steps.vulnerable.outputs.analysis-complete }}
+        run: |
+          node scripts/verify-sarif-schema.mjs artifacts/vulnerable.sarif
+          node scripts/verify-sarif.mjs artifacts/vulnerable.sarif
+          test "$EXPECT_FINDINGS" = "9"
+          test "$EXPECT_CRITICAL" = "2"
+          test "$EXPECT_HIGH" = "4"
+          test "$EXPECT_MEDIUM" = "3"
+          test "$EXPECT_LOW" = "0"
+          test "$OUTPUT_SARIF_PATH" = "artifacts/vulnerable.sarif"
+          test "$ANALYSIS_COMPLETE" = "true"
+
+      - name: Action smoke - hardened
+        id: hardened
+        uses: ./
+        with:
+          path: examples/hardened
+          sarif: artifacts/hardened.sarif
+          fail-on: none
+
+      - name: Verify hardened Action outputs
+        env:
+          EXPECT_FINDINGS: ${{ steps.hardened.outputs.findings }}
+          EXPECT_CRITICAL: ${{ steps.hardened.outputs.critical }}
+          EXPECT_HIGH: ${{ steps.hardened.outputs.high }}
+          EXPECT_MEDIUM: ${{ steps.hardened.outputs.medium }}
+          EXPECT_LOW: ${{ steps.hardened.outputs.low }}
+          OUTPUT_SARIF_PATH: ${{ steps.hardened.outputs.sarif-path }}
+          ANALYSIS_COMPLETE: ${{ steps.hardened.outputs.analysis-complete }}
+        run: |
+          node scripts/verify-sarif-schema.mjs artifacts/hardened.sarif
+          node scripts/verify-sarif.mjs artifacts/hardened.sarif
+          test "$EXPECT_FINDINGS" = "0"
+          test "$OUTPUT_SARIF_PATH" = "artifacts/hardened.sarif"
+          test "$ANALYSIS_COMPLETE" = "true"
+
+      - name: Action smoke - threshold failure
+        id: threshold
+        continue-on-error: true
+        uses: ./
+        with:
+          path: examples/vulnerable
+          sarif: artifacts/threshold.sarif
+          fail-on: high
+
+      - name: Verify Action threshold behavior
+        if: always()
+        env:
+          EXPECT_FINDINGS: ${{ steps.threshold.outputs.findings }}
+          EXPECT_CRITICAL: ${{ steps.threshold.outputs.critical }}
+          EXPECT_HIGH: ${{ steps.threshold.outputs.high }}
+          EXPECT_MEDIUM: ${{ steps.threshold.outputs.medium }}
+          EXPECT_LOW: ${{ steps.threshold.outputs.low }}
+          STEP_OUTCOME: ${{ steps.threshold.outcome }}
+        run: |
+          test "$STEP_OUTCOME" = "failure"
+          node scripts/verify-sarif-schema.mjs artifacts/threshold.sarif
+          node scripts/verify-sarif.mjs artifacts/threshold.sarif
+          test "$EXPECT_HIGH" -gt 0
+
+      - name: CLI smoke
+        run: node dist/cli.js scan examples/vulnerable --json --fail-on none
 
       - name: Package smoke test
-        run: npm pack --dry-run
+        run: |
+          npm pack --json --dry-run --ignore-scripts --foreground-scripts=false > artifacts/npm-pack.json
+          node scripts/verify-package.mjs artifacts/npm-pack.json
+          pnpm package:smoke
+
+      - name: Verify frozen baseline and benchmark snapshot
+        run: |
+          pnpm baseline:verify
+          pnpm benchmark:verify
+
+      - name: Reproduction toolchain smoke test
+        run: pnpm benchmark:smoke

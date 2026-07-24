@@ -1,0 +1,86 @@
+name: Published v0.1.1 tag smoke
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  consumer:
+    if: >-
+      (github.event_name == 'release' &&
+      github.event.release.tag_name == 'v0.1.1') ||
+      (github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/tags/v0.1.1')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout consumer fixtures
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Published Action smoke - vulnerable
+        id: vulnerable
+        uses: David-Wu1119/agentci-guard@v0.1.1
+        with:
+          path: examples/vulnerable
+          sarif: artifacts/published-vulnerable.sarif
+          fail-on: none
+
+      - name: Verify vulnerable outputs and SARIF
+        env:
+          EXPECT_FINDINGS: ${{ steps.vulnerable.outputs.findings }}
+          EXPECT_CRITICAL: ${{ steps.vulnerable.outputs.critical }}
+          EXPECT_HIGH: ${{ steps.vulnerable.outputs.high }}
+          EXPECT_MEDIUM: ${{ steps.vulnerable.outputs.medium }}
+          EXPECT_LOW: ${{ steps.vulnerable.outputs.low }}
+          OUTPUT_SARIF_PATH: ${{ steps.vulnerable.outputs.sarif-path }}
+          ANALYSIS_COMPLETE: ${{ steps.vulnerable.outputs.analysis-complete }}
+        run: |
+          node scripts/verify-sarif.mjs artifacts/published-vulnerable.sarif
+          test "$EXPECT_FINDINGS" = "9"
+          test "$EXPECT_CRITICAL" = "2"
+          test "$EXPECT_HIGH" = "4"
+          test "$EXPECT_MEDIUM" = "3"
+          test "$EXPECT_LOW" = "0"
+          test "$OUTPUT_SARIF_PATH" = "artifacts/published-vulnerable.sarif"
+          test "$ANALYSIS_COMPLETE" = "true"
+
+      - name: Published Action smoke - hardened
+        id: hardened
+        uses: David-Wu1119/agentci-guard@v0.1.1
+        with:
+          path: examples/hardened
+          sarif: artifacts/published-hardened.sarif
+          fail-on: none
+
+      - name: Verify hardened outputs and SARIF
+        env:
+          EXPECT_FINDINGS: ${{ steps.hardened.outputs.findings }}
+          OUTPUT_SARIF_PATH: ${{ steps.hardened.outputs.sarif-path }}
+          ANALYSIS_COMPLETE: ${{ steps.hardened.outputs.analysis-complete }}
+        run: |
+          node scripts/verify-sarif.mjs artifacts/published-hardened.sarif
+          test "$EXPECT_FINDINGS" = "0"
+          test "$OUTPUT_SARIF_PATH" = "artifacts/published-hardened.sarif"
+          test "$ANALYSIS_COMPLETE" = "true"
+
+      - name: Published Action smoke - threshold failure
+        id: threshold
+        continue-on-error: true
+        uses: David-Wu1119/agentci-guard@v0.1.1
+        with:
+          path: examples/vulnerable
+          sarif: artifacts/published-threshold.sarif
+          fail-on: high
+
+      - name: Verify published threshold behavior
+        if: always()
+        env:
+          STEP_OUTCOME: ${{ steps.threshold.outcome }}
+          EXPECT_FINDINGS: ${{ steps.threshold.outputs.findings }}
+        run: |
+          test "$STEP_OUTCOME" = "failure"
+          test "$EXPECT_FINDINGS" = "9"
+          node scripts/verify-sarif.mjs artifacts/published-threshold.sarif

@@ -1,0 +1,59 @@
+# PRオープン時にClaudeが自動コードレビュー
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+    # 特定ファイルのみ対象にする場合（任意）
+    # paths:
+    #   - "src/**/*.ts"
+    #   - "src/**/*.tsx"
+    #   - "src/**/*.js"
+    #   - "src/**/*.jsx"
+
+jobs:
+  claude-review:
+    # ドラフトPRはスキップ
+    if: ${{ !github.event.pull_request.draft }}
+    # PR作成者でフィルタする場合（任意）
+    # if: |
+    #   github.event.pull_request.user.login == 'external-contributor' ||
+    #   github.event.pull_request.user.login == 'new-developer' ||
+    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write
+
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Claudeコードレビュー実行
+        id: claude-review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+          # PRフィードバックを1つのコメントに集約（更新時に新規コメントを追加しない）
+          use_sticky_comment: true
+
+          # PRフィードバックに「修正する」リンクを含める
+          include_fix_links: true
+
+          prompt: |
+            To analyze this pull request with specialized agents.
+
+            Use the repository's CLAUDE.md for guidance on style and conventions.
+
+            Respond in Japanese (日本語で回答してください).
+
+          # 詳細: https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
+          claude_args: |
+            --model claude-sonnet-4-5-20250929
+            --allowedTools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"

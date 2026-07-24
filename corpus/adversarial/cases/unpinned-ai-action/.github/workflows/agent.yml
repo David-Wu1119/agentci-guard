@@ -1,0 +1,8 @@
+name: unpinned-ai-action
+on: push
+permissions: read-all
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1

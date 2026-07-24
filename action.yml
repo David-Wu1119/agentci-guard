@@ -30,13 +30,10 @@ outputs:
     description: Number of low-severity findings.
   sarif-path:
     description: Path to the written SARIF file.
+  diagnostics:
+    description: Number of parse or incomplete-analysis diagnostics.
+  analysis-complete:
+    description: Whether the scanner closed its static-analysis boundary.
 runs:
   using: node24
-  main: dist/cli.js
-  args:
-    - scan
-    - ${{ inputs.path }}
-    - --sarif
-    - ${{ inputs.sarif }}
-    - --fail-on
-    - ${{ inputs.fail-on }}
+  main: dist/action.js

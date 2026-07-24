@@ -1,0 +1,11 @@
+name: job-env-secret
+on: push
+permissions:
+  contents: read
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567
