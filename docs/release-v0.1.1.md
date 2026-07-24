@@ -19,16 +19,28 @@ required gate below has evidence.
 - [x] Real-workflow candidate benchmark contains at least 100 workflows from at
       least 50 repositories, with fixed commits, blob/hash provenance,
       repository-disjoint splits, and snapshot verification.
+- [x] Benchmark v3 contains multiple agent Action/CLI families, exact-case
+      workflow paths, granular annotation units, a deterministic independent
+      review plan, replacement holdouts for inspected development cases,
+      schemas, separate task metrics, and a reproduction smoke test.
+- [x] CI validates the committed Action bundle, manifest, SARIF severity and
+      locations, package contents, benchmark schemas, and full dependency
+      audit.
+- [x] The candidate npm tarball runs its Action and CLI after extraction outside
+      the repository with no `node_modules`.
 - [ ] Hosted GitHub Actions run passes the actual manifest-based CI job.
-- [ ] Two independent humans complete the annotation sheet without seeing
-      predictions.
-- [ ] Disagreements are adjudicated and preserved.
-- [ ] Evaluation metrics report per-rule and micro precision, recall, F1,
-      support, 95% intervals, coverage, diagnostics, and error types.
+- [ ] A primary human completes all units and a second human completes the
+      predeclared independent-review plan without seeing predictions.
+- [ ] Disagreements are adjudicated with a stable human pseudonym, preserved,
+      and mechanically cross-checked against both independent label files.
+- [ ] Evaluation metrics report agent detection separately; per-rule, micro,
+      and macro precision/recall/F1; support and 95% intervals; supported and
+      overall universes; decision coverage; abstentions; diagnostics; and error
+      types.
 - [ ] README reports the measured result and limitations without calling the
       tool a production gate.
-- [ ] Release tarball contains `dist/action.js`; clean-install CLI and Action
-      smoke checks pass.
+- [ ] The exact final release tarball matches the reviewed candidate and repeats
+      the standalone CLI and Action smoke.
 - [ ] A human reviews the final diff, release notes, tag target, and npm
       provenance.
 
@@ -37,8 +49,10 @@ required gate below has evidence.
 ```bash
 pnpm install --frozen-lockfile
 pnpm check
-pnpm audit --prod
-npm pack --dry-run --json
+pnpm benchmark:smoke
+pnpm audit --audit-level high
+npm pack --dry-run --json --ignore-scripts
+pnpm package:smoke
 ```
 
 ## External actions requiring explicit authorization

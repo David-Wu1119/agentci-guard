@@ -8,4 +8,8 @@ export default defineConfig({
   sourcemap: true,
   splitting: false,
   target: "node20",
+  noExternal: [/.*/],
+  banner: {
+    js: 'import { createRequire as __agentciCreateRequire } from "node:module"; const require = __agentciCreateRequire(import.meta.url);',
+  },
 });

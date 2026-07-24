@@ -1,0 +1,21 @@
+name: misleading-non-agent
+on: pull_request
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: [self-hosted, build-agent]
+    steps:
+      - uses: datadog/agent-action@v1
+      - uses: actions/setup-python@v5
+      - uses: actions/setup-node@v4
+      - name: Publish non-agent inference package
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          python -m pytest
+          node scripts/build.mjs
+          curl https://api.openai.com/v1/responses \
+            -H "Authorization: Bearer $OPENAI_API_KEY" \
+            -d '{"model":"gpt-4o","input":"classify this release note"}'
+          curl -H "User-Agent: ci-bot/1.0" https://status.example.com/ping

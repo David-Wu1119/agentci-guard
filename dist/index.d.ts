@@ -9,12 +9,27 @@ type Finding = {
     file: string;
     job?: string;
     step?: string;
+    /** Zero-based index in the job's steps array. */
+    step_index?: number;
     message: string;
     why: string;
     fix: string[];
     evidence: string;
     line?: number;
     reachable_events?: string[];
+    call_chain?: string[];
+};
+type AgentUsage = {
+    id: string;
+    file: string;
+    job: string;
+    step: string;
+    /** Zero-based index in the job's steps array. */
+    step_index: number;
+    kind: "action" | "cli" | "other";
+    evidence: string;
+    line: number;
+    reachable_events: string[];
     call_chain?: string[];
 };
 type Diagnostic = {
@@ -44,6 +59,7 @@ type ScanResult = {
     scanned_at: string;
     root: string;
     workflow_count: number;
+    agent_usages: AgentUsage[];
     findings: Finding[];
     summary: Record<Severity, number>;
     diagnostics: Diagnostic[];
@@ -82,6 +98,13 @@ type SarifLog = {
             message: {
                 text: string;
             };
+            properties: {
+                "agentci/severity": Severity;
+                "agentci/reachableEvents": string[];
+                "agentci/job"?: string;
+                "agentci/step"?: string;
+                "agentci/stepIndex"?: number;
+            };
             locations: Array<{
                 physicalLocation: {
                     artifactLocation: {
@@ -110,13 +133,14 @@ type AgentciConfig = {
 /** Load config from an explicit path, or by discovery in the scan root. */
 declare function loadConfig(root: string, explicitPath?: string): Promise<AgentciConfig>;
 /**
- * Inline, file-level suppression directives read from raw workflow text:
+ * Standalone top-level, file-level suppression directives:
  *   # agentci-ignore <rule-id> [<rule-id> ...] [-- reason]
  *   # agentci-ignore-all [-- reason]
  *
  * Findings are reported at job/step granularity rather than per line, so
- * suppression is scoped to the whole file. The optional `-- reason` is for
- * humans and is ignored by the parser.
+ * suppression is scoped to the whole file. Requiring column-zero YAML comments
+ * prevents shell-script comments or quoted prompt text from disabling checks.
+ * The optional `-- reason` is for humans and is ignored by the parser.
  */
 declare function parseInlineIgnores(raw: string): {
     all: boolean;
@@ -125,12 +149,16 @@ declare function parseInlineIgnores(raw: string): {
 /** Minimal glob match: `*` matches within a path segment, `**` across segments. */
 declare function matchesPath(glob: string, target: string): boolean;
 
+declare const AI_AGENT_ACTION_PATTERNS: RegExp[];
+declare const AI_AGENT_CLI_PATTERNS: RegExp[];
 declare const AI_AGENT_PATTERNS: RegExp[];
 declare function looksLikeAiUsage(value: string): boolean;
+declare function looksLikeAiAction(value: string): boolean;
+declare function looksLikeAiCli(value: string): boolean;
 declare function containsUntrustedGitHubContext(value: string): boolean;
 declare function untrustedGitHubContextEvents(value: string): string[];
 declare function containsSecretReference(value: string): boolean;
-declare function containsShellAccess(value: string): boolean;
+declare function containsShellAccess(value: unknown): boolean;
 declare function isPinnedAction(uses: string): boolean;
 
 type FailOn = "none" | Severity;
@@ -191,4 +219,4 @@ declare function mergeEnvironment(...layers: unknown[]): Record<string, string>;
  */
 declare function narrowEvents(events: string[], rawCondition: unknown): Reachability;
 
-export { AI_AGENT_PATTERNS, type AgentciConfig, type Diagnostic, type EffectivePermissions, type FailOn, type Finding, type PermissionDefault, type PermissionLevel, RULES, type Reachability, type RuleDefinition, SENSITIVE_WRITE_SCOPES, SEVERITY_ORDER, type SarifLog, type ScanOptions, type ScanResult, type Severity, UNTRUSTED_EVENTS, type WorkflowFile, containsSecretReference, containsShellAccess, containsUntrustedGitHubContext, describePermissions, formatGithubOutputs, hasFindingAtOrAbove, hasSensitiveWrite, hasUnknownSensitivePermission, isPinnedAction, loadConfig, loadWorkflowFiles, looksLikeAiUsage, matchesPath, mergeEnvironment, narrowEvents, normalizeTriggers, parseFailOn, parseInlineIgnores, permissionLevel, renderMarkdownReport, renderTextReport, resolvePermissions, scanRepository, scanWorkflow, toSarif, untrustedGitHubContextEvents };
+export { AI_AGENT_ACTION_PATTERNS, AI_AGENT_CLI_PATTERNS, AI_AGENT_PATTERNS, type AgentUsage, type AgentciConfig, type Diagnostic, type EffectivePermissions, type FailOn, type Finding, type PermissionDefault, type PermissionLevel, RULES, type Reachability, type RuleDefinition, SENSITIVE_WRITE_SCOPES, SEVERITY_ORDER, type SarifLog, type ScanOptions, type ScanResult, type Severity, UNTRUSTED_EVENTS, type WorkflowFile, containsSecretReference, containsShellAccess, containsUntrustedGitHubContext, describePermissions, formatGithubOutputs, hasFindingAtOrAbove, hasSensitiveWrite, hasUnknownSensitivePermission, isPinnedAction, loadConfig, loadWorkflowFiles, looksLikeAiAction, looksLikeAiCli, looksLikeAiUsage, matchesPath, mergeEnvironment, narrowEvents, normalizeTriggers, parseFailOn, parseInlineIgnores, permissionLevel, renderMarkdownReport, renderTextReport, resolvePermissions, scanRepository, scanWorkflow, toSarif, untrustedGitHubContextEvents };

@@ -12,22 +12,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replaced the broken v0.1.0 Action wiring with a dedicated `dist/action.js`
   entrypoint that reads `INPUT_*`, writes SARIF and declared outputs, validates
   inputs, and implements `fail-on` exit behavior.
+- Bundled every runtime dependency into the committed Action/CLI artifacts and
+  added a tarball smoke that executes them without `node_modules`; the earlier
+  in-repository smoke could hide external imports.
 - CI now executes the real `action.yml` through `uses: ./` and checks vulnerable,
   hardened, and expected-threshold-failure cases.
 - Resolved known semantic defects around workflow/job/step environment
-  precedence, `run:` shell semantics, event-specific reachability, absent and
-  overridden permission defaults, discussion events/permissions, local and
-  remote reusable workflows, YAML parse errors, checkout refs, and SARIF lines.
+  precedence (including untrusted values), `run:` shell semantics,
+  event-specific reachability, absent and overridden permission defaults,
+  discussion events/permissions, nested local and remote reusable workflows,
+  YAML parse errors, current checkout protection, and SARIF lines.
+- Restricted agent observations to structured Action targets and executable
+  coding-agent CLI commands; provider keys, model names, prose, install
+  commands, and version/help checks no longer establish agent execution.
 
 ### Added
 
 - Explicit workflow analysis model with parse/incomplete-analysis diagnostics.
 - Public synthetic adversarial regression corpus.
 - Frozen, licensed, repo-disjoint real-workflow candidate benchmark with fixed
-  commits, blob hashes, snapshots, annotation protocol, verification, and metric
-  scripts. Accuracy remains unreported until two-human labeling and adjudication
-  are complete.
+  commits, blob hashes, snapshots, a 7,056-unit annotation protocol, independent
+  review plan, schema validation, separate agent-detection and rule metrics,
+  supported/overall universes, confidence intervals, abstention coverage, and
+  generated error analysis. Accuracy remains unreported until human labeling
+  and adjudication are complete.
+- A non-rule `agent_usages` observation stream with stable job and step
+  locations so agent identification can be measured independently.
+- Targeted Codex Action, Aider CLI, Cursor Agent CLI, and OpenHands benchmark
+  strata. Unlabeled v1/v2 candidates are archived; v2 replaced 15 noncanonical
+  mis-cased control paths, and v3 moved 16 inspected diversity cases to
+  development and froze 16 unseen replacements before labeling.
 - Reproducible v0.1.0 baseline and historical artifact inventory.
+- Draft 2020-12 schemas that are compiled and applied to the benchmark manifest
+  and any published annotation records in CI.
+- Generated license notices for every production dependency included in the
+  committed bundles.
+- Cross-file label provenance checks, stable adjudicator identities, computed
+  Git blob verification, and clean-worktree capture before metric outputs are
+  created.
 
 ### Changed
 

@@ -5,6 +5,9 @@ on:
       request:
         required: true
         type: string
+      tools:
+        required: true
+        type: string
 jobs:
   agent:
     runs-on: ubuntu-latest
@@ -12,3 +15,4 @@ jobs:
       - uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567
         with:
           prompt: ${{ inputs.request }}
+          claude_args: ${{ inputs.tools }}

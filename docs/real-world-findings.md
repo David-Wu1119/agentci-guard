@@ -75,12 +75,14 @@ a labeled dataset either, so no exploitability or prevalence claim survives.
 v0.1.1 uses:
 
 - a public synthetic adversarial corpus for known semantic regressions;
-- a frozen, licensed real-workflow candidate corpus with fixed commits and
-  hashes;
+- a frozen, licensed 152-workflow v3 candidate corpus with fixed commits,
+  hashes, multiple agent families, and a preserved superseded v1 manifest;
 - repository-disjoint development/evaluation splits;
-- two independent human annotators plus adjudication;
-- scripts for precision, recall, F1, support, confidence intervals, analysis
-  coverage, diagnostics, and error taxonomy.
+- a full primary annotation pass, deterministic second-human review plan, and
+  preserved adjudication;
+- scripts for separate agent-detection and rule precision, recall, F1, support,
+  confidence intervals, decision coverage, abstention, diagnostics, and error
+  taxonomy.
 
 The replacement benchmark remains **unscored** until the required human labels
 exist. No accuracy number should appear in project claims before that point.

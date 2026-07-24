@@ -1,5 +1,9 @@
 # Rules
 
+The normative predicate and severity contract is
+[`../RULES.md`](../RULES.md). This shorter page is retained for package and
+historical links.
+
 Rules are security hypotheses over an explicit workflow model. YAML parse
 failures, unknown permission defaults, unsupported reachability expressions,
 missing local reusables, cycles, and remote reusable workflows are reported as
@@ -20,7 +24,8 @@ secret.
 
 ## `agentci/untrusted-input-in-prompt`
 
-Raw PR, issue, comment, review, branch, or commit text is passed into an AI prompt or shell command.
+Raw PR, issue, comment, review, branch, or commit text is passed into an AI
+prompt, shell command, or the AI step's effective environment.
 
 ## `agentci/ai-shell-access`
 
@@ -38,4 +43,6 @@ An AI-related third-party action is not pinned to a full commit SHA.
 
 ## `agentci/unsafe-checkout`
 
-A privileged workflow checks out untrusted PR head code.
+A `pull_request_target` workflow explicitly bypasses current checkout
+protection, or uses a known-unprotected checkout release, while requesting PR
+head/fork code. Ambiguous fixed Action refs are an analysis diagnostic.

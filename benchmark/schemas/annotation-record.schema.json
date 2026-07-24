@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/David-Wu1119/agentci-guard/benchmark/schemas/annotation-record.schema.json",
+  "title": "AgentCI Guard annotation record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "unit_id",
+    "case_id",
+    "split",
+    "workflow_file",
+    "scope",
+    "job_id",
+    "step_index",
+    "step_name",
+    "rule_id",
+    "ground_truth",
+    "reachability",
+    "triggers",
+    "effective_permissions",
+    "untrusted_source",
+    "agent_sink",
+    "capability",
+    "mitigation",
+    "evidence_lines",
+    "explanation",
+    "annotator",
+    "adjudicator",
+    "review_status",
+    "notes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 2
+    },
+    "unit_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "split": {
+      "enum": ["dev", "eval"]
+    },
+    "workflow_file": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scope": {
+      "enum": ["job", "step", "reusable-call", "workflow"]
+    },
+    "job_id": {
+      "type": ["string", "null"]
+    },
+    "step_index": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "step_name": {
+      "type": ["string", "null"]
+    },
+    "rule_id": {
+      "type": "string",
+      "pattern": "^agentci/"
+    },
+    "ground_truth": {
+      "enum": ["positive", "negative", "indeterminate"]
+    },
+    "reachability": {
+      "enum": ["reachable", "unreachable", "unknown"]
+    },
+    "triggers": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "effective_permissions": {
+      "$ref": "#/$defs/permissionAssessment"
+    },
+    "untrusted_source": {
+      "$ref": "#/$defs/assessment"
+    },
+    "agent_sink": {
+      "$ref": "#/$defs/assessment"
+    },
+    "capability": {
+      "$ref": "#/$defs/assessment"
+    },
+    "mitigation": {
+      "$ref": "#/$defs/assessment"
+    },
+    "evidence_lines": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evidenceLine"
+      }
+    },
+    "explanation": {
+      "type": "string",
+      "minLength": 1
+    },
+    "annotator": {
+      "type": "string",
+      "minLength": 1
+    },
+    "adjudicator": {
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "review_status": {
+      "enum": [
+        "independent",
+        "single-pass",
+        "independently-reviewed",
+        "adjudicated"
+      ]
+    },
+    "notes": {
+      "type": "string"
+    },
+    "source_annotations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["a", "b"],
+      "properties": {
+        "a": {
+          "$ref": "#/$defs/sourceAnnotation"
+        },
+        "b": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sourceAnnotation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "description"],
+      "properties": {
+        "status": {
+          "enum": ["present", "absent", "unknown", "not-applicable"]
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "permissionAssessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "description"],
+      "properties": {
+        "status": {
+          "enum": ["known", "none", "unknown", "not-applicable"]
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "evidenceLine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "start", "end"],
+      "properties": {
+        "file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "start": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "end": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "sourceAnnotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "annotator",
+        "ground_truth",
+        "reachability",
+        "review_status"
+      ],
+      "properties": {
+        "annotator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ground_truth": {
+          "enum": ["positive", "negative", "indeterminate"]
+        },
+        "reachability": {
+          "enum": ["reachable", "unreachable", "unknown"]
+        },
+        "review_status": {
+          "const": "independent"
+        }
+      }
+    }
+  }
+}

@@ -31,6 +31,15 @@ export function toSarif(findings: Finding[]): SarifLog {
           ruleId: finding.rule_id,
           level: sarifLevel(finding.severity),
           message: { text: `${finding.title}: ${finding.evidence}` },
+          properties: {
+            "agentci/severity": finding.severity,
+            "agentci/reachableEvents": finding.reachable_events ?? [],
+            ...(finding.job ? { "agentci/job": finding.job } : {}),
+            ...(finding.step ? { "agentci/step": finding.step } : {}),
+            ...(finding.step_index === undefined
+              ? {}
+              : { "agentci/stepIndex": finding.step_index }),
+          },
           locations: [
             {
               physicalLocation: {

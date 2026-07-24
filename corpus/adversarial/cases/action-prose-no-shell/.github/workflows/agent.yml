@@ -8,4 +8,4 @@ jobs:
     steps:
       - uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567
         with:
-          prompt: Review the Python package without running commands.
+          prompt: Do not enable shell or commands; review the Python package.

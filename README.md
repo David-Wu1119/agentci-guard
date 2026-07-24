@@ -7,7 +7,8 @@ AI coding-agent configurations.
 
 It statically checks whether untrusted GitHub event content can reach an AI
 agent with secrets, write permissions, shell capability, or an unsafe checkout.
-It is a calibrated research prototype, not a production security gate.
+It is not a production security gate. Its v0.1.1 candidate is **not yet
+calibrated**: human labels and accuracy measurements are still pending.
 
 > **Release status:** v0.1.0's JavaScript Action entrypoint is broken. The CLI
 > works, but `uses: David-Wu1119/agentci-guard@v0` does not pass manifest inputs
@@ -16,9 +17,9 @@ It is a calibrated research prototype, not a production security gate.
 
 The old 75-repository scan is retained as a
 [historical, non-reproducible exploratory result](docs/real-world-findings.md).
-It is not accuracy evidence. The new
-[real-workflow benchmark](benchmark/README.md) is frozen but has no accuracy
-result until two humans independently label and adjudicate it.
+It is not accuracy evidence. The new 152-workflow, 152-repository
+[real-workflow benchmark](BENCHMARK.md) is frozen but has no accuracy result
+until its blind human-labeling and independent-review protocol is complete.
 
 ![AgentCI Guard scanning a vulnerable workflow](docs/demo.gif)
 
@@ -125,7 +126,7 @@ Fix:
 
 Real workflows sometimes have a finding you've reviewed and accepted. Two ways to silence one without disabling the whole scan:
 
-**Inline (per file)** — add a comment anywhere in the workflow:
+**Inline (per file)** — add a standalone column-zero comment to the workflow:
 
 ```yaml
 # agentci-ignore agentci/unpinned-ai-action -- mirrored internally, reviewed 2026-06
@@ -158,7 +159,9 @@ pnpm typecheck
 pnpm test
 pnpm build
 npm pack --dry-run
-node scripts/benchmark/verify-snapshot.mjs
+pnpm package:smoke
+pnpm benchmark:verify
+pnpm benchmark:smoke
 ```
 
 The exact publication blockers are tracked in the
@@ -171,11 +174,14 @@ model downloaded third-party actions, or prove that a workflow is safe or
 exploitable. Findings are review hypotheses. Parse and incomplete-analysis
 conditions are emitted as diagnostics rather than security findings.
 
-See the [threat model](docs/threat-model.md), the
+See the [threat model](THREAT_MODEL.md), the
 [static analysis model](docs/analysis-model.md), the
+[rule contract](RULES.md), the
 [adversarial regression corpus](corpus/adversarial/README.md), and the
-[benchmark protocol](benchmark/README.md).
+[benchmark protocol](BENCHMARK.md).
 
 ## License
 
-MIT
+AgentCI Guard is MIT licensed. Licenses for dependencies included in the
+committed bundles are preserved in
+[`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md).

@@ -1,93 +1,117 @@
 #!/usr/bin/env node
 import fs from "node:fs";
 import path from "node:path";
+import {
+  decisionsEqual,
+  readJsonLines,
+  recordFromCsvRow,
+  sourceAnnotation,
+  validateAnnotationSet,
+  writeJsonLines,
+} from "./annotation-lib.mjs";
 import { csvObjects } from "./csv.mjs";
 
-const [leftArgument, rightArgument, decisionsArgument, outputArgument] =
-  process.argv.slice(2);
-if (!leftArgument || !rightArgument || !decisionsArgument || !outputArgument) {
+const [
+  primaryArgument,
+  reviewerArgument,
+  decisionsArgument,
+  outputArgument,
+  adjudicator,
+] = process.argv.slice(2);
+if (
+  !primaryArgument ||
+  !reviewerArgument ||
+  !decisionsArgument ||
+  !outputArgument ||
+  !adjudicator
+) {
   throw new Error(
-    "Usage: node scripts/benchmark/adjudicate.mjs <annotator-a.jsonl> <annotator-b.jsonl> <filled-disagreements.csv> <adjudicated.jsonl>",
+    "Usage: node scripts/benchmark/adjudicate.mjs <primary.jsonl> <reviewer.jsonl> <filled-disagreements.csv> <adjudicated.jsonl> <adjudicator-pseudonym>",
   );
 }
-const repositoryRoot = path.resolve(
-  path.dirname(new URL(import.meta.url).pathname),
-  "../..",
-);
-const manifest = JSON.parse(
-  fs.readFileSync(
-    path.join(repositoryRoot, "benchmark", "manifest.json"),
-    "utf8",
-  ),
-);
-const left = byCase(readJsonLines(path.resolve(leftArgument)));
-const right = byCase(readJsonLines(path.resolve(rightArgument)));
-const decisions = new Map(
-  csvObjects(fs.readFileSync(path.resolve(decisionsArgument), "utf8")).map(
-    (row) => [`${row.case_id}:${row.rule_id}`, row],
-  ),
-);
-const output = [];
+if (adjudicator === "adjudicated") {
+  throw new Error("Adjudicator must be a stable human pseudonym.");
+}
 
-for (const item of manifest.cases) {
-  const leftEntry = left.get(item.case_id);
-  const rightEntry = right.get(item.case_id);
-  if (!leftEntry || !rightEntry) {
-    throw new Error(`Missing independent labels for ${item.case_id}.`);
+const primary = validateAnnotationSet(
+  readJsonLines(path.resolve(primaryArgument)),
+  {
+    registryName: "annotation-sheet.csv",
+    role: "independent",
+  },
+);
+const reviewer = validateAnnotationSet(
+  readJsonLines(path.resolve(reviewerArgument)),
+  {
+    registryName: "review-sheet.csv",
+    role: "independent",
+  },
+);
+if (primary.annotator === reviewer.annotator) {
+  throw new Error("Independent label files must use different annotators.");
+}
+const decisionRows = csvObjects(
+  fs.readFileSync(path.resolve(decisionsArgument), "utf8"),
+);
+const decisions = new Map();
+for (const row of decisionRows) {
+  if (!row.unit_id) throw new Error("Adjudication row is missing unit_id.");
+  if (decisions.has(row.unit_id)) {
+    throw new Error(`Duplicate adjudication row ${row.unit_id}.`);
   }
-  const labels = {};
-  const rationales = {};
-  const errorTypes = {};
-  const sourceLabels = { a: {}, b: {} };
-  for (const rule of manifest.rules) {
-    const leftLabel = leftEntry.labels[rule];
-    const rightLabel = rightEntry.labels[rule];
-    sourceLabels.a[rule] = leftLabel;
-    sourceLabels.b[rule] = rightLabel;
-    if (leftLabel === rightLabel) {
-      labels[rule] = leftLabel;
-      continue;
+  decisions.set(row.unit_id, row);
+}
+
+const output = [];
+const usedDecisions = new Set();
+for (const registry of primary.registryRows) {
+  const left = primary.recordsByUnit.get(registry.unit_id);
+  const right = reviewer.recordsByUnit.get(registry.unit_id);
+  let chosen = left;
+  let reviewStatus = "single-pass";
+  if (right && decisionsEqual(left, right)) {
+    reviewStatus = "independently-reviewed";
+  } else if (right) {
+    const row = decisions.get(registry.unit_id);
+    if (!row) {
+      throw new Error(`Missing adjudication for ${registry.unit_id}.`);
     }
-    const decision = decisions.get(`${item.case_id}:${rule}`);
-    const adjudicated = decision?.adjudicated?.trim().toLowerCase();
-    if (!["positive", "negative", "uncertain"].includes(adjudicated)) {
-      throw new Error(`Missing adjudication for ${item.case_id}/${rule}.`);
-    }
-    if (!decision.rationale?.trim()) {
-      throw new Error(
-        `Missing adjudication rationale for ${item.case_id}/${rule}.`,
-      );
-    }
-    labels[rule] = adjudicated;
-    rationales[rule] = decision.rationale.trim();
-    if (decision.error_type?.trim()) {
-      errorTypes[rule] = decision.error_type.trim();
-    }
+    chosen = recordFromCsvRow(row, "adjudicator-input");
+    reviewStatus = "adjudicated";
+    usedDecisions.add(registry.unit_id);
   }
   output.push({
-    case_id: item.case_id,
+    ...chosen,
     annotator: "adjudicated",
-    labels,
-    rationales,
-    error_types: errorTypes,
-    source_labels: sourceLabels,
-    notes: "",
+    adjudicator: reviewStatus === "adjudicated" ? adjudicator : null,
+    review_status: reviewStatus,
+    source_annotations: {
+      a: sourceAnnotation(left),
+      b: right ? sourceAnnotation(right) : null,
+    },
   });
 }
-fs.writeFileSync(
-  path.resolve(outputArgument),
-  `${output.map((entry) => JSON.stringify(entry)).join("\n")}\n`,
+if (usedDecisions.size !== decisions.size) {
+  const unused = [...decisions.keys()].filter(
+    (unitId) => !usedDecisions.has(unitId),
+  );
+  throw new Error(
+    `Adjudication CSV contains ${unused.length} unexpected row(s): ${unused.slice(0, 3).join(", ")}.`,
+  );
+}
+
+validateAnnotationSet(output, {
+  registryName: "annotation-sheet.csv",
+  role: "final",
+  expectedAnnotator: "adjudicated",
+});
+writeJsonLines(path.resolve(outputArgument), output);
+const counts = {};
+for (const record of output) {
+  counts[record.review_status] = (counts[record.review_status] ?? 0) + 1;
+}
+console.log(
+  `Wrote ${output.length} final units: ${Object.entries(counts)
+    .map(([status, count]) => `${status}=${count}`)
+    .join(", ")}.`,
 );
-console.log(`Wrote ${output.length} adjudicated cases.`);
-
-function readJsonLines(file) {
-  return fs
-    .readFileSync(file, "utf8")
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .map((line) => JSON.parse(line));
-}
-
-function byCase(entries) {
-  return new Map(entries.map((entry) => [entry.case_id, entry]));
-}

@@ -1,0 +1,81 @@
+name: E2E TUI Tests (macOS)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "bin/**"
+      - "profiles/**"
+      - "tests/e2e/**"
+      - "tests/run.sh"
+      - "tests/setup_suite.bash"
+      - "tests/test_helper.bash"
+      - "dist/**"
+      - ".github/workflows/e2e-agent-tui-macos.yml"
+  pull_request:
+    paths:
+      - "bin/**"
+      - "profiles/**"
+      - "tests/e2e/**"
+      - "tests/run.sh"
+      - "tests/setup_suite.bash"
+      - "tests/test_helper.bash"
+      - "dist/**"
+      - ".github/workflows/e2e-agent-tui-macos.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-tui-macos:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v6
+
+      - name: Cache npm download cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.npm
+          key: e2e-npm-${{ runner.os }}-${{ hashFiles('.github/workflows/e2e-agent-tui-macos.yml') }}
+          restore-keys: |
+            e2e-npm-${{ runner.os }}-
+
+      - name: Prepare artifacts directory
+        run: mkdir -p artifacts/e2e
+
+      - name: Install TUI agent dependencies
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+        run: |
+          brew install bats-core parallel tmux node aider block-goose-cli
+          npm install --global --no-fund --no-audit \
+            @anthropic-ai/claude-code \
+            @google/gemini-cli \
+            @kilocode/cli \
+            @mariozechner/pi-coding-agent \
+            @openai/codex \
+            @sourcegraph/amp \
+            opencode-ai
+
+      - name: Run agent TUI tests
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SAFEHOUSE_AGENT_TUI_STARTUP_WAIT_SECS: "20"
+        run: |
+          set -o pipefail
+          ./tests/run.sh e2e 2>&1 | tee artifacts/e2e/tests.log
+
+      - name: Upload agent TUI logs
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: agent-tui-logs
+          path: artifacts/e2e
+          if-no-files-found: ignore

@@ -8,11 +8,13 @@ import {
   containsSecretReference,
   containsShellAccess,
   isPinnedAction,
-  looksLikeAiUsage,
+  looksLikeAiAction,
+  looksLikeAiCli,
   untrustedGitHubContextEvents,
 } from "./detect.js";
 import { RULES, SEVERITY_ORDER } from "./rules.js";
 import type {
+  AgentUsage,
   Diagnostic,
   Finding,
   ScanOptions,
@@ -37,12 +39,14 @@ type FindingContext = {
   file: string;
   job?: string;
   step?: string;
+  stepIndex?: number;
   evidence: string;
   line?: number;
   events?: string[];
   callChain?: string[];
 };
 type AnalysisOutput = {
+  agentUsages: AgentUsage[];
   findings: Finding[];
   diagnostics: Diagnostic[];
 };
@@ -59,6 +63,7 @@ type RepositoryAnalysis = {
   config: AgentciConfig;
   workflows: Map<string, WorkflowFile>;
   analyzed: Set<string>;
+  called: Set<string>;
 };
 
 const EMPTY_REUSABLE_CONTEXT: ReusableContext = {
@@ -83,30 +88,46 @@ export async function scanRepository(
       workflows.map((workflow) => [path.resolve(workflow.path), workflow]),
     ),
     analyzed: new Set(),
+    called: new Set(),
   };
 
-  const locallyCalled = findLocallyCalledWorkflows(workflows, scanRoot);
   const roots = workflows.filter((workflow) => {
     const triggers = workflowTriggers(workflow);
     return (
-      !locallyCalled.has(path.resolve(workflow.path)) ||
+      workflow.parse_error !== undefined ||
+      triggers.length === 0 ||
       triggers.some((trigger) => trigger !== "workflow_call")
     );
   });
 
-  const output: AnalysisOutput = { findings: [], diagnostics: [] };
+  const output: AnalysisOutput = {
+    agentUsages: [],
+    findings: [],
+    diagnostics: [],
+  };
   for (const workflow of roots) {
-    mergeOutput(
-      output,
-      analyzeWorkflow(workflow, repository, EMPTY_REUSABLE_CONTEXT),
+    const triggers = workflowTriggers(workflow);
+    const directEvents = triggers.filter(
+      (trigger) => trigger !== "workflow_call",
     );
+    const rootContext =
+      directEvents.length !== triggers.length
+        ? { ...EMPTY_REUSABLE_CONTEXT, events: directEvents }
+        : EMPTY_REUSABLE_CONTEXT;
+    mergeOutput(output, analyzeWorkflow(workflow, repository, rootContext));
   }
 
-  // A cycle or an unreferenced workflow_call-only file may leave no root.
-  // Analyze it once without a caller so it is visible and explicitly partial.
+  // A reusable workflow without a reachable local caller has unknown caller
+  // inputs, events, secrets, and token permissions. Analyze call-only files
+  // once so their contents remain visible, and mark dual-trigger files partial.
   for (const workflow of workflows) {
     const absolute = path.resolve(workflow.path);
-    if (repository.analyzed.has(absolute)) continue;
+    if (
+      !workflowTriggers(workflow).includes("workflow_call") ||
+      repository.called.has(absolute)
+    ) {
+      continue;
+    }
     const file = relativeFile(scanRoot, workflow.path);
     output.diagnostics.push({
       code: "agentci/analysis-reusable-without-caller",
@@ -117,10 +138,12 @@ export async function scanRepository(
         "Reusable workflow was analyzed without a reachable local caller; caller inputs, events, secrets, and token permissions are unknown.",
       line: 1,
     });
-    mergeOutput(
-      output,
-      analyzeWorkflow(workflow, repository, EMPTY_REUSABLE_CONTEXT),
-    );
+    if (!repository.analyzed.has(absolute)) {
+      mergeOutput(
+        output,
+        analyzeWorkflow(workflow, repository, EMPTY_REUSABLE_CONTEXT),
+      );
+    }
   }
 
   const findings = dedupe(output.findings).filter(
@@ -133,6 +156,7 @@ export async function scanRepository(
     scanned_at: new Date().toISOString(),
     root: scanRoot,
     workflow_count: workflows.length,
+    agent_usages: dedupeAgentUsages(output.agentUsages),
     findings,
     summary: summarize(findings),
     diagnostics,
@@ -145,9 +169,13 @@ export async function loadWorkflowFiles(root: string): Promise<WorkflowFile[]> {
     cwd: root,
     dot: true,
     absolute: true,
+    followSymbolicLinks: false,
+    onlyFiles: true,
   });
   const workflows: WorkflowFile[] = [];
   for (const file of entries.sort()) {
+    const metadata = await fs.lstat(file);
+    if (!metadata.isFile() || metadata.isSymbolicLink()) continue;
     const raw = await fs.readFile(file, "utf8");
     const document = YAML.parseDocument(raw, { prettyErrors: true });
     const error = document.errors[0];
@@ -176,6 +204,7 @@ export function scanWorkflow(workflow: WorkflowFile, root: string): Finding[] {
     config: { ignore: [], ignorePaths: [] },
     workflows: new Map([[path.resolve(workflow.path), workflow]]),
     analyzed: new Set(),
+    called: new Set(),
   };
   return analyzeWorkflow(workflow, repository, EMPTY_REUSABLE_CONTEXT).findings;
 }
@@ -200,6 +229,7 @@ function analyzeWorkflow(
   repository.analyzed.add(path.resolve(workflow.path));
   if (workflow.parse_error) {
     return {
+      agentUsages: [],
       findings: [],
       diagnostics: [
         {
@@ -228,7 +258,11 @@ function analyzeWorkflow(
           context.permissionCeiling,
         );
   const jobs = isRecord(doc.jobs) ? doc.jobs : {};
-  const output: AnalysisOutput = { findings: [], diagnostics: [] };
+  const output: AnalysisOutput = {
+    agentUsages: [],
+    findings: [],
+    diagnostics: [],
+  };
 
   for (const [jobName, rawJob] of Object.entries(jobs)) {
     if (!isRecord(rawJob)) continue;
@@ -287,7 +321,7 @@ function analyzeWorkflow(
       if (!isRecord(rawStep)) continue;
       const stepName =
         typeof rawStep.name === "string" ? rawStep.name : `step ${index + 1}`;
-      const stepLine = locateStepLine(workflow.raw, jobName, stepName, index);
+      const stepLine = locateStepLine(workflow.raw, jobName, index);
       const stepReachability = narrowEvents(jobReachability.events, rawStep.if);
       if (!stepReachability.complete) {
         output.diagnostics.push({
@@ -319,10 +353,19 @@ function analyzeWorkflow(
       );
       const stepUses = typeof rawStep.uses === "string" ? rawStep.uses : "";
       const stepRun = typeof rawStep.run === "string" ? rawStep.run : "";
-      const stepUsesAi = looksLikeAiUsage(materialized);
+      const effectiveWith = materializeStructure(
+        rawStep.with,
+        context.inputValues,
+      );
+      const stepUsesAi =
+        looksLikeAiAction(materializeInputs(stepUses, context.inputValues)) ||
+        looksLikeAiCli(materializeInputs(stepRun, context.inputValues));
       const untrustedEvents = untrustedGitHubContextEvents(
         materializeInputs(
-          JSON.stringify(stripGuards(rawStep)),
+          JSON.stringify({
+            step: stripGuards(rawStep),
+            effectiveEnvironment,
+          }),
           context.inputValues,
         ),
       );
@@ -345,6 +388,27 @@ function analyzeWorkflow(
         );
 
       if (stepUsesAi) {
+        output.agentUsages.push({
+          id: [file, jobName, index, context.callChain.join(">")].join(":"),
+          file,
+          job: jobName,
+          step: stepName,
+          step_index: index,
+          kind:
+            stepRun.trim().length > 0
+              ? "cli"
+              : stepUses.length > 0
+                ? "action"
+                : "other",
+          evidence:
+            stepRun.trim().length > 0
+              ? shrink(stepRun)
+              : shrink(stepUses || materialized),
+          line: stepLine,
+          reachable_events: stepReachability.events,
+          call_chain:
+            context.callChain.length > 0 ? context.callChain : undefined,
+        });
         aiSteps.push({
           hasSecret,
           hasUntrustedSink,
@@ -356,6 +420,7 @@ function analyzeWorkflow(
               file,
               job: jobName,
               step: stepName,
+              stepIndex: index,
               evidence: shrink(materialized),
               line: stepLine,
               events: stepReachability.events,
@@ -363,19 +428,17 @@ function analyzeWorkflow(
             }),
           );
         }
-        if (
-          stepRun.trim().length > 0 ||
-          containsShellAccess(JSON.stringify(rawStep.with ?? {}))
-        ) {
+        if (stepRun.trim().length > 0 || containsShellAccess(effectiveWith)) {
           output.findings.push(
             makeFinding("agentci/ai-shell-access", {
               file,
               job: jobName,
               step: stepName,
+              stepIndex: index,
               evidence:
                 stepRun.trim().length > 0
                   ? `AI CLI executes through run: ${shrink(stepRun)}`
-                  : shrink(JSON.stringify(rawStep.with)),
+                  : shrink(JSON.stringify(effectiveWith)),
               line: stepLine,
               events: stepReachability.events,
               callChain: context.callChain,
@@ -388,6 +451,7 @@ function analyzeWorkflow(
               file,
               job: jobName,
               step: stepName,
+              stepIndex: index,
               evidence: `uses: ${stepUses}`,
               line: stepLine,
               events: stepReachability.events,
@@ -397,21 +461,33 @@ function analyzeWorkflow(
         }
       }
 
-      if (
-        stepReachability.events.includes("pull_request_target") &&
-        isUnsafeCheckout(rawStep)
-      ) {
-        output.findings.push(
-          makeFinding("agentci/unsafe-checkout", {
+      if (stepReachability.events.includes("pull_request_target")) {
+        const checkout = assessPullRequestTargetCheckout(rawStep);
+        if (checkout === "unsafe") {
+          output.findings.push(
+            makeFinding("agentci/unsafe-checkout", {
+              file,
+              job: jobName,
+              step: stepName,
+              stepIndex: index,
+              evidence: shrink(JSON.stringify(rawStep)),
+              line: stepLine,
+              events: stepReachability.events,
+              callChain: context.callChain,
+            }),
+          );
+        } else if (checkout === "unknown") {
+          output.diagnostics.push({
+            code: "agentci/analysis-checkout-protection-unknown",
+            kind: "analysis",
+            severity: "warning",
             file,
             job: jobName,
-            step: stepName,
-            evidence: shrink(JSON.stringify(rawStep)),
             line: stepLine,
-            events: stepReachability.events,
-            callChain: context.callChain,
-          }),
-        );
+            message:
+              "The checkout step requests pull-request code, but its ref does not identify whether GitHub's built-in unsafe-PR protection is present.",
+          });
+        }
       }
     }
 
@@ -514,6 +590,7 @@ function analyzeReusableCall(
   const callerFile = relativeFile(repository.root, caller.path);
   if (!uses.startsWith("./")) {
     return {
+      agentUsages: [],
       findings: [],
       diagnostics: [
         {
@@ -533,6 +610,7 @@ function analyzeReusableCall(
   const target = repository.workflows.get(targetPath);
   if (!target) {
     return {
+      agentUsages: [],
       findings: [],
       diagnostics: [
         {
@@ -547,8 +625,10 @@ function analyzeReusableCall(
       ],
     };
   }
+  repository.called.add(targetPath);
   if (context.stack.includes(targetPath)) {
     return {
+      agentUsages: [],
       findings: [],
       diagnostics: [
         {
@@ -567,7 +647,7 @@ function analyzeReusableCall(
   return analyzeWorkflow(target, repository, {
     events,
     permissionCeiling: permissions,
-    inputValues: toStringMap(rawJob.with),
+    inputValues: toStringMap(rawJob.with, context.inputValues),
     inheritedSecrets:
       rawJob.secrets === "inherit" ||
       containsSecretReference(JSON.stringify(rawJob.secrets ?? {})),
@@ -580,7 +660,7 @@ function makeFinding(ruleId: string, context: FindingContext): Finding {
   const rule = RULES[ruleId];
   if (!rule) throw new Error(`Unknown rule: ${ruleId}`);
   const chain = context.callChain?.join(">") ?? "";
-  const id = `${ruleId}:${context.file}:${context.job ?? ""}:${context.step ?? ""}:${chain}`;
+  const id = `${ruleId}:${context.file}:${context.job ?? ""}:${context.stepIndex ?? ""}:${chain}`;
   return {
     id,
     rule_id: rule.id,
@@ -589,6 +669,7 @@ function makeFinding(ruleId: string, context: FindingContext): Finding {
     file: context.file,
     job: context.job,
     step: context.step,
+    step_index: context.stepIndex,
     message: rule.title,
     why: rule.why,
     fix: rule.fix,
@@ -600,27 +681,6 @@ function makeFinding(ruleId: string, context: FindingContext): Finding {
         ? context.callChain
         : undefined,
   };
-}
-
-function findLocallyCalledWorkflows(
-  workflows: WorkflowFile[],
-  root: string,
-): Set<string> {
-  const called = new Set<string>();
-  for (const workflow of workflows) {
-    const doc = isRecord(workflow.document) ? workflow.document : {};
-    const jobs = isRecord(doc.jobs) ? doc.jobs : {};
-    for (const rawJob of Object.values(jobs)) {
-      if (
-        isRecord(rawJob) &&
-        typeof rawJob.uses === "string" &&
-        rawJob.uses.startsWith("./")
-      ) {
-        called.add(path.resolve(root, rawJob.uses));
-      }
-    }
-  }
-  return called;
 }
 
 function workflowTriggers(workflow: WorkflowFile): string[] {
@@ -638,17 +698,49 @@ function contextCanReach(
   );
 }
 
-function isUnsafeCheckout(step: WorkflowMap): boolean {
+function assessPullRequestTargetCheckout(
+  step: WorkflowMap,
+): "not-applicable" | "protected" | "unsafe" | "unknown" {
   if (
     typeof step.uses !== "string" ||
     !/^actions\/checkout@/i.test(step.uses)
   ) {
-    return false;
+    return "not-applicable";
   }
-  const ref = isRecord(step.with) ? String(step.with.ref ?? "") : "";
-  return /github\.(?:event\.pull_request\.head\.(?:sha|ref)|head_ref)/i.test(
-    ref,
-  );
+  const inputs = isRecord(step.with) ? step.with : {};
+  const ref = String(inputs.ref ?? "");
+  const checkoutRepository = String(inputs.repository ?? "");
+  const requestsPullRequestCode =
+    /github\.(?:event\.pull_request\.(?:head\.(?:sha|ref)|merge_commit_sha)|head_ref)/i.test(
+      ref,
+    ) ||
+    /refs\/pull\/[^\n]+\/(?:head|merge)/i.test(ref) ||
+    /github\.event\.pull_request\.head\.repo\.full_name/i.test(
+      checkoutRepository,
+    );
+  if (!requestsPullRequestCode) return "not-applicable";
+
+  const actionRef = step.uses.slice(step.uses.lastIndexOf("@") + 1);
+  const protection = /^v1(?:$|\.)/i.test(actionRef)
+    ? "absent"
+    : /^v[2-7]$/i.test(actionRef) || /^v7\./i.test(actionRef)
+      ? "present"
+      : "unknown";
+  const optOut = literalBoolean(inputs["allow-unsafe-pr-checkout"]);
+
+  if (protection === "absent" || optOut === true) return "unsafe";
+  if (protection === "present" && optOut === false) return "protected";
+  return "unknown";
+}
+
+function literalBoolean(value: unknown): boolean | "unknown" {
+  if (value === undefined || value === false) return false;
+  if (value === true) return true;
+  if (typeof value !== "string") return "unknown";
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "false" || normalized === "${{ false }}") return false;
+  if (normalized === "true" || normalized === "${{ true }}") return true;
+  return "unknown";
 }
 
 function materializeInputs(
@@ -661,12 +753,37 @@ function materializeInputs(
   );
 }
 
-function toStringMap(value: unknown): Record<string, string> {
+function materializeStructure(
+  value: unknown,
+  inputValues: Record<string, string>,
+): unknown {
+  if (typeof value === "string") return materializeInputs(value, inputValues);
+  if (Array.isArray(value)) {
+    return value.map((item) => materializeStructure(item, inputValues));
+  }
+  if (isRecord(value)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        materializeStructure(item, inputValues),
+      ]),
+    );
+  }
+  return value;
+}
+
+function toStringMap(
+  value: unknown,
+  parentInputs: Record<string, string> = {},
+): Record<string, string> {
   if (!isRecord(value)) return {};
   return Object.fromEntries(
     Object.entries(value).map(([key, item]) => [
       key,
-      typeof item === "string" ? item : JSON.stringify(item ?? ""),
+      materializeInputs(
+        typeof item === "string" ? item : JSON.stringify(item ?? ""),
+        parentInputs,
+      ),
     ]),
   );
 }
@@ -690,11 +807,14 @@ function locateJobLine(raw: string, jobName: string): number {
   if (jobsIndex < 0) return 1;
   const jobsIndent = indentation(lines[jobsIndex]);
   const matcher = keyMatcher(jobName);
+  let childIndent: number | undefined;
   for (let index = jobsIndex + 1; index < lines.length; index++) {
     const line = lines[index];
     if (!line.trim() || line.trimStart().startsWith("#")) continue;
     const indent = indentation(line);
     if (indent <= jobsIndent) break;
+    if (childIndent === undefined) childIndent = indent;
+    if (indent !== childIndent) continue;
     if (matcher.test(line.trim())) return index + 1;
   }
   return jobsIndex + 1;
@@ -703,7 +823,6 @@ function locateJobLine(raw: string, jobName: string): number {
 function locateStepLine(
   raw: string,
   jobName: string,
-  stepName: string,
   stepIndex: number,
 ): number {
   const lines = raw.split("\n");
@@ -724,7 +843,6 @@ function locateStepLine(
   if (stepsIndex < 0) return jobLine;
 
   const stepStarts: number[] = [];
-  const quotedName = stripYamlQuotes(stepName);
   let itemIndent: number | undefined;
   for (let index = stepsIndex + 1; index < lines.length; index++) {
     const line = lines[index];
@@ -735,12 +853,6 @@ function locateStepLine(
     if (itemIndent === undefined) itemIndent = indent;
     if (indent !== itemIndent) continue;
     stepStarts.push(index + 1);
-    if (
-      /^\s*-\s+name\s*:/.test(line) &&
-      stripYamlQuotes(match[2].trim()) === quotedName
-    ) {
-      return index + 1;
-    }
   }
   return stepStarts[stepIndex] ?? jobLine;
 }
@@ -748,16 +860,6 @@ function locateStepLine(
 function keyMatcher(key: string): RegExp {
   const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`^(?:${escaped}|"${escaped}"|'${escaped}')\\s*:`);
-}
-
-function stripYamlQuotes(value: string): string {
-  if (
-    (value.startsWith('"') && value.endsWith('"')) ||
-    (value.startsWith("'") && value.endsWith("'"))
-  ) {
-    return value.slice(1, -1);
-  }
-  return value;
 }
 
 function indentation(line: string): number {
@@ -781,8 +883,18 @@ function unionEvents(events: string[]): string[] {
 }
 
 function mergeOutput(target: AnalysisOutput, source: AnalysisOutput): void {
+  target.agentUsages.push(...source.agentUsages);
   target.findings.push(...source.findings);
   target.diagnostics.push(...source.diagnostics);
+}
+
+function dedupeAgentUsages(usages: AgentUsage[]): AgentUsage[] {
+  const seen = new Set<string>();
+  return usages.filter((usage) => {
+    if (seen.has(usage.id)) return false;
+    seen.add(usage.id);
+    return true;
+  });
 }
 
 function dedupe(findings: Finding[]): Finding[] {

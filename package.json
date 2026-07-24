@@ -17,6 +17,15 @@
     "dist",
     "action.yml",
     "README.md",
+    "BENCHMARK.md",
+    "ANNOTATION_GUIDE.md",
+    "DATA_CARD.md",
+    "REPRODUCIBILITY.md",
+    "ERROR_ANALYSIS.md",
+    "THREAT_MODEL.md",
+    "RULES.md",
+    "THIRD_PARTY_LICENSES.md",
+    "CHANGELOG.md",
     "LICENSE",
     "SECURITY.md",
     "docs",
@@ -24,14 +33,17 @@
   ],
   "scripts": {
     "build": "tsup",
-    "check": "npm run format:check && npm run typecheck && npm test && npm run build && npm run benchmark:verify",
+    "check": "npm run format:check && npm run typecheck && npm test && npm run build && npm run licenses:check && npm run benchmark:verify",
     "format:check": "prettier \"**/*.{md,json,yml,yaml,ts,mjs}\" --check",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "prepare": "npm run build",
-    "prepublishOnly": "npm run check",
+    "prepublishOnly": "npm run check && npm run package:smoke",
     "agentci": "tsx src/cli.ts",
-    "benchmark:verify": "node scripts/benchmark/verify-snapshot.mjs"
+    "benchmark:verify": "node scripts/benchmark/verify-snapshot.mjs && node scripts/benchmark/generate-annotation-sheet.mjs --check && node scripts/benchmark/generate-review-sheet.mjs --check && node scripts/benchmark/validate-labels.mjs",
+    "benchmark:smoke": "node scripts/benchmark/smoke-annotation-toolchain.mjs",
+    "licenses:check": "node scripts/generate-third-party-licenses.mjs --check",
+    "package:smoke": "node scripts/verify-standalone-package.mjs"
   },
   "keywords": [
     "github-actions",
@@ -55,6 +67,12 @@
     "node": ">=20.18.0"
   },
   "packageManager": "pnpm@10.11.0",
+  "pnpm": {
+    "overrides": {
+      "postcss": "8.5.23",
+      "vite": "8.1.5"
+    }
+  },
   "dependencies": {
     "commander": "^14.0.2",
     "fast-glob": "^3.3.3",
@@ -63,10 +81,13 @@
   },
   "devDependencies": {
     "@types/node": "^22.19.3",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
     "prettier": "^3.8.3",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.15"
+    "vite": "8.1.5",
+    "vitest": "^4.1.10"
   }
 }

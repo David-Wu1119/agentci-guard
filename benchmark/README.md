@@ -1,84 +1,68 @@
 # AgentCI Guard Real-Workflow Benchmark
 
-## Status
+**Status: v3 corpus frozen; human labels absent; no accuracy claim is valid.**
 
-**Candidate corpus frozen; human labels pending. No accuracy claim is valid
-yet.**
+The reader-facing protocol is [`../BENCHMARK.md`](../BENCHMARK.md). This
+directory contains the machine-verifiable research artifacts:
 
-The benchmark separates three artifacts:
+- `manifest.json`: 152 fixed workflows from 152 repositories, source
+  provenance, split, sampling frames, review plan, and qualification targets.
+- `snapshots/`: exact workflow bytes used for annotation and scoring.
+- `archive/agentci-real-workflows-v1/` and `agentci-real-workflows-v2/`:
+  superseded unlabeled candidate manifests.
+- `annotation-sheet.csv`: 7,056 blank workflow/job/step/task units.
+- `review-sheet.csv`: deterministic 5,676-unit second-human plan.
+- `schemas/`: manifest and annotation JSON Schemas.
+- `labels/`: human source labels, adjudicated labels, and post-evaluation error
+  analysis when available.
+- `THIRD_PARTY_NOTICES.md`: source attribution and repository SPDX metadata.
 
-1. `manifest.json` and `snapshots/`: immutable real workflows with repository,
-   path, commit, blob, hash, license, sampling stratum, and repo-disjoint split.
-2. `annotation-sheet.csv`: a blank sheet for human annotation.
-3. `labels/`: two independent human label sets plus an adjudicated set.
+V1 lacked agent-family diversity and contained 15 mis-cased control paths. V2
+fixed those defects, but its 16 diversity snapshots were later inspected during
+pre-label detector correction. V3 keeps those 16 as development data and adds
+16 mechanically selected, unseen evaluation replacements. Both superseded
+manifests remain available for audit.
 
-The synthetic fixtures in `corpus/adversarial/` are deliberately excluded.
+The benchmark is targeted and enriched. It is not a prevalence sample.
 
-## Sampling frame
+## Integrity checks
 
-The collection script takes one workflow per repository from each of two
-GitHub code-search frames:
+```bash
+pnpm benchmark:verify
+pnpm build
+pnpm benchmark:smoke
+```
 
-- AI-enriched: workflows containing `anthropics/claude-code-action`.
-- Control: workflows containing `actions/checkout`, excluding repositories
-  selected for the AI-enriched stratum.
+`benchmark:verify` validates all hashes and provenance, regenerates both blank
+annotation registries, validates schemas, and checks any public label package.
+`benchmark:smoke` runs the annotation and scoring toolchain using temporary
+synthetic labels only.
 
-Eligible paths are direct `.yml`/`.yaml` children of `.github/workflows/`.
-Candidates are ordered by a seeded SHA-256 key, not manually selected.
-Repositories without a detected SPDX license are skipped because the workflow
-snapshots are redistributed here.
+## Human workflow
 
-This is a calibration sample, not a prevalence sample. Its strata are
-intentionally balanced and must not be used to estimate ecosystem prevalence.
-
-## Annotation protocol
-
-Two humans must independently label every workflow/rule pair as:
-
-- `positive`: the rule's documented condition is present;
-- `negative`: the condition is absent;
-- `uncertain`: the available static workflow is insufficient.
-
-Annotators must not run AgentCI Guard or inspect its predictions before their
-independent pass. They should record a short rationale for positives and
-uncertain labels. Disagreements are adjudicated by reviewing the workflow and
-rule definition together; the adjudicated file must preserve both original
-labels.
-
-The development and evaluation splits are repository-disjoint. Rule changes
-may use only `dev`; `eval` remains sealed until the release-candidate scoring
-run.
-
-See [`labels/README.md`](labels/README.md) for the JSONL schema.
-
-Each annotator should copy `annotation-sheet.csv`, fill every rule column, and
-use a stable pseudonym:
+Follow [`../ANNOTATION_GUIDE.md`](../ANNOTATION_GUIDE.md). The independent
+annotators must not run AgentCI Guard or view its predictions.
 
 ```bash
 node scripts/benchmark/import-annotation-csv.mjs \
-  annotator-a-filled.csv reviewer-a benchmark/labels/annotator-a.jsonl
+  annotator-a-filled.csv reviewer-a benchmark/labels/annotator-a.jsonl \
+  --coverage all
+
 node scripts/benchmark/import-annotation-csv.mjs \
-  annotator-b-filled.csv reviewer-b benchmark/labels/annotator-b.jsonl
+  annotator-b-filled.csv reviewer-b benchmark/labels/annotator-b.jsonl \
+  --coverage review-plan
+
 node scripts/benchmark/compare-annotations.mjs \
   benchmark/labels/annotator-a.jsonl \
   benchmark/labels/annotator-b.jsonl \
   disagreements.csv
-# Fill the adjudicated, error_type, and rationale columns, then:
+
 node scripts/benchmark/adjudicate.mjs \
   benchmark/labels/annotator-a.jsonl \
   benchmark/labels/annotator-b.jsonl \
   disagreements.csv \
-  benchmark/labels/adjudicated.jsonl
+  benchmark/labels/adjudicated.jsonl \
+  reviewer-c
 ```
 
-## Reproduction
-
-```bash
-node scripts/benchmark/verify-snapshot.mjs
-pnpm build
-node scripts/benchmark/score.mjs benchmark/labels/adjudicated.jsonl
-```
-
-`score.mjs` reports per-rule and micro precision, recall, F1, support, 95%
-Wilson intervals, analysis coverage, diagnostic counts, and an error taxonomy.
-It refuses incomplete labels.
+The eval scorer remains sealed while `manifest.json` status is `unlabeled`.

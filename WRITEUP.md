@@ -29,8 +29,9 @@ v0.1.1 replaces the missing evidence with two distinct artifacts:
 
 1. a public adversarial regression corpus for known failure modes; and
 2. a frozen real-workflow benchmark with fixed repository commits, blob hashes,
-   immutable snapshots, repo-disjoint splits, two-human labeling, adjudication,
-   and reproducible metric scripts.
+   immutable snapshots, repo-disjoint splits, a full primary annotation pass,
+   deterministic independent review, adjudication, and reproducible metric
+   scripts.
 
 The benchmark is intentionally unscored until the independent labels exist.
 AgentCI Guard remains an experimental workflow linter, not a production
@@ -41,4 +42,4 @@ See:
 - [v0.1.0 baseline and artifact inventory](studies/v0.1.0-baseline/README.md)
 - [historical aggregate tables](docs/real-world-findings.md)
 - [adversarial corpus](corpus/adversarial/README.md)
-- [real-workflow benchmark protocol](benchmark/README.md)
+- [real-workflow benchmark protocol](BENCHMARK.md)

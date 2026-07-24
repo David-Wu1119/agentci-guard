@@ -1,5 +1,9 @@
 # Threat Model
 
+The canonical v0.1.1 threat boundary is
+[`../THREAT_MODEL.md`](../THREAT_MODEL.md). This page is retained for older
+links.
+
 AgentCI Guard experimentally scans GitHub Actions workflow YAML for static
 patterns that can increase the risk of AI coding-agent jobs.
 

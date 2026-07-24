@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Historical one-shot collector for the superseded, unlabeled v1 candidate.
+// Current v3 provenance is the v1 output plus the checked-in diversity,
+// control-path, and heldout-correction scripts; never overwrite an existing
+// snapshot.
 import { execFileSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -63,7 +67,7 @@ for (const stratum of strata) {
   const eligible = searchResults
     .filter(
       (item) =>
-        /^\.github\/workflows\/[^/]+\.ya?ml$/i.test(item.path) &&
+        /^\.github\/workflows\/[^/]+\.ya?ml$/.test(item.path) &&
         !item.repository.isPrivate &&
         !item.repository.isFork,
     )

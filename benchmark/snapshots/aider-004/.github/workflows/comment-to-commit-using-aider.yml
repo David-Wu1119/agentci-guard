@@ -1,0 +1,488 @@
+name: Comment to Commit using Aider
+on:
+  workflow_call:
+    inputs:
+      comment-id:
+        description: "ID of the comment that triggered the workflow"
+        required: true
+        type: number
+      pr-url:
+        description: "URL of the pull request"
+        required: true
+        type: string
+      is-review:
+        description: "Is this a review comment?"
+        required: false
+        type: boolean
+        default: false
+      model:
+        description: "Model to use"
+        required: false
+        type: string
+        default: "o4-mini"
+      provider:
+        description: "Provider to use"
+        required: false
+        type: string
+        default: "openai"
+      chat-timeout:
+        description: "Timeout for chat in minutes to prevent burning your credits"
+        required: false
+        type: number
+        default: 10
+      map-tokens:
+        description: "Map tokens"
+        required: false
+        type: number
+        default: 5000
+      install-command:
+        description: "Command to run to install dependencies"
+        required: false
+        type: string
+        default: ""
+      autofix-command:
+        description: "Command to run to autofix code"
+        required: false
+        type: string
+        default: ""
+      test-command:
+        description: "Command to run tests after changes"
+        required: false
+        type: string
+        default: ""
+    secrets:
+      openai-api-key:
+        description: "OpenAI API key"
+        required: false
+      anthropic-api-key:
+        description: "Anthropic API Key"
+        required: false
+      groq-api-key:
+        description: "Groq API Key"
+        required: false
+      gemini-api-key:
+        description: "Gemini API Key"
+        required: false
+      cohere-api-key:
+        description: "Cohere API Key"
+        required: false
+      openrouter-api-key:
+        description: "OpenRouter API Key"
+        required: false
+      deepseek-api-key:
+        description: "Deepseek API Key"
+        required: false
+
+jobs:
+  create-commit:
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: write
+      
+    runs-on: ubuntu-latest
+    steps:
+      - name: Handle comment reactions
+        uses: actions/github-script@v7
+        with:
+          script: |
+            if (${{ inputs.is-review }}) {
+              // Add "eyes" reaction to the review comment
+              await github.rest.reactions.createForPullRequestReviewComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: ${{ inputs.comment-id }},
+                content: 'eyes'
+              });
+
+              // List reactions on the review comment and remove any "rocket" reaction
+              const reactions = await github.rest.reactions.listForPullRequestReviewComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: ${{ inputs.comment-id }}
+              });
+              for (const reaction of reactions.data) {
+                if (reaction.content === 'rocket') {
+                  await github.rest.reactions.deleteForPullRequestComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    comment_id: ${{ inputs.comment-id }},
+                    reaction_id: reaction.id
+                  });
+                }
+              }
+            }
+            else {
+              // Add "eyes" reaction to the comment
+              await github.rest.reactions.createForIssueComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: ${{ inputs.comment-id }},
+                content: 'eyes'
+              });
+              
+              // Check if "completed" reaction exists and delete it
+              const reactions = await github.rest.reactions.listForIssueComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: ${{ inputs.comment-id }}
+              });
+              
+              for (const reaction of reactions.data) {
+                if (reaction.content === 'rocket') {
+                  // Delete completed reaction
+                  await github.rest.reactions.deleteForIssueComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    comment_id: ${{ inputs.comment-id }},
+                    reaction_id: reaction.id
+                  });
+                }
+              }
+            }
+
+      - name: Extract PR info and comment body
+        uses: actions/github-script@v7
+        id: extract_info
+        with:
+          script: |
+            // Extract PR number from PR URL
+            const prUrl = "${{ inputs.pr-url }}";
+            const prNumber = parseInt(prUrl.split('/').pop());
+            
+            // Get PR data to extract branch
+            const prData = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+            
+            let commentData;
+            if (${{ inputs.is-review }}) {
+              // Get comment text
+              commentData = await github.rest.pulls.getReviewComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: ${{ inputs.comment-id }}
+              });
+            }
+            else {
+              // Get comment text
+              commentData = await github.rest.issues.getComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: ${{ inputs.comment-id }}
+              });
+            }
+            
+            // Try to find related issue number from PR title or body
+            let issueNumber = null;
+            
+            // Check PR title and body for references like "Fixes #123", "Closes #123", etc.
+            const titleAndBody = prData.data.title + "\n" + prData.data.body;
+            const issueRegex = /(close[sd]?|fix(e[sd])?|resolve[sd]?)\s+#(\d+)/gi;
+            const matches = [...titleAndBody.matchAll(issueRegex)];
+            
+            if (matches.length > 0) {
+              // Use the first matched issue number
+              issueNumber = parseInt(matches[0][3]);
+            }
+            
+            // If we couldn't find issue from title/body, check if PR itself was created from an issue
+            if (!issueNumber) {
+              try {
+                // Check PR body for "Resolves: #X" pattern that GitHub adds
+                const resolveMatch = prData.data.body.match(/\bresolves:?\s+#(\d+)/i);
+                if (resolveMatch) {
+                  issueNumber = parseInt(resolveMatch[1]);
+                }
+              } catch (e) {
+                // Ignore errors, fallback to PR number
+              }
+            }
+            
+            // Fallback to PR number if no issue found
+            if (!issueNumber) {
+              issueNumber = prNumber;
+              console.log("No linked issue found, using PR number as fallback");
+            } else {
+              console.log(`Found linked issue: #${issueNumber}`);
+            }
+            
+            // Set individual outputs instead of a complex JSON object
+            core.setOutput("pr_number", prNumber);
+            core.setOutput("issue_number", issueNumber);
+            core.setOutput("branch", prData.data.head.ref);
+            core.setOutput("comment_body", commentData.data.body);
+            if (${{ inputs.is-review }}) {
+              core.setOutput("file_path", commentData.data.path);
+              core.setOutput("position", commentData.data.position);
+              core.setOutput("diff_hunk", commentData.data.diff_hunk);
+            }
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.extract_info.outputs.branch }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Install AI CLI
+        run: dotnet tool install --global tryAGI.AI --prerelease
+
+      - name: Setup Git user
+        run: |
+          git config --local user.email "bot@aider.com"
+          git config --local user.name "github-actions[bot]"
+
+      - name: Create prompt file
+        shell: bash
+        run: |
+          {
+            echo "Apply all necessary changes in one step (it is automated and will be just committed so do not ask user anything) based on below user comment."
+            echo ""
+            
+            if [ "${{ inputs.is-review }}" == "true" ]; then
+              echo "File: ${{ steps.extract_info.outputs.file_path }}"
+              echo "Position: ${{ steps.extract_info.outputs.position }}"
+              echo "Diff:"
+              echo '```'
+              echo "${{ steps.extract_info.outputs.diff_hunk }}"
+              echo '```'
+            else
+              # Remove '@aider' from the comment body and output it
+              comment_body="${{ steps.extract_info.outputs.comment_body }}"
+              echo "${comment_body//@aider/}"
+            fi
+          } > .aider.prompt.md
+          
+          echo "###################################################"
+          echo "Aider Prompt:"
+          cat .aider.prompt.md
+          echo "###################################################"
+
+      - name: Try extract model from labels
+        uses: actions/github-script@v7
+        id: try_extract_model_from_labels
+        with:
+          result-encoding: string
+          script: |
+            const result = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ steps.extract_info.outputs.issue_number }}
+            });
+            const labels = result.data.labels;
+
+            if (labels.some(label => label.name.startsWith('aider-r1-free'))) {
+              return 'openrouter/deepseek/deepseek-r1:free';
+            }
+
+            const model = labels.find(label => label.name.startsWith('aider-'));
+            if (model) {
+              return model.name.split('ider-')[1].replace('-high', '');
+            }
+
+            return "${{ inputs.model }}";
+
+      - name: Try extract reasoning effort from labels
+        uses: actions/github-script@v7
+        id: try_extract_reasoning_effort_from_labels
+        with:
+          result-encoding: string
+          script: |
+            const result = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ steps.extract_info.outputs.issue_number }}
+            });
+            const labels = result.data.labels;
+            
+            const model = labels.find(label => label.name.startsWith('aider-'));
+            if (model && model.name.endsWith('-high')) {
+              return "--reasoning-effort high";
+            }
+
+            return "";
+
+      - name: Show extracted data
+        run: |
+          echo "PR Number: ${{ steps.extract_info.outputs.pr_number }}"
+          echo "Issue Number: ${{ steps.extract_info.outputs.issue_number }}"
+          echo "Branch: ${{ steps.extract_info.outputs.branch }}"
+          echo "prompt: ${{ steps.create_prompt.outputs.result }}"
+          echo "model: ${{ steps.try_extract_model_from_labels.outputs.result }}"
+          echo "reasoning_effort: ${{ steps.try_extract_reasoning_effort_from_labels.outputs.result }}"
+          echo "file_path: ${{ steps.extract_info.outputs.file_path }}"
+          echo "position: ${{ steps.extract_info.outputs.position }}"
+          echo "diff_hunk: ${{ steps.extract_info.outputs.diff_hunk }}"
+
+      - name: Install dependencies
+        if: inputs.install-command != ''
+        run: ${{ inputs.install-command }}
+
+      - name: Cache pip packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-aider-chat
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Apply changes with Aider
+        timeout-minutes: ${{ inputs.chat-timeout }}
+        env:
+          # API keys - Used implicitly by Aider
+          OPENAI_API_KEY: ${{ secrets.openai-api-key }}
+          OPENROUTER_API_KEY: ${{ secrets.openrouter-api-key }}
+          ANTHROPIC_API_KEY: ${{ secrets.anthropic-api-key }}
+          COHERE_API_KEY: ${{ secrets.cohere-api-key }}
+          GEMINI_API_KEY: ${{ secrets.gemini-api-key }}
+          DEEPSEEK_API_KEY: ${{ secrets.deepseek-api-key }}
+          GROQ_API_KEY: ${{ secrets.groq-api-key }}
+          
+        run: |
+          pip install aider-chat
+
+          # Conditionally define LINT_CMD if autofix-command is set
+          if [ -n "${{ inputs.autofix-command }}" ]; then
+            LINT_CMD=(--lint-cmd "${{ inputs.autofix-command }}")
+          else
+            LINT_CMD=()
+          fi
+
+          # Conditionally define TEST_CMD if test-command is set
+          if [ -n "${{ inputs.test-command }}" ]; then
+            TEST_CMD=(--auto-test --test-cmd "${{ inputs.test-command }}")
+          else
+            TEST_CMD=()
+          fi
+          
+          aider \
+            --model "${{ steps.try_extract_model_from_labels.outputs.result }}" \
+            --no-analytics \
+            --yes-always \
+            --watch-files \
+            --skip-sanity-check-repo \
+            --message-file .aider.prompt.md \
+            --no-auto-commits \
+            --map-tokens ${{ inputs.map-tokens }} \
+            ${{ steps.try_extract_reasoning_effort_from_labels.outputs.result }} \
+            "${LINT_CMD[@]}" \
+            "${TEST_CMD[@]}"
+
+      - name: Check for changes
+        id: changes
+        run: |
+          CHANGED=$(git diff --name-only -- . ':!.gitignore')
+          if [ -z "$CHANGED" ]; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Push changes
+        if: steps.changes.outputs.has_changes == 'true'
+        timeout-minutes: ${{ inputs.chat-timeout }}
+        env:
+          # API keys - Used implicitly by Aider
+          OPENAI_API_KEY: ${{ secrets.openai-api-key }}
+          OPENROUTER_API_KEY: ${{ secrets.openrouter-api-key }}
+          ANTHROPIC_API_KEY: ${{ secrets.anthropic-api-key }}
+          COHERE_API_KEY: ${{ secrets.cohere-api-key }}
+          GEMINI_API_KEY: ${{ secrets.gemini-api-key }}
+          DEEPSEEK_API_KEY: ${{ secrets.deepseek-api-key }}
+          GROQ_API_KEY: ${{ secrets.groq-api-key }}
+        run: |
+          git add . ':!.gitignore'
+          aider --model "${{ steps.try_extract_model_from_labels.outputs.result }}" --commit --yes-always --watch-files --skip-sanity-check-repo
+          git push --force-with-lease -u origin ${{ steps.extract_info.outputs.branch }}
+
+      - name: Create comment with Aider output
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          OPENAI_API_KEY: ${{ secrets.openai-api-key }}
+          OPENROUTER_API_KEY: ${{ secrets.openrouter-api-key }}
+          ANTHROPIC_API_KEY: ${{ secrets.anthropic-api-key }}
+          COHERE_API_KEY: ${{ secrets.cohere-api-key }}
+          GEMINI_API_KEY: ${{ secrets.gemini-api-key }}
+          DEEPSEEK_API_KEY: ${{ secrets.deepseek-api-key }}
+          GROQ_API_KEY: ${{ secrets.groq-api-key }}
+        with:
+          script: |
+            // Summarize the aider chat history file
+            let chatContent = '';
+            const { execSync } = require('child_process');
+            try {
+              chatContent = execSync('ai --input-file .aider.chat.history.md --input "Summarize the chat history in 20 words. Only summarize what it DID, not settings, time, version, repo-map, token count, etc. Assume that it\'s you who did the changes, not Aider. It should be a first person summary of what it did." --provider ${{ inputs.provider }}', { encoding: 'utf-8' });
+              console.log('CLI Output:', chatContent);
+            } catch (error) {
+              console.error('Error running CLI tool:', error);
+              chatContent = 'Failed to generate summary of changes.';
+            }
+            
+            // Create workflow run link - fix to use correct format
+            const workflowRunLink = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId || github.run_id || process.env.GITHUB_RUN_ID}`;
+            
+            if (${{ inputs.is-review }}) {
+              // Create a new reply to the review comment
+              await github.rest.pulls.createReplyForReviewComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: ${{ steps.extract_info.outputs.pr_number }},
+                comment_id: ${{ inputs.comment-id }},
+                body: `${chatContent}\n\n[View workflow run](${workflowRunLink})`
+              });
+            }
+            else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: ${{ steps.extract_info.outputs.pr_number }},
+                body: `${chatContent}\n\n[View workflow run](${workflowRunLink})`
+              });
+            }
+
+      - name: Add completed reaction
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            if (${{ inputs.is-review }}) {
+              // Add "completed" reaction (rocket) to the review comment
+              await github.rest.reactions.createForPullRequestReviewComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: ${{ inputs.comment-id }},
+                content: 'rocket'
+              });
+            }
+            else {
+              // Add "completed" reaction (rocket) to the comment
+              await github.rest.reactions.createForIssueComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                  comment_id: ${{ inputs.comment-id }},
+                  content: 'rocket'
+              });
+            }
+
+      - name: Show Aider chat history
+        if: always()
+        run: cat .aider.chat.history.md
+
+      - name: Show extracted data
+        if: always()
+        run: |
+          echo "PR Number: ${{ steps.extract_info.outputs.pr_number }}"
+          echo "Issue Number: ${{ steps.extract_info.outputs.issue_number }}"
+          echo "Branch: ${{ steps.extract_info.outputs.branch }}"
+          echo "model: ${{ steps.try_extract_model_from_labels.outputs.result }}"
+          echo "reasoning_effort: ${{ steps.try_extract_reasoning_effort_from_labels.outputs.result }}"
+          echo "file_path: ${{ steps.extract_info.outputs.file_path }}"
+          echo "position: ${{ steps.extract_info.outputs.position }}"
+          echo "diff_hunk: ${{ steps.extract_info.outputs.diff_hunk }}"

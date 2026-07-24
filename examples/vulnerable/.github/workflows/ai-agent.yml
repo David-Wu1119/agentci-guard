@@ -13,9 +13,10 @@ jobs:
   claude:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          allow-unsafe-pr-checkout: true
       - name: Run Claude Code
         uses: anthropics/claude-code-action@v1
         env:
@@ -26,4 +27,4 @@ jobs:
             User request:
             ${{ github.event.comment.body }}
       - name: Shell agent fallback
-        run: npx claude-code "${{ github.event.pull_request.body }}"
+        run: npx @anthropic-ai/claude-code "${{ github.event.pull_request.body }}"

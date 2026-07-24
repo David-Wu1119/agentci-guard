@@ -4,6 +4,7 @@ permissions:
   issues: write
 jobs:
   agent:
-    uses: ./.github/workflows/reusable.yml
+    uses: ./.github/workflows/bridge.yml
     with:
       request: ${{ github.event.comment.body }}
+      tools: "--allowedTools Bash(git:*)"

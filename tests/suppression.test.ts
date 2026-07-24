@@ -46,6 +46,22 @@ jobs:
     const rules = rulesFor(`# agentci-ignore-all${base}`);
     expect(rules.size).toBe(0);
   });
+
+  it("does not treat prompt or shell-script text as a suppression directive", () => {
+    const rules = rulesFor(`
+on: pull_request_target
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "# agentci-ignore-all"
+          # agentci-ignore-all
+          claude -p "\${{ github.event.pull_request.body }}"
+`);
+    expect(rules.has("agentci/pull-request-target-ai")).toBe(true);
+    expect(rules.has("agentci/untrusted-input-in-prompt")).toBe(true);
+  });
 });
 
 describe("config-file suppression", () => {

@@ -1,0 +1,61 @@
+name: PR HEAD Scan with Gates
+
+on: pull_request
+
+jobs:
+  workbench-scan-gate:
+    runs-on: ubuntu-latest
+    env:
+      WORKBENCH_URL: ${{ secrets.WORKBENCH_URL }}
+      WORKBENCH_USER: ${{ secrets.WORKBENCH_USER }}
+      WORKBENCH_TOKEN: ${{ secrets.WORKBENCH_TOKEN }}
+    steps: #running with Python until we fix the GHCR Image 
+    - name: Checkout Workbench Agent
+      uses: actions/checkout@v4
+
+# Zipping the code uploads a single file for Workbench to extract.
+    - name: Zip the PR HEAD Branch
+      run: |
+        zip -r $GITHUB_WORKSPACE/code.zip . -x \
+        '*.tmp' '*.temp' '*.bak' \
+        '*.cache' '*.db' '*.idx' \
+        '*.log' '*.txt' '*.event' \
+        '*.sample' '*.demo' '*.example' \
+        '*.sql' '*.hprof' '*.dmp' \
+        '.gitignore' '.dockerignore' \
+        '.git/*' '.github/*'
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install Workbench Agent Dependencies
+      run: pip install .
+
+    - name: Scan PR HEAD Branch
+      run: |
+        workbench-agent scan \
+        --api-url ${{ env.WORKBENCH_URL }} \
+        --api-user ${{ env.WORKBENCH_USER }} \
+        --api-token ${{ env.WORKBENCH_TOKEN }} \
+        --project-name $GITHUB_REPOSITORY \
+        --scan-name PR-HEAD-$GITHUB_HEAD_REF \
+        --path $GITHUB_WORKSPACE/code.zip \
+        --reuse-project-ids $GITHUB_REPOSITORY \
+        --run-dependency-analysis \
+        --autoid-file-licenses \
+        --autoid-file-copyrights \
+        --delta-scan \
+        --no-wait
+
+    - name: Evaluate Gates for PR HEAD Branch
+      run: |
+        workbench-agent evaluate-gates \
+        --api-url ${{ env.WORKBENCH_URL }} \
+        --api-user ${{ env.WORKBENCH_USER }} \
+        --api-token ${{ env.WORKBENCH_TOKEN }} \
+        --project-name $GITHUB_REPOSITORY \
+        --scan-name PR-HEAD-$GITHUB_HEAD_REF \
+        --fail-on-pending \
+        --fail-on-policy

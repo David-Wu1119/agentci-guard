@@ -84,13 +84,14 @@ function normalizeDefaultPermissions(
 }
 
 /**
- * Inline, file-level suppression directives read from raw workflow text:
+ * Standalone top-level, file-level suppression directives:
  *   # agentci-ignore <rule-id> [<rule-id> ...] [-- reason]
  *   # agentci-ignore-all [-- reason]
  *
  * Findings are reported at job/step granularity rather than per line, so
- * suppression is scoped to the whole file. The optional `-- reason` is for
- * humans and is ignored by the parser.
+ * suppression is scoped to the whole file. Requiring column-zero YAML comments
+ * prevents shell-script comments or quoted prompt text from disabling checks.
+ * The optional `-- reason` is for humans and is ignored by the parser.
  */
 export function parseInlineIgnores(raw: string): {
   all: boolean;
@@ -100,11 +101,11 @@ export function parseInlineIgnores(raw: string): {
   let all = false;
 
   for (const line of raw.split("\n")) {
-    if (/#\s*agentci-ignore-all\b/i.test(line)) {
+    if (/^#\s*agentci-ignore-all\b/i.test(line)) {
       all = true;
       continue;
     }
-    const match = /#\s*agentci-ignore\s+([^\n]+)/i.exec(line);
+    const match = /^#\s*agentci-ignore\s+([^\n]+)/i.exec(line);
     if (!match) continue;
     const spec = match[1].split("--")[0]; // strip the optional "-- reason"
     for (const id of spec.split(/[\s,]+/)) {
