@@ -34,7 +34,9 @@ require the post-tag consumer smoke.
       hardened, and threshold behavior without installing project dependencies.
 - [x] A manual post-publication workflow installs `agentci-guard@0.1.1` into an
       empty consumer project and verifies vulnerable and hardened CLI results.
-- [ ] Hosted GitHub Actions run passes the actual manifest-based CI job.
+- [x] Hosted GitHub Actions run passes the actual manifest-based CI job
+      ([commit `81921f0`](https://github.com/David-Wu1119/agentci-guard/commit/81921f0546c10635dc63aec67525af84f9f13c95),
+      [run `30132192081`](https://github.com/David-Wu1119/agentci-guard/actions/runs/30132192081)).
 - [ ] A primary human completes all units and a second human completes the
       predeclared independent-review plan without seeing predictions.
 - [ ] Disagreements are adjudicated with a stable human pseudonym, preserved,

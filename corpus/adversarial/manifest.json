@@ -591,6 +591,39 @@
       ]
     },
     {
+      "id": "discussion-title-readonly",
+      "path": "cases/discussion-title-readonly",
+      "targets": ["discussion event", "discussion-title source"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent",
+        "step": "step 1"
+      },
+      "expected": {
+        "reachable_events": ["discussion"],
+        "findings": [
+          {
+            "rule_id": "agentci/untrusted-input-in-prompt",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "step": "step 1",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "A discussion title is untrusted event content even when an explicit discussions read scope prevents token-write findings.",
+      "assumption_sources": [
+        "event-security",
+        "permissions",
+        "project-rule-contract"
+      ]
+    },
+    {
       "id": "parse-error",
       "path": "cases/parse-error",
       "targets": ["parse failure visibility"],
@@ -731,6 +764,51 @@
       ]
     },
     {
+      "id": "local-reusable-secret",
+      "path": "cases/local-reusable-secret",
+      "targets": [
+        "reusable workflow secret propagation",
+        "inherited secret exposure"
+      ],
+      "subject": {
+        "file": ".github/workflows/reusable.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["push"],
+        "findings": [
+          {
+            "rule_id": "agentci/ai-with-secrets",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/reusable.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [],
+        "agent_usages": [
+          {
+            "file": ".github/workflows/reusable.yml",
+            "job": "agent",
+            "step": "step 1",
+            "kind": "action",
+            "line_min": 7,
+            "reachable_events": ["push"],
+            "call_chain": [".github/workflows/caller.yml#agent"]
+          }
+        ],
+        "analysis_complete": true
+      },
+      "rationale": "A caller's secrets inherit declaration exposes inherited secrets to a reachable AI job in the local reusable workflow.",
+      "assumption_sources": [
+        "reusable-workflows",
+        "project-analysis-contract",
+        "project-rule-contract"
+      ]
+    },
+    {
       "id": "local-reusable-cycle",
       "path": "cases/local-reusable-cycle",
       "targets": ["reusable workflow cycle"],
@@ -755,6 +833,33 @@
         "analysis_complete": false
       },
       "rationale": "A local call cycle prevents complete expansion and must be reported as partial analysis.",
+      "assumption_sources": ["reusable-workflows", "project-analysis-contract"]
+    },
+    {
+      "id": "local-reusable-missing",
+      "path": "cases/local-reusable-missing",
+      "targets": ["missing local reusable workflow target"],
+      "subject": {
+        "file": ".github/workflows/caller.yml",
+        "job": "call"
+      },
+      "expected": {
+        "reachable_events": ["push"],
+        "findings": [],
+        "diagnostics": [
+          {
+            "code": "agentci/analysis-local-reusable-missing",
+            "severity": "error",
+            "location": {
+              "file": ".github/workflows/caller.yml",
+              "job": "call",
+              "line_min": 2
+            }
+          }
+        ],
+        "analysis_complete": false
+      },
+      "rationale": "A missing local reusable workflow prevents complete expansion and must produce an explicit error instead of a clean result.",
       "assumption_sources": ["reusable-workflows", "project-analysis-contract"]
     },
     {
