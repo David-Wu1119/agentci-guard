@@ -620,9 +620,9 @@ function qualificationResult({
       securityMicro.supported.precision,
       targets.security_micro_precision,
     ),
-    security_supported_recall: metricAtLeast(
-      securityMicro.supported.recall,
-      targets.security_supported_recall,
+    security_overall_recall: metricAtLeast(
+      securityMicro.overall.recall,
+      targets.security_overall_recall,
     ),
     agent_detection_decision_coverage: metricAtLeast(
       agentDetection.decision_coverage,

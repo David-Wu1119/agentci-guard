@@ -136,7 +136,7 @@
         "agent_detection_precision",
         "agent_detection_recall",
         "security_micro_precision",
-        "security_supported_recall",
+        "security_overall_recall",
         "decision_coverage",
         "high_critical_rule_precision"
       ],
@@ -150,7 +150,7 @@
         "security_micro_precision": {
           "$ref": "#/$defs/rate"
         },
-        "security_supported_recall": {
+        "security_overall_recall": {
           "$ref": "#/$defs/rate"
         },
         "decision_coverage": {

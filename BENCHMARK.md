@@ -127,7 +127,8 @@ percentage claims; exact counts remain public.
 - agent-detection overall recall ≥ 80%, with scanner abstentions on human
   positives counted as false negatives;
 - security-rule supported micro precision ≥ 90%;
-- security-rule supported micro recall ≥ 80%;
+- security-rule overall micro recall ≥ 80%, with scanner abstentions on human
+  positives counted as false negatives;
 - decision coverage ≥ 80% separately for agent detection, security rules, and
   all tasks combined;
 - independently reviewed coverage ≥ 80%;

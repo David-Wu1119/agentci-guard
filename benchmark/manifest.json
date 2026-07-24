@@ -115,7 +115,7 @@
     "agent_detection_precision": 0.9,
     "agent_detection_recall": 0.8,
     "security_micro_precision": 0.9,
-    "security_supported_recall": 0.8,
+    "security_overall_recall": 0.8,
     "decision_coverage": 0.8,
     "high_critical_rule_precision": 0.8
   },
