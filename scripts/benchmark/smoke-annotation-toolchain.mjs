@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -10,6 +11,10 @@ const temporary = fs.mkdtempSync(
   path.join(os.tmpdir(), "agentci-annotation-smoke-"),
 );
 try {
+  const packetRoot = path.join(temporary, "pilot-packet");
+  run(["scripts/benchmark/export-pilot-packet.mjs", packetRoot]);
+  verifyPilotPacket(packetRoot);
+
   const pilotACsv = path.join(temporary, "pilot-a.csv");
   const pilotBCsv = path.join(temporary, "pilot-b.csv");
   fillSynthetic(
@@ -196,6 +201,87 @@ function fillTiming(source, destination, annotator) {
   fs.writeFileSync(destination, renderCsv([header, ...rows]));
 }
 
+function verifyPilotPacket(packetRoot) {
+  const allowedTopLevel = new Set([
+    "ANNOTATION_GUIDE.md",
+    "CHECKSUMS.sha256",
+    "README.md",
+    "RULES.md",
+    "SOURCES.md",
+    "analysis-model.md",
+    "annotation-sheet.csv",
+    "manifest.json",
+    "timing-sheet.csv",
+    "workflows",
+  ]);
+  const unexpected = fs
+    .readdirSync(packetRoot)
+    .filter((entry) => !allowedTopLevel.has(entry));
+  if (unexpected.length > 0) {
+    throw new Error(
+      `Pilot packet contains unexpected top-level entries: ${unexpected.join(", ")}.`,
+    );
+  }
+  const manifest = JSON.parse(
+    fs.readFileSync(path.join(packetRoot, "manifest.json"), "utf8"),
+  );
+  if (
+    manifest.split !== "dev" ||
+    manifest.case_count !== 6 ||
+    manifest.annotation_unit_count !== 168
+  ) {
+    throw new Error("Pilot packet manifest is not development-only.");
+  }
+  for (const item of manifest.cases) {
+    const workflow = path.join(
+      packetRoot,
+      "workflows",
+      item.case_id,
+      item.source_path,
+    );
+    if (
+      !fs.existsSync(workflow) ||
+      sha256(fs.readFileSync(workflow)) !== item.source_sha256
+    ) {
+      throw new Error(`${item.case_id}: packet workflow hash is invalid.`);
+    }
+  }
+
+  const checksums = new Map(
+    fs
+      .readFileSync(path.join(packetRoot, "CHECKSUMS.sha256"), "utf8")
+      .trim()
+      .split(/\r?\n/)
+      .map((line) => {
+        const match = /^([a-f0-9]{64}) {2}(.+)$/.exec(line);
+        if (!match) throw new Error(`Invalid packet checksum row: ${line}`);
+        return [match[2], match[1]];
+      }),
+  );
+  const packetFiles = walk(packetRoot)
+    .map((file) => path.relative(packetRoot, file).split(path.sep).join("/"))
+    .filter((file) => file !== "CHECKSUMS.sha256")
+    .sort();
+  if (
+    checksums.size !== packetFiles.length ||
+    packetFiles.some(
+      (file) =>
+        !checksums.has(file) ||
+        checksums.get(file) !==
+          sha256(fs.readFileSync(path.join(packetRoot, file))),
+    )
+  ) {
+    throw new Error("Pilot packet checksums do not cover the exact allowlist.");
+  }
+  if (
+    packetFiles.some((file) =>
+      /(^|\/)(?:src|dist|eval|results|predictions?)(?:\/|$)/i.test(file),
+    )
+  ) {
+    throw new Error("Pilot packet leaked scanner or evaluation artifacts.");
+  }
+}
+
 function fillAdjudications(disagreementFile, primaryFile) {
   const [decisionHeader, ...decisionRows] = parseCsv(
     fs.readFileSync(disagreementFile, "utf8"),
@@ -228,4 +314,18 @@ function run(arguments_, environment = {}) {
     stdio: "pipe",
     env: { ...process.env, ...environment },
   });
+}
+
+function walk(directory) {
+  const output = [];
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const candidate = path.join(directory, entry.name);
+    if (entry.isDirectory()) output.push(...walk(candidate));
+    else if (entry.isFile()) output.push(candidate);
+  }
+  return output;
+}
+
+function sha256(value) {
+  return crypto.createHash("sha256").update(value).digest("hex");
 }

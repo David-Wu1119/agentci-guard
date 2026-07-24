@@ -95,6 +95,8 @@ This command:
 - regenerates the 5,676-unit independent-review plan;
 - regenerates the six-case, 168-unit development-only annotation feasibility
   pilot without consulting predictions or evaluation workflow content;
+- smoke-tests an allowlisted annotator packet that excludes scanner code,
+  built bundles, evaluation snapshots, and predictions;
 - validates annotation schemas and any published label package.
 
 The collection scripts document how the frozen files were selected, but rerun

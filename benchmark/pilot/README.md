@@ -24,29 +24,34 @@ another annotator's sheet, or open evaluation snapshots.
 
 ## Blind pilot procedure
 
-From the repository root:
+The coordinator creates two isolated packets from the repository root:
 
 ```bash
 pilot_dir="$(mktemp -d)"
-cp benchmark/pilot/annotation-sheet.csv "$pilot_dir/annotator-a.csv"
-cp benchmark/pilot/annotation-sheet.csv "$pilot_dir/annotator-b.csv"
-cp benchmark/pilot/timing-sheet.csv "$pilot_dir/timing-a.csv"
-cp benchmark/pilot/timing-sheet.csv "$pilot_dir/timing-b.csv"
+node scripts/benchmark/export-pilot-packet.mjs "$pilot_dir/annotator-a"
+node scripts/benchmark/export-pilot-packet.mjs "$pilot_dir/annotator-b"
 ```
 
-Each annotator follows `ANNOTATION_GUIDE.md`, fills all 168 annotation rows, and
-records active minutes separately for each workflow. Use different stable human
-pseudonyms.
+Each packet contains only the selected development snapshots, rule contract,
+analysis guide, blank annotation/timing sheets, source attribution, and
+checksums. It excludes scanner code, built bundles, evaluation snapshots, and
+predictions.
+
+Each annotator follows the packet's `README.md`, fills all 168 annotation rows,
+and records active minutes separately for each workflow. Use different stable
+human pseudonyms.
 
 After both independent passes:
 
 ```bash
 node scripts/benchmark/import-annotation-csv.mjs \
-  "$pilot_dir/annotator-a.csv" reviewer-a "$pilot_dir/annotator-a.jsonl" \
+  "$pilot_dir/annotator-a/annotation-sheet.csv" \
+  reviewer-a "$pilot_dir/annotator-a.jsonl" \
   --coverage pilot
 
 node scripts/benchmark/import-annotation-csv.mjs \
-  "$pilot_dir/annotator-b.csv" reviewer-b "$pilot_dir/annotator-b.jsonl" \
+  "$pilot_dir/annotator-b/annotation-sheet.csv" \
+  reviewer-b "$pilot_dir/annotator-b.jsonl" \
   --coverage pilot
 
 node scripts/benchmark/compare-annotations.mjs \
@@ -56,8 +61,8 @@ node scripts/benchmark/compare-annotations.mjs \
   --coverage pilot
 
 node scripts/benchmark/summarize-pilot.mjs \
-  "$pilot_dir/timing-a.csv" \
-  "$pilot_dir/timing-b.csv" \
+  "$pilot_dir/annotator-a/timing-sheet.csv" \
+  "$pilot_dir/annotator-b/timing-sheet.csv" \
   "$pilot_dir/annotator-a.jsonl" \
   "$pilot_dir/annotator-b.jsonl" \
   "$pilot_dir/summary.json"
