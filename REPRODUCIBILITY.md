@@ -12,6 +12,8 @@ annotation toolchain, and—once human labels exist—every reported metric.
 - Benchmark inputs: checked-in snapshots and `benchmark/manifest.json`
 
 Use a clean checkout of the exact scanner commit recorded in the metric JSON.
+The checkout must include full history and tags so the frozen v0.1.0 baseline
+can be checked against its recorded Git objects.
 
 ## Code and Action verification
 
@@ -25,12 +27,25 @@ pnpm build
 
 git diff --exit-code -- dist
 node scripts/verify-action-manifest.mjs
+pnpm baseline:verify
 pnpm audit --audit-level high
 ```
 
 The hosted CI additionally invokes `uses: ./` for vulnerable, hardened, and
 threshold-failure cases. `scripts/verify-sarif.mjs` checks SARIF structure,
 severity properties, relative artifact locations, and meaningful line numbers.
+
+After the immutable `v0.1.1` tag and GitHub release exist,
+`.github/workflows/published-tag-smoke.yml` repeats those checks through the
+fully qualified `David-Wu1119/agentci-guard@v0.1.1` consumer reference without
+installing repository dependencies. The moving `v0` tag must not be updated
+until this run passes.
+
+After npm publication, manually dispatch
+`.github/workflows/published-npm-smoke.yml` with the workflow ref set to
+`v0.1.1`. The job refuses any other ref, creates an empty consumer project,
+installs exactly `agentci-guard@0.1.1` from the public registry, and verifies
+vulnerable and hardened scans before `v0` can move.
 
 Local Action execution can be reproduced without a GitHub token:
 

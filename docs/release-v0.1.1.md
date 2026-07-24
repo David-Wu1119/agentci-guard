@@ -1,9 +1,10 @@
 # v0.1.1 Release Gate
 
-v0.1.1 must not be tagged, published to npm, or moved under `v0` until every
-required gate below has evidence.
+The immutable `v0.1.1` tag must not be created until every pre-tag gate below
+has evidence. npm publication and movement of the floating `v0` tag additionally
+require the post-tag consumer smoke.
 
-## Required
+## Pre-tag required
 
 - [x] v0.1.0 baseline, environment, outputs, defects, and historical artifact
       inventory are frozen.
@@ -28,6 +29,11 @@ required gate below has evidence.
       audit.
 - [x] The candidate npm tarball runs its Action and CLI after extraction outside
       the repository with no `node_modules`.
+- [x] A release-triggered consumer workflow is fixed to the immutable
+      `David-Wu1119/agentci-guard@v0.1.1` reference and verifies vulnerable,
+      hardened, and threshold behavior without installing project dependencies.
+- [x] A manual post-publication workflow installs `agentci-guard@0.1.1` into an
+      empty consumer project and verifies vulnerable and hardened CLI results.
 - [ ] Hosted GitHub Actions run passes the actual manifest-based CI job.
 - [ ] A primary human completes all units and a second human completes the
       predeclared independent-review plan without seeing predictions.
@@ -43,6 +49,15 @@ required gate below has evidence.
       the standalone CLI and Action smoke.
 - [ ] A human reviews the final diff, release notes, tag target, and npm
       provenance.
+
+## Post-tag required
+
+- [ ] The release-triggered consumer workflow passes against the immutable
+      `David-Wu1119/agentci-guard@v0.1.1` reference.
+- [ ] The matching npm package is published and its installed CLI passes an
+      external consumer smoke.
+- [ ] Only after both checks pass, the floating `v0` tag is moved to the
+      `v0.1.1` commit.
 
 ## Local verification
 
@@ -60,7 +75,11 @@ pnpm package:smoke
 1. Push `feat/v0.1.1-research-prototype` and open a pull request so GitHub can
    execute the hosted manifest test.
 2. After labels and metrics pass review, merge the exact reviewed commit.
-3. Create annotated tag `v0.1.1`, update moving tag `v0`, create the GitHub
-   release, and publish the matching npm tarball.
+3. Create the annotated immutable tag `v0.1.1` and its GitHub release. The
+   release triggers `.github/workflows/published-tag-smoke.yml`.
+4. After the published-tag smoke passes, publish the already reviewed matching
+   npm tarball and dispatch `.github/workflows/published-npm-smoke.yml` at the
+   `v0.1.1` tag ref.
+5. Move `v0` only after both remote consumer checks pass.
 
 No release action should be inferred from local completion.

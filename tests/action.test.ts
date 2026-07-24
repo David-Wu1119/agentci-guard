@@ -40,6 +40,27 @@ describe("JavaScript Action entrypoint", () => {
 
     const ci = await fs.readFile(".github/workflows/ci.yml", "utf8");
     expect(ci.match(/uses:\s*\.\/\s*$/gm)?.length).toBeGreaterThanOrEqual(3);
+
+    const publishedSmoke = await fs.readFile(
+      ".github/workflows/published-tag-smoke.yml",
+      "utf8",
+    );
+    expect(
+      publishedSmoke.match(/uses:\s*David-Wu1119\/agentci-guard@v0\.1\.1\s*$/gm)
+        ?.length,
+    ).toBe(3);
+    expect(publishedSmoke).toMatch(
+      /github\.event\.release\.tag_name == 'v0\.1\.1'/,
+    );
+    expect(publishedSmoke).toContain("github.ref == 'refs/tags/v0.1.1'");
+
+    const npmSmoke = await fs.readFile(
+      ".github/workflows/published-npm-smoke.yml",
+      "utf8",
+    );
+    expect(npmSmoke).toContain("agentci-guard@0.1.1");
+    expect(npmSmoke).toContain("github.ref == 'refs/tags/v0.1.1'");
+    expect(npmSmoke).toContain('"$consumer_dir/node_modules/.bin/agentci"');
   });
 
   it("reads inputs, writes SARIF and outputs, and succeeds with fail-on none", async () => {
