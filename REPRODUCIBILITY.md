@@ -67,7 +67,8 @@ node scripts/verify-sarif.mjs "$tmp_dir/result.sarif"
 
 ```bash
 tmp_dir="$(mktemp -d)"
-npm pack --json --dry-run --ignore-scripts > "$tmp_dir/pack.json"
+npm pack --json --dry-run --ignore-scripts --foreground-scripts=false \
+  > "$tmp_dir/pack.json"
 node scripts/verify-package.mjs "$tmp_dir/pack.json"
 pnpm package:smoke
 ```
@@ -77,6 +78,8 @@ the documented package version. The standalone smoke creates the actual
 tarball, extracts it outside the repository, confirms `node_modules` is absent,
 and executes both the Action and CLI from that extracted package. This catches
 external runtime imports that an in-repository smoke can hide.
+`--foreground-scripts=false` keeps npm 10 lifecycle output out of the JSON
+stream when `prepare` still runs during `npm pack`.
 
 ## Benchmark integrity
 

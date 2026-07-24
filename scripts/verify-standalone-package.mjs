@@ -16,7 +16,14 @@ try {
   const packReport = JSON.parse(
     execFileSync(
       "npm",
-      ["pack", "--json", "--ignore-scripts", "--pack-destination", temporary],
+      [
+        "pack",
+        "--json",
+        "--ignore-scripts",
+        "--foreground-scripts=false",
+        "--pack-destination",
+        temporary,
+      ],
       {
         cwd: repositoryRoot,
         encoding: "utf8",

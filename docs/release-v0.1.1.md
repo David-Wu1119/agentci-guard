@@ -66,7 +66,7 @@ pnpm install --frozen-lockfile
 pnpm check
 pnpm benchmark:smoke
 pnpm audit --audit-level high
-npm pack --dry-run --json --ignore-scripts
+npm pack --dry-run --json --ignore-scripts --foreground-scripts=false
 pnpm package:smoke
 ```
 

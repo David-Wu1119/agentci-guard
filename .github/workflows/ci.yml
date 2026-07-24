@@ -135,7 +135,7 @@ jobs:
 
       - name: Package smoke test
         run: |
-          npm pack --json --dry-run --ignore-scripts > artifacts/npm-pack.json
+          npm pack --json --dry-run --ignore-scripts --foreground-scripts=false > artifacts/npm-pack.json
           node scripts/verify-package.mjs artifacts/npm-pack.json
           pnpm package:smoke
 
