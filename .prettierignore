@@ -5,3 +5,4 @@ coverage/
 agentci-results.*
 benchmark/snapshots/
 corpus/adversarial/cases/parse-error/
+schemas/sarif-schema-2.1.0.json

@@ -24,9 +24,9 @@ require the post-tag consumer smoke.
       workflow paths, granular annotation units, a deterministic independent
       review plan, replacement holdouts for inspected development cases,
       schemas, separate task metrics, and a reproduction smoke test.
-- [x] CI validates the committed Action bundle, manifest, SARIF severity and
-      locations, package contents, benchmark schemas, and full dependency
-      audit.
+- [x] CI validates the committed Action bundle, manifest, SARIF against the
+      checksum-pinned official OASIS schema, project severity and locations,
+      package contents, benchmark schemas, and full dependency audit.
 - [x] The candidate npm tarball runs its Action and CLI after extraction outside
       the repository with no `node_modules`.
 - [x] A release-triggered consumer workflow is fixed to the immutable

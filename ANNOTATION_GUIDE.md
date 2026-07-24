@@ -15,6 +15,12 @@ annotator's decisions during an independent pass.
 The sheets are generated from YAML structure only. Their job/step units and
 configured triggers do not contain scanner predictions.
 
+The development-only feasibility pilot under `benchmark/pilot/` uses the same
+schema and decision rules. Both humans label the same 168 units without seeing
+each other's work. Its timing and agreement results decide whether the full
+annotation protocol is operationally feasible; pilot labels are not accuracy
+evidence.
+
 ## Ground-truth values
 
 - `positive`: the complete rule predicate is present at this exact unit.

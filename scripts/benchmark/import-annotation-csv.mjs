@@ -13,16 +13,25 @@ const [inputArgument, annotator, outputArgument, ...options] =
   process.argv.slice(2);
 if (!inputArgument || !annotator || !outputArgument) {
   throw new Error(
-    "Usage: node scripts/benchmark/import-annotation-csv.mjs <filled.csv> <annotator-pseudonym> <output.jsonl> [--coverage all|review-plan]",
+    "Usage: node scripts/benchmark/import-annotation-csv.mjs <filled.csv> <annotator-pseudonym> <output.jsonl> [--coverage all|review-plan|pilot]",
   );
 }
-const coverageIndex = options.indexOf("--coverage");
-const coverage = coverageIndex >= 0 ? options[coverageIndex + 1] : "all";
-if (!["all", "review-plan"].includes(coverage)) {
-  throw new Error("--coverage must be all or review-plan.");
+if (
+  options.length !== 0 &&
+  (options.length !== 2 || options[0] !== "--coverage" || !options[1])
+) {
+  throw new Error("Expected either no options or --coverage <value>.");
 }
-const registryName =
-  coverage === "all" ? "annotation-sheet.csv" : "review-sheet.csv";
+const coverage = options.length === 0 ? "all" : options[1];
+const registryByCoverage = {
+  all: "annotation-sheet.csv",
+  "review-plan": "review-sheet.csv",
+  pilot: "pilot/annotation-sheet.csv",
+};
+const registryName = registryByCoverage[coverage];
+if (!registryName) {
+  throw new Error("--coverage must be all, review-plan, or pilot.");
+}
 const context = loadContext(registryName);
 const rows = csvObjects(fs.readFileSync(path.resolve(inputArgument), "utf8"));
 const rowsByUnit = new Map();

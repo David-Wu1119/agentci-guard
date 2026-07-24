@@ -40,10 +40,10 @@ if (document.version !== "2.1.0") {
   errors.push(`version must be 2.1.0, got ${String(document.version)}`);
 }
 if (
-  typeof document.$schema !== "string" ||
-  !document.$schema.includes("sarif")
+  document.$schema !==
+  "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json"
 ) {
-  errors.push("$schema must identify a SARIF schema");
+  errors.push("$schema must identify the pinned OASIS SARIF 2.1.0 schema");
 }
 if (!Array.isArray(document.runs) || document.runs.length !== 1) {
   errors.push("runs must contain exactly one run");

@@ -77,6 +77,11 @@ is `benchmark/schemas/annotation-record.schema.json`.
 
 ## Human review protocol
 
+- Before formal labeling, two humans run the deterministic development-only
+  feasibility pilot under `benchmark/pilot/`. It measures active time,
+  agreement, and protocol ambiguity on 168 units without opening evaluation
+  labels or consulting scanner predictions. Pilot decisions are not accuracy
+  evidence.
 - Annotator A labels all 7,056 units without running AgentCI Guard or viewing
   predictions.
 - Annotator B independently labels all agent-detection and high/critical rule

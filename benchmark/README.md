@@ -12,6 +12,8 @@ directory contains the machine-verifiable research artifacts:
   superseded unlabeled candidate manifests.
 - `annotation-sheet.csv`: 7,056 blank workflow/job/step/task units.
 - `review-sheet.csv`: deterministic 5,676-unit second-human plan.
+- `pilot/`: deterministic development-only, two-human feasibility pilot; never
+  counted as accuracy evidence.
 - `schemas/`: manifest and annotation JSON Schemas.
 - `labels/`: human source labels, adjudicated labels, and post-evaluation error
   analysis when available.
@@ -42,6 +44,11 @@ synthetic labels only.
 
 Follow [`../ANNOTATION_GUIDE.md`](../ANNOTATION_GUIDE.md). The independent
 annotators must not run AgentCI Guard or view its predictions.
+
+Before committing to the full 12,732 primary/review decisions, run the
+development-only [`pilot/README.md`](pilot/README.md) procedure to measure
+active annotation time and protocol disagreement. Any protocol revision must be
+frozen before evaluation labels are opened.
 
 ```bash
 node scripts/benchmark/import-annotation-csv.mjs \

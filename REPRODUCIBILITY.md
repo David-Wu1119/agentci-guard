@@ -32,8 +32,10 @@ pnpm audit --audit-level high
 ```
 
 The hosted CI additionally invokes `uses: ./` for vulnerable, hardened, and
-threshold-failure cases. `scripts/verify-sarif.mjs` checks SARIF structure,
-severity properties, relative artifact locations, and meaningful line numbers.
+threshold-failure cases. `scripts/verify-sarif-schema.mjs` validates each output
+against the checksum-pinned official OASIS SARIF 2.1.0 Errata 01 schema.
+`scripts/verify-sarif.mjs` separately checks AgentCI rule metadata, severity
+properties, relative artifact locations, and meaningful line numbers.
 
 After the immutable `v0.1.1` tag and GitHub release exist,
 `.github/workflows/published-tag-smoke.yml` repeats those checks through the
@@ -57,6 +59,7 @@ env \
   'INPUT_FAIL-ON=none' \
   GITHUB_OUTPUT="$tmp_dir/output" \
   node dist/action.js
+node scripts/verify-sarif-schema.mjs "$tmp_dir/result.sarif"
 node scripts/verify-sarif.mjs "$tmp_dir/result.sarif"
 ```
 
@@ -90,6 +93,8 @@ This command:
 - regenerates the 7,056-unit blank annotation registry in memory and compares
   it byte-for-byte with the checked-in CSV;
 - regenerates the 5,676-unit independent-review plan;
+- regenerates the six-case, 168-unit development-only annotation feasibility
+  pilot without consulting predictions or evaluation workflow content;
 - validates annotation schemas and any published label package.
 
 The collection scripts document how the frozen files were selected, but rerun

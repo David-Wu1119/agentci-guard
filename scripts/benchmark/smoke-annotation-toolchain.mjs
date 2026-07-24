@@ -10,6 +10,73 @@ const temporary = fs.mkdtempSync(
   path.join(os.tmpdir(), "agentci-annotation-smoke-"),
 );
 try {
+  const pilotACsv = path.join(temporary, "pilot-a.csv");
+  const pilotBCsv = path.join(temporary, "pilot-b.csv");
+  fillSynthetic(
+    path.join(benchmarkRoot, "pilot", "annotation-sheet.csv"),
+    pilotACsv,
+  );
+  fillSynthetic(
+    path.join(benchmarkRoot, "pilot", "annotation-sheet.csv"),
+    pilotBCsv,
+  );
+  introduceReviewerDisagreement(pilotBCsv);
+  const pilotAJsonl = path.join(temporary, "pilot-a.jsonl");
+  const pilotBJsonl = path.join(temporary, "pilot-b.jsonl");
+  run([
+    "scripts/benchmark/import-annotation-csv.mjs",
+    pilotACsv,
+    "pilot-a",
+    pilotAJsonl,
+    "--coverage",
+    "pilot",
+  ]);
+  run([
+    "scripts/benchmark/import-annotation-csv.mjs",
+    pilotBCsv,
+    "pilot-b",
+    pilotBJsonl,
+    "--coverage",
+    "pilot",
+  ]);
+  run([
+    "scripts/benchmark/compare-annotations.mjs",
+    pilotAJsonl,
+    pilotBJsonl,
+    path.join(temporary, "pilot-disagreements.csv"),
+    "--coverage",
+    "pilot",
+  ]);
+  const pilotTimingA = path.join(temporary, "pilot-timing-a.csv");
+  const pilotTimingB = path.join(temporary, "pilot-timing-b.csv");
+  fillTiming(
+    path.join(benchmarkRoot, "pilot", "timing-sheet.csv"),
+    pilotTimingA,
+    "pilot-a",
+  );
+  fillTiming(
+    path.join(benchmarkRoot, "pilot", "timing-sheet.csv"),
+    pilotTimingB,
+    "pilot-b",
+  );
+  const pilotSummary = path.join(temporary, "pilot-summary.json");
+  run([
+    "scripts/benchmark/summarize-pilot.mjs",
+    pilotTimingA,
+    pilotTimingB,
+    pilotAJsonl,
+    pilotBJsonl,
+    pilotSummary,
+  ]);
+  const pilotReport = JSON.parse(fs.readFileSync(pilotSummary, "utf8"));
+  if (
+    pilotReport.status !== "complete" ||
+    pilotReport.annotation_units_per_annotator !== 168 ||
+    pilotReport.agreement.independently_reviewed_units !== 168
+  ) {
+    throw new Error("Pilot smoke produced an unexpected feasibility report.");
+  }
+
   const primaryCsv = path.join(temporary, "primary.csv");
   const reviewerCsv = path.join(temporary, "reviewer.csv");
   fillSynthetic(path.join(benchmarkRoot, "annotation-sheet.csv"), primaryCsv);
@@ -113,6 +180,20 @@ function introduceReviewerDisagreement(file) {
   rows[0][column.explanation] =
     "Synthetic disagreement used only to test adjudication provenance.";
   fs.writeFileSync(file, renderCsv([header, ...rows]));
+}
+
+function fillTiming(source, destination, annotator) {
+  const [header, ...rows] = parseCsv(fs.readFileSync(source, "utf8"));
+  const column = Object.fromEntries(header.map((name, index) => [name, index]));
+  for (const row of rows) {
+    row[column.annotator_pseudonym] = annotator;
+    row[column.started_at_utc] = "2026-01-01T00:00:00Z";
+    row[column.completed_at_utc] = "2026-01-01T00:30:00Z";
+    row[column.active_minutes] = "20";
+    row[column.interruption_minutes] = "0";
+    row[column.notes] = "Synthetic smoke timing.";
+  }
+  fs.writeFileSync(destination, renderCsv([header, ...rows]));
 }
 
 function fillAdjudications(disagreementFile, primaryFile) {

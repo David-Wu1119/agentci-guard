@@ -8,21 +8,35 @@ import {
 } from "./annotation-lib.mjs";
 import { renderCsv } from "./csv.mjs";
 
-const [primaryArgument, reviewerArgument, outputArgument] =
+const [primaryArgument, reviewerArgument, outputArgument, ...options] =
   process.argv.slice(2);
 if (!primaryArgument || !reviewerArgument || !outputArgument) {
   throw new Error(
-    "Usage: node scripts/benchmark/compare-annotations.mjs <primary.jsonl> <reviewer.jsonl> <disagreements.csv>",
+    "Usage: node scripts/benchmark/compare-annotations.mjs <primary.jsonl> <reviewer.jsonl> <disagreements.csv> [--coverage formal|pilot]",
   );
 }
+if (
+  options.length !== 0 &&
+  (options.length !== 2 || options[0] !== "--coverage" || !options[1])
+) {
+  throw new Error("Expected either no options or --coverage <value>.");
+}
+const coverage = options.length === 0 ? "formal" : options[1];
+if (!["formal", "pilot"].includes(coverage)) {
+  throw new Error("--coverage must be formal or pilot.");
+}
+const primaryRegistry =
+  coverage === "pilot" ? "pilot/annotation-sheet.csv" : "annotation-sheet.csv";
+const reviewerRegistry =
+  coverage === "pilot" ? "pilot/annotation-sheet.csv" : "review-sheet.csv";
 const primaryRecords = readJsonLines(path.resolve(primaryArgument));
 const reviewerRecords = readJsonLines(path.resolve(reviewerArgument));
 const primary = validateAnnotationSet(primaryRecords, {
-  registryName: "annotation-sheet.csv",
+  registryName: primaryRegistry,
   role: "independent",
 });
 const reviewer = validateAnnotationSet(reviewerRecords, {
-  registryName: "review-sheet.csv",
+  registryName: reviewerRegistry,
   role: "independent",
 });
 if (primary.annotator === reviewer.annotator) {

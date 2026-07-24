@@ -41,7 +41,7 @@
     "prepublishOnly": "npm run check && npm run package:smoke",
     "agentci": "tsx src/cli.ts",
     "baseline:verify": "node scripts/verify-baseline.mjs",
-    "benchmark:verify": "node scripts/benchmark/verify-snapshot.mjs && node scripts/benchmark/generate-annotation-sheet.mjs --check && node scripts/benchmark/generate-review-sheet.mjs --check && node scripts/benchmark/validate-labels.mjs",
+    "benchmark:verify": "node scripts/benchmark/verify-snapshot.mjs && node scripts/benchmark/generate-annotation-sheet.mjs --check && node scripts/benchmark/generate-review-sheet.mjs --check && node scripts/benchmark/generate-pilot-sheet.mjs --check && node scripts/benchmark/validate-labels.mjs",
     "benchmark:smoke": "node scripts/benchmark/smoke-annotation-toolchain.mjs",
     "licenses:check": "node scripts/generate-third-party-licenses.mjs --check",
     "package:smoke": "node scripts/verify-standalone-package.mjs"
@@ -83,6 +83,7 @@
   "devDependencies": {
     "@types/node": "^22.19.3",
     "ajv": "^8.20.0",
+    "ajv-draft-04": "1.0.0",
     "ajv-formats": "^3.0.1",
     "prettier": "^3.8.3",
     "tsup": "^8.5.1",

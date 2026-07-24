@@ -72,6 +72,7 @@ jobs:
           OUTPUT_SARIF_PATH: ${{ steps.vulnerable.outputs.sarif-path }}
           ANALYSIS_COMPLETE: ${{ steps.vulnerable.outputs.analysis-complete }}
         run: |
+          node scripts/verify-sarif-schema.mjs artifacts/vulnerable.sarif
           node scripts/verify-sarif.mjs artifacts/vulnerable.sarif
           test "$EXPECT_FINDINGS" = "9"
           test "$EXPECT_CRITICAL" = "2"
@@ -99,6 +100,7 @@ jobs:
           OUTPUT_SARIF_PATH: ${{ steps.hardened.outputs.sarif-path }}
           ANALYSIS_COMPLETE: ${{ steps.hardened.outputs.analysis-complete }}
         run: |
+          node scripts/verify-sarif-schema.mjs artifacts/hardened.sarif
           node scripts/verify-sarif.mjs artifacts/hardened.sarif
           test "$EXPECT_FINDINGS" = "0"
           test "$OUTPUT_SARIF_PATH" = "artifacts/hardened.sarif"
@@ -124,6 +126,7 @@ jobs:
           STEP_OUTCOME: ${{ steps.threshold.outcome }}
         run: |
           test "$STEP_OUTCOME" = "failure"
+          node scripts/verify-sarif-schema.mjs artifacts/threshold.sarif
           node scripts/verify-sarif.mjs artifacts/threshold.sarif
           test "$EXPECT_HIGH" -gt 0
 

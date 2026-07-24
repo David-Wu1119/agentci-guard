@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "pilot_id": "agentci-v0.1.1-annotation-feasibility-v1",
+  "purpose": "Development-only blind annotation feasibility and agreement pilot; not accuracy evidence.",
+  "status": "template",
+  "source_benchmark_id": "agentci-real-workflows-v3",
+  "source_frozen_at": "2026-07-24T20:22:35.839Z",
+  "source_selection_inputs_sha256": "98c6aba8e591fdb237cefdc333ab14f0f8234bdd4815586320c1c2dd8b9f4360",
+  "source_annotation_registry_sha256": "4a6b74706a557cf9521977a4d0dcae856cbc6c43c764952f0dcd7b1e50184cde",
+  "split": "dev",
+  "evaluation_content_inspected_for_selection": false,
+  "selection": {
+    "seed": "agentci-guard-annotation-pilot-v1",
+    "method": "Select one development case per stratum with annotation-unit count nearest that stratum median; break ties by SHA-256(seed:case_id).",
+    "cases_per_stratum": 1,
+    "content_fields_used": [
+      "case_id",
+      "split",
+      "stratum",
+      "annotation_unit_count"
+    ]
+  },
+  "case_count": 6,
+  "annotation_unit_count": 168,
+  "cases": [
+    {
+      "case_id": "aider-001",
+      "stratum": "agent-diversity-aider-cli",
+      "repository": "eugene1g/agent-safehouse",
+      "source_path": ".github/workflows/e2e-agent-tui-macos.yml",
+      "source_commit": "027dd626e7800530aeeb87ce078996762df63691",
+      "source_sha256": "a0b0f59352efb059a1e8c10f8efd4adf5415f21cc320d5364c59d2f93b340064",
+      "snapshot_path": "benchmark/snapshots/aider-001/.github/workflows/e2e-agent-tui-macos.yml",
+      "annotation_unit_count": 34,
+      "stratum_median_unit_count": 41.5
+    },
+    {
+      "case_id": "codex-002",
+      "stratum": "agent-diversity-codex-action",
+      "repository": "hellangleZ/zspark",
+      "source_path": ".github/workflows/issue-labeler.yml",
+      "source_commit": "8ea0344416a1c3d7861566cdd3f66a8aaf11ede9",
+      "source_sha256": "d99c135a02e52c154bafda4756b20aaf94ee67a228a96dce083fa27fd4f561df",
+      "snapshot_path": "benchmark/snapshots/codex-002/.github/workflows/issue-labeler.yml",
+      "annotation_unit_count": 28,
+      "stratum_median_unit_count": 42.5
+    },
+    {
+      "case_id": "cursor-002",
+      "stratum": "agent-diversity-cursor-agent-cli",
+      "repository": "ColumbiaStellaratorTheory/firm3d",
+      "source_path": ".github/workflows/cursor-code-review.yml",
+      "source_commit": "8b4f4805a8da8093c44b6aff6cb5c185591a662c",
+      "source_sha256": "1bd54044424a23b19cc12da75e6b24a02831b2cc932fdbf426930f1579fcf87a",
+      "snapshot_path": "benchmark/snapshots/cursor-002/.github/workflows/cursor-code-review.yml",
+      "annotation_unit_count": 29,
+      "stratum_median_unit_count": 36.5
+    },
+    {
+      "case_id": "openhands-004",
+      "stratum": "agent-diversity-openhands",
+      "repository": "rajshah4/openhands-petstore-demo",
+      "source_path": ".github/workflows/openhands-release-notes.yml",
+      "source_commit": "47403d8465638bb582cf7f49d36e68a5807996ec",
+      "source_sha256": "63af9505fd3f1193807cac31a3c23c3bb3d2f128a8f683a1145b3199d7ba27a3",
+      "snapshot_path": "benchmark/snapshots/openhands-004/.github/workflows/openhands-release-notes.yml",
+      "annotation_unit_count": 24,
+      "stratum_median_unit_count": 21.5
+    },
+    {
+      "case_id": "ai-018",
+      "stratum": "ai-enriched",
+      "repository": "deriv-com/deriv-analytics",
+      "source_path": ".github/workflows/claude.yml",
+      "source_commit": "f60d5e198aa102ed97b2264e5634d38dc10ae164",
+      "source_sha256": "f33dcd6975745ffe412c2e410ce895669f2a3b197b021c03ddc9d08c77ae7e06",
+      "snapshot_path": "benchmark/snapshots/ai-018/.github/workflows/claude.yml",
+      "annotation_unit_count": 24,
+      "stratum_median_unit_count": 21.5
+    },
+    {
+      "case_id": "control-059",
+      "stratum": "control",
+      "repository": "ganler/code-r1",
+      "source_path": ".github/workflows/vllm.yml",
+      "source_commit": "443f8da8058d07051793eff875da117534fd1ba1",
+      "source_sha256": "9cac099b063f6dfe6c0db8065208c6e06a90fdcd037ebc1834bcf65fd414a40b",
+      "snapshot_path": "benchmark/snapshots/control-059/.github/workflows/vllm.yml",
+      "annotation_unit_count": 29,
+      "stratum_median_unit_count": 29
+    }
+  ]
+}
