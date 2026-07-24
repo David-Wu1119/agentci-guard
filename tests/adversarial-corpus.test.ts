@@ -3,7 +3,12 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadWorkflowFiles, scanRepository } from "../src/index.js";
 import { narrowEvents, normalizeTriggers } from "../src/workflow-model.js";
-import type { Diagnostic, Finding, Severity } from "../src/types.js";
+import type {
+  AgentUsage,
+  Diagnostic,
+  Finding,
+  Severity,
+} from "../src/types.js";
 
 type ExpectedLocation = {
   file: string;
@@ -32,6 +37,15 @@ type CorpusCase = {
       code: string;
       severity: Diagnostic["severity"];
       location: Omit<ExpectedLocation, "step">;
+    }>;
+    agent_usages?: Array<{
+      file: string;
+      job: string;
+      step: string;
+      kind: AgentUsage["kind"];
+      line_min: number;
+      reachable_events: string[];
+      call_chain?: string[];
     }>;
     analysis_complete: boolean;
   };
@@ -88,6 +102,14 @@ function expectedDiagnosticSignature(
     diagnostic.location.file,
     diagnostic.location.job ?? null,
   ]);
+}
+
+function agentUsageSignature(
+  usage:
+    | AgentUsage
+    | NonNullable<CorpusCase["expected"]["agent_usages"]>[number],
+): string {
+  return JSON.stringify([usage.file, usage.job, usage.step, usage.kind]);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -166,6 +188,28 @@ describe("public adversarial corpus", () => {
           expected.location.line_min,
         );
       }
+
+      if (fixture.expected.agent_usages) {
+        const actualAgentUsages = [...result.agent_usages].sort((left, right) =>
+          agentUsageSignature(left).localeCompare(agentUsageSignature(right)),
+        );
+        const expectedAgentUsages = [...fixture.expected.agent_usages].sort(
+          (left, right) =>
+            agentUsageSignature(left).localeCompare(agentUsageSignature(right)),
+        );
+        expect(actualAgentUsages.map(agentUsageSignature)).toEqual(
+          expectedAgentUsages.map(agentUsageSignature),
+        );
+        for (const [index, expected] of expectedAgentUsages.entries()) {
+          const actual = actualAgentUsages[index];
+          expect(actual?.line ?? 0).toBeGreaterThanOrEqual(expected.line_min);
+          expect([...(actual?.reachable_events ?? [])].sort()).toEqual(
+            [...expected.reachable_events].sort(),
+          );
+          expect(actual?.call_chain ?? []).toEqual(expected.call_chain ?? []);
+        }
+      }
+
       expect(result.analysis_complete).toBe(fixture.expected.analysis_complete);
 
       const workflows = await loadWorkflowFiles(fixtureRoot);

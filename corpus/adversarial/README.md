@@ -1,7 +1,7 @@
 # AgentCI Guard Adversarial Corpus
 
 This corpus contains synthetic workflows designed to break specific scanner
-assumptions. All 31 cases are public, minimal, and checked in CI through
+assumptions. All 33 cases are public, minimal, and checked in CI through
 `tests/adversarial-corpus.test.ts`.
 
 This is **not an accuracy benchmark**:
@@ -16,9 +16,9 @@ AgentCI Guard on real workflows?” The frozen human-labeled benchmark under
 `benchmark/` serves that separate purpose.
 
 The version-2 manifest records each case's target, subject location, reachable
-events, exact finding rule and severity, diagnostic and analysis status,
-rationale, and primary/project assumption sources. CI validates the metadata
-and exact scanner outcomes; it also directly checks job reachability for
-non-reusable workflows.
+events, exact finding rule and severity, optional exact agent-usage evidence,
+diagnostic and analysis status, rationale, and primary/project assumption
+sources. CI validates the metadata and exact scanner outcomes; it also directly
+checks job reachability for non-reusable workflows.
 
 Case definitions and expected outputs are in [`manifest.json`](manifest.json).

@@ -558,6 +558,39 @@
       ]
     },
     {
+      "id": "discussion-readonly",
+      "path": "cases/discussion-readonly",
+      "targets": ["discussion comment event", "read-only permission boundary"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent",
+        "step": "step 1"
+      },
+      "expected": {
+        "reachable_events": ["discussion_comment"],
+        "findings": [
+          {
+            "rule_id": "agentci/untrusted-input-in-prompt",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "step": "step 1",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "Discussion comment content remains untrusted, but an explicit discussions read scope must not create write-permission findings.",
+      "assumption_sources": [
+        "event-security",
+        "permissions",
+        "project-rule-contract"
+      ]
+    },
+    {
       "id": "parse-error",
       "path": "cases/parse-error",
       "targets": ["parse failure visibility"],
@@ -637,6 +670,20 @@
           }
         ],
         "diagnostics": [],
+        "agent_usages": [
+          {
+            "file": ".github/workflows/reusable.yml",
+            "job": "agent",
+            "step": "step 1",
+            "kind": "action",
+            "line_min": 15,
+            "reachable_events": ["issue_comment"],
+            "call_chain": [
+              ".github/workflows/caller.yml#agent",
+              ".github/workflows/bridge.yml#agent"
+            ]
+          }
+        ],
         "analysis_complete": true
       },
       "rationale": "Caller event, permission, untrusted input, and explicit capability context must propagate through a nested local reusable-workflow call chain.",
@@ -644,6 +691,42 @@
         "reusable-workflows",
         "permissions",
         "event-security",
+        "project-rule-contract"
+      ]
+    },
+    {
+      "id": "local-reusable-safe",
+      "path": "cases/local-reusable-safe",
+      "targets": [
+        "safe local reusable workflow",
+        "resolved agent usage without findings"
+      ],
+      "subject": {
+        "file": ".github/workflows/reusable.yml",
+        "job": "agent",
+        "step": "step 1"
+      },
+      "expected": {
+        "reachable_events": ["push"],
+        "findings": [],
+        "diagnostics": [],
+        "agent_usages": [
+          {
+            "file": ".github/workflows/reusable.yml",
+            "job": "agent",
+            "step": "step 1",
+            "kind": "action",
+            "line_min": 7,
+            "reachable_events": ["push"],
+            "call_chain": [".github/workflows/caller.yml#agent"]
+          }
+        ],
+        "analysis_complete": true
+      },
+      "rationale": "A pinned agent with a trusted prompt and read-only permissions in a reachable local reusable workflow must be detected without producing a finding.",
+      "assumption_sources": [
+        "reusable-workflows",
+        "permissions",
         "project-rule-contract"
       ]
     },
