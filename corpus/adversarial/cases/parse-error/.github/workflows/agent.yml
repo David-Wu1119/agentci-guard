@@ -1,0 +1,6 @@
+name: parse-error
+on: [push
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+

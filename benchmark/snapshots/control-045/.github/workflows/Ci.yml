@@ -1,0 +1,108 @@
+name: CI/CD Banking Software
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  build_test_package:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        # Define build configurations for each platform
+        # This will create a job for each combination of os and platform_type
+        include:
+          - os: ubuntu-latest
+            platform_type: web
+            build_command: 'npm run build:web'
+            test_command: 'npm test:web'
+            package_command: 'npm run package:web' # E.g., for static site or backend build
+            artifact_name: 'web-app'
+            path_to_artifact: 'dist/web'
+          - os: windows-latest
+            platform_type: desktop
+            build_command: 'dotnet build ./DesktopApp.sln /p:Configuration=Release'
+            test_command: 'dotnet test ./DesktopApp.sln'
+            package_command: 'msbuild /p:Configuration=Release /t:Publish DesktopInstaller.wixproj' # WiX or MSIX packaging
+            artifact_name: 'desktop-installer'
+            path_to_artifact: 'artifacts/desktop'
+          - os: ubuntu-latest # For Android APK
+            platform_type: mobile-android
+            build_command: './gradlew assembleRelease'
+            test_command: './gradlew test'
+            package_command: './gradlew bundleReleaseAar' # or assembleRelease for APK
+            artifact_name: 'android-app'
+            path_to_artifact: 'app/build/outputs/apk/release'
+          - os: macos-latest # For iOS (if Flutter/React Native)
+            platform_type: mobile-ios
+            build_command: 'flutter build ios --release --no-codesign' # For Flutter, adjust for native iOS
+            test_command: 'flutter test'
+            package_command: 'fastlane gym' # For IPA, requires Fastlane setup
+            artifact_name: 'ios-app'
+            path_to_artifact: 'build/ios/archive/Runner.xcarchive' # Or wherever IPA is
+          - os: windows-latest # For MSIX (Windows Store/Sideloading)
+            platform_type: mobile-windows
+            build_command: 'msbuild /p:Configuration=Release ./UWPApp.sln' # Or WinUI 3 project
+            test_command: 'vstest.console.exe ./UWPApp.Tests.dll'
+            package_command: 'msbuild /p:Configuration=Release /t:Publish ./UWPApp.Packaging/UWPApp.Packaging.wapproj'
+            artifact_name: 'msix-package'
+            path_to_artifact: 'AppPackages'
+
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js (for web)
+      if: matrix.platform_type == 'web'
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Setup .NET (for desktop/UWP)
+      if: matrix.platform_type == 'desktop' || matrix.platform_type == 'mobile-windows'
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x' # Or relevant .NET version
+
+    - name: Setup Java/Gradle (for Android)
+      if: matrix.platform_type == 'mobile-android'
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Install dependencies
+      run: |
+        # Commands to install dependencies specific to each platform
+        # e.g., npm ci for web, nuget restore for .NET, pod install for iOS
+        if [[ "${{ matrix.platform_type }}" == "web" ]]; then
+          npm ci
+        elif [[ "${{ matrix.platform_type }}" == "desktop" || "${{ matrix.platform_type }}" == "mobile-windows" ]]; then
+          dotnet restore
+        fi # Add other platforms as needed
+
+    - name: Build ${{ matrix.platform_type }}
+      run: ${{ matrix.build_command }}
+
+    - name: Run Tests for ${{ matrix.platform_type }}
+      run: ${{ matrix.test_command }}
+      # Add steps for security scanning here (e.g., Snyk, SonarCloud)
+
+    - name: Package ${{ matrix.platform_type }}
+      run: ${{ matrix.package_command }}
+      env:
+        # Example for Android signing, adapt for other platforms
+        KEYSTORE_PATH: ${{ secrets.ANDROID_KEYSTORE_PATH }}
+        KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+    - name: Upload Artifacts for ${{ matrix.platform_type }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.artifact_name }}-${{ github.sha }} # Unique artifact name per commit
+        path: ${{ matrix.path_to_artifact }}
+        

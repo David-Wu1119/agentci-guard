@@ -1,0 +1,14 @@
+name: local-reusable-callee
+on:
+  workflow_call:
+    inputs:
+      request:
+        required: true
+        type: string
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          prompt: ${{ inputs.request }}

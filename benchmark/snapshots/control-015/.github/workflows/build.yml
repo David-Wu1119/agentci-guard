@@ -1,0 +1,176 @@
+name: Build
+
+on:
+  pull_request:
+  push:
+    branches-ignore:
+      - 'hotfix-*'   
+      - 'release'
+
+
+jobs:
+
+  docker-build-home:
+    runs-on: ubuntu-latest
+    env:
+      CI_PIPELINE_ID: ${{github.run_number}}
+    steps:
+      - name: Checkout 
+        uses: actions/checkout@v4
+
+      - name: Preinstall 
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          command: npm run prerun
+      
+      # build image for accounts service
+      - name: build docker image
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 45
+          max_attempts: 3
+          command: sudo docker build --no-cache -f ./Home/Dockerfile .
+
+
+  docker-build-app:
+    runs-on: ubuntu-latest
+    env:
+      CI_PIPELINE_ID: ${{github.run_number}}
+    steps:
+      - name: Checkout 
+        uses: actions/checkout@v4
+
+      - name: Preinstall 
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          command: npm run prerun
+
+        
+      # build image for accounts service
+      - name: build docker image
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 45
+          max_attempts: 3
+          command: sudo docker build --no-cache -f ./App/Dockerfile .
+
+
+  docker-build-e2e:
+    runs-on: ubuntu-latest
+    env:
+      CI_PIPELINE_ID: ${{github.run_number}}
+    steps:
+      - name: Checkout 
+        uses: actions/checkout@v4
+
+      - name: Preinstall 
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          command: npm run prerun
+
+        
+      # build image for accounts service
+      - name: build docker image
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 45
+          max_attempts: 3
+          command: sudo docker build --no-cache -f ./E2E/Dockerfile .
+
+  docker-build-probe:
+    runs-on: ubuntu-latest
+    env:
+      CI_PIPELINE_ID: ${{github.run_number}}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Preinstall
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          command: npm run prerun
+
+      # build image probe api
+      - name: build docker image
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 45
+          max_attempts: 3
+          command: sudo docker build --no-cache -f ./Probe/Dockerfile .
+
+  docker-build-runbook-agent:
+    runs-on: ubuntu-latest
+    env:
+      CI_PIPELINE_ID: ${{github.run_number}}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Preinstall
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          command: npm run prerun
+
+      # build runbook agent image
+      - name: build docker image
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: sudo docker build --no-cache -f ./RunbookAgent/Dockerfile .
+
+  docker-build-test-server:
+    runs-on: ubuntu-latest
+    env:
+      CI_PIPELINE_ID: ${{github.run_number}}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Preinstall
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          command: npm run prerun
+
+      # build image for mail service
+      - name: build docker image
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 45
+          max_attempts: 3
+          command: sudo docker build --no-cache -f ./TestServer/Dockerfile .
+
+  docker-build-ai-agent:
+    runs-on: ubuntu-latest
+    env:
+      CI_PIPELINE_ID: ${{github.run_number}}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Preinstall
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          command: npm run prerun
+
+      # build image for ai agent service
+      - name: build docker image
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 45
+          max_attempts: 3
+          command: sudo docker build --no-cache -f ./AIAgent/Dockerfile .

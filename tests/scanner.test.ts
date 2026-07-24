@@ -23,5 +23,32 @@ describe("scanRepository", () => {
     expect(sarif.version).toBe("2.1.0");
     expect(sarif.runs[0]?.tool.driver.name).toBe("AgentCI Guard");
     expect(sarif.runs[0]?.results.length).toBe(result.findings.length);
+    expect(
+      sarif.runs[0]?.results.every(
+        (entry) =>
+          (entry.locations[0]?.physicalLocation.region?.startLine ?? 0) > 1,
+      ),
+    ).toBe(true);
+  });
+
+  it("fails when an explicit config path is missing", async () => {
+    await expect(
+      scanRepository("tests/fixtures", {
+        configPath: "tests/fixtures/does-not-exist.json",
+      }),
+    ).rejects.toThrow("Unable to read config file");
+  });
+
+  it("reports malformed YAML as a diagnostic, not a security finding", async () => {
+    const result = await scanRepository("corpus/adversarial/cases/parse-error");
+
+    expect(result.findings).toEqual([]);
+    expect(result.diagnostics).toEqual([
+      expect.objectContaining({
+        code: "agentci/parse-error",
+        kind: "parse",
+      }),
+    ]);
+    expect(result.analysis_complete).toBe(false);
   });
 });

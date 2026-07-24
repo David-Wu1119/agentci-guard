@@ -35,7 +35,7 @@ export function toSarif(findings: Finding[]): SarifLog {
             {
               physicalLocation: {
                 artifactLocation: { uri: finding.file },
-                region: { startLine: 1 },
+                region: { startLine: finding.line ?? 1 },
               },
             },
           ],

@@ -1,0 +1,11 @@
+name: action-prose-no-shell
+on: push
+permissions:
+  contents: read
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          prompt: Review the Python package without running commands.

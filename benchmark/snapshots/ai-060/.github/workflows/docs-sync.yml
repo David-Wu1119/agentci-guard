@@ -1,0 +1,229 @@
+name: Docs Sync
+
+# Automated documentation maintenance via /meta:docs-quick-update --ci.
+#
+# How it works:
+#   - Push to main touching watched code surfaces → workflow runs.
+#   - Cold periods (no relevant changes) cost zero GHA minutes (paths filter).
+#   - Concurrency-grouped + queued: rapid back-to-back merges process in order.
+#   - Single rolling PR on `docs-sync/auto` accumulates updates; one open PR max.
+#   - Project-specific behavior lives in `.github/docs-sync.config.json`
+#     (allowlist, denylist, diff window).
+#
+# Prerequisites:
+#   - Run `/install-github-app` in Claude Code first to set up the Claude
+#     Code GitHub App and configure `CLAUDE_CODE_OAUTH_TOKEN` repo secret.
+#
+# Per-project tuning:
+#   - Adjust the `paths:` filter below to match your project's documented
+#     code surfaces.
+#   - Adjust `.github/docs-sync.config.json` for allowlist/denylist/range.
+#
+# The vendored command at `.github/prompts/docs-quick-update.md` is a copy of
+# `meta:docs-quick-update` from the vt-spells private plugin marketplace.
+# Refresh by overwriting that file when the upstream command improves.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      # Adjust these for your project. Defaults below cover common surfaces
+      # in a vt-saas-template-derived app.
+      - 'src/models/**'
+      - 'src/libs/**'
+      - 'src/app/api/**'
+      - src/proxy.ts
+      - src/instrumentation.ts
+  workflow_dispatch: {}
+
+concurrency:
+  group: docs-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+
+    steps:
+      - name: Checkout main with full history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Skip if commit is cosmetic (Conventional Commits filter)
+        id: filter
+        if: github.event_name == 'push'
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # Inspect exactly the commits THIS push introduced — not `git log -1`,
+          # which reads main's tip at checkout time. With back-to-back merges the
+          # checkout (ref: main) lands on an *advanced* HEAD, so `git log -1`
+          # would judge a later commit than the one that triggered this run. A
+          # cosmetic tip (e.g. a chore release commit) then masked an earlier
+          # feat/fix in the same burst, silently skipping its doc updates.
+          #
+          # Resolve the push range from the event payload instead. Fall back to
+          # the single triggering commit for a new branch (before == zeros) or an
+          # unreachable base (e.g. force-push).
+          ZERO="0000000000000000000000000000000000000000"
+          if [ -n "${BEFORE_SHA:-}" ] && [ "$BEFORE_SHA" != "$ZERO" ] && git cat-file -e "${BEFORE_SHA}^{commit}" 2>/dev/null; then
+            RANGE="${BEFORE_SHA}..${HEAD_SHA}"
+          else
+            RANGE="${HEAD_SHA}~1..${HEAD_SHA}"
+          fi
+          echo "Inspecting pushed commits in range: $RANGE"
+          SUBJECTS=$(git log --format=%s "$RANGE")
+          echo "$SUBJECTS"
+          # Skip ONLY if every commit in the push is cosmetic. Any feat/fix/etc.
+          # in the burst keeps the run alive. Matches bare (chore:) and scoped
+          # (chore(deps):) forms.
+          NON_COSMETIC=$(echo "$SUBJECTS" | grep -vE '^(chore|test|style|ci|build|refactor|docs|perf)(\([^)]+\))?!?:' || true)
+          if [ -z "$NON_COSMETIC" ]; then
+            echo "All pushed commits are cosmetic / non-feature — skipping docs sync."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Non-cosmetic commit(s) present — running docs sync."
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check for existing rolling PR
+        if: steps.filter.outputs.skip != 'true'
+        id: existing
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          PR_NUMBER=$(gh pr list --head docs-sync/auto --state open --json number --jq '.[0].number // empty')
+          if [ -n "$PR_NUMBER" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Found existing rolling PR #$PR_NUMBER"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "No existing rolling PR"
+          fi
+
+      - name: Prepare rolling branch
+        if: steps.filter.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Reuse the rolling branch whenever it exists on the remote — not just
+          # when an open PR points at it. The branch can outlive its PR (closed
+          # without deletion, or a squash/rebase merge that leaves it behind), and
+          # blindly recreating it makes the later push a non-fast-forward that
+          # fails the job. Probe the remote branch directly, independent of PR state.
+          if git ls-remote --exit-code --heads origin docs-sync/auto >/dev/null 2>&1; then
+            git fetch origin docs-sync/auto:refs/remotes/origin/docs-sync/auto
+            git checkout -B docs-sync/auto origin/docs-sync/auto
+            if ! git rebase origin/main; then
+              git rebase --abort
+              echo "::error::Rebase of docs-sync/auto onto main failed. Resolve manually on the PR, then re-run."
+              exit 1
+            fi
+          else
+            git checkout -b docs-sync/auto origin/main
+          fi
+
+      - name: Load command prompt
+        if: steps.filter.outputs.skip != 'true'
+        run: |
+          {
+            echo 'DOCS_PROMPT<<PROMPT_EOF'
+            cat .github/prompts/docs-quick-update.md
+            echo ""
+            echo "---"
+            echo ""
+            echo "Execute the command above with the \`--ci\` flag."
+            echo 'PROMPT_EOF'
+          } >> "$GITHUB_ENV"
+
+      - name: Set up Node
+        if: steps.filter.outputs.skip != 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install Claude Code CLI
+        if: steps.filter.outputs.skip != 'true'
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run Claude docs-quick-update --ci
+        if: steps.filter.outputs.skip != 'true'
+        # Headless Claude Code CLI — NOT anthropics/claude-code-action.
+        # The action rejects `push` events ("Unsupported event type: push"),
+        # but this workflow is push-triggered, so the action can never run here.
+        # `claude -p` (print mode) has no event-type restriction. Auth reuses the
+        # existing CLAUDE_CODE_OAUTH_TOKEN secret via env var (no interactive login).
+        # --dangerously-skip-permissions: the prompt is first-party (committed in
+        # .github/prompts/) and the runner is ephemeral — same trust level the
+        # action operated at. Do not swap back to the action; it cannot accept push.
+        #
+        # The prompt is piped via stdin, NOT passed as a positional arg: it begins
+        # with the prompt file's `---` YAML frontmatter, which the CLI's option
+        # parser would reject as `unknown option '---'`. stdin sidesteps option
+        # parsing entirely (the documented headless pattern for large prompts).
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          printf '%s' "$DOCS_PROMPT" | claude -p \
+            --model claude-sonnet-4-6 \
+            --dangerously-skip-permissions
+
+      - name: Commit and push doc updates
+        if: steps.filter.outputs.skip != 'true'
+        id: commit
+        run: |
+          set -euo pipefail
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "No documentation changes produced. Exiting clean."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git add -A
+          git commit -m "docs: sync with code changes through ${GITHUB_SHA:0:7}"
+          # Rebasing onto main rewrites the branch's commit SHAs, so the push is a
+          # non-fast-forward by design. --force-with-lease lands it while still
+          # refusing to clobber any commit pushed to the branch since our fetch
+          # (e.g. a human editing the rolling PR), failing safely instead.
+          git push --force-with-lease origin docs-sync/auto
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Open rolling PR if new
+        if: steps.commit.outputs.changed == 'true' && steps.existing.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create \
+            --base main \
+            --head docs-sync/auto \
+            --title "docs: automated documentation sync" \
+            --body "$(cat <<'EOF'
+          Auto-generated documentation updates from recent code changes on `main`.
+
+          **Source command:** `/meta:docs-quick-update --ci`
+          **Config:** `.github/docs-sync.config.json`
+          **Workflow:** `.github/workflows/docs-sync.yml`
+
+          ### How this PR evolves
+
+          This is a **rolling PR**. Future runs push additional commits to `docs-sync/auto` rather than opening new PRs. Merge when you're happy with the current state; the next relevant code change on `main` opens a fresh rolling PR.
+
+          ### If a suggestion is wrong
+
+          Just edit the file directly on the `docs-sync/auto` branch. The next workflow run will rebase onto `main` and add new commits on top of your edits.
+          EOF
+          )"

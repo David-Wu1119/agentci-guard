@@ -1,11 +1,17 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import type { PermissionDefault } from "./types.js";
 
 export type AgentciConfig = {
   /** Rule ids to suppress everywhere, e.g. "agentci/unpinned-ai-action". */
   ignore: string[];
   /** Workflow path globs (relative to scan root) to exclude from reporting. */
   ignorePaths: string[];
+  /**
+   * Optional repository policy for otherwise-absent workflow permissions.
+   * Without this, AgentCI Guard reports the effective permission as unknown.
+   */
+  defaultPermissions?: PermissionDefault;
 };
 
 const EMPTY: AgentciConfig = { ignore: [], ignorePaths: [] };
@@ -25,13 +31,20 @@ export async function loadConfig(
     let raw: string;
     try {
       raw = await fs.readFile(file, "utf8");
-    } catch {
+    } catch (error) {
+      if (explicitPath) {
+        const detail = error instanceof Error ? `: ${error.message}` : "";
+        throw new Error(`Unable to read config file ${file}${detail}`);
+      }
       continue;
     }
     const parsed = JSON.parse(raw) as Partial<AgentciConfig>;
     return {
       ignore: toStringArray(parsed.ignore),
       ignorePaths: toStringArray(parsed.ignorePaths),
+      defaultPermissions: normalizeDefaultPermissions(
+        parsed.defaultPermissions,
+      ),
     };
   }
   return EMPTY;
@@ -39,6 +52,35 @@ export async function loadConfig(
 
 function toStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.map((item) => String(item)) : [];
+}
+
+function normalizeDefaultPermissions(
+  value: unknown,
+): PermissionDefault | undefined {
+  if (value === undefined) return undefined;
+  if (
+    value === "unknown" ||
+    value === "none" ||
+    value === "read-all" ||
+    value === "write-all"
+  ) {
+    return value;
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(
+      "defaultPermissions must be unknown, none, read-all, write-all, or a permission map.",
+    );
+  }
+  const normalized: Record<string, "none" | "read" | "write"> = {};
+  for (const [scope, level] of Object.entries(value)) {
+    if (level !== "none" && level !== "read" && level !== "write") {
+      throw new Error(
+        `defaultPermissions.${scope} must be none, read, or write.`,
+      );
+    }
+    normalized[scope] = level;
+  }
+  return normalized;
 }
 
 /**

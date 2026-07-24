@@ -1,6 +1,9 @@
 # Contributing to agentci-guard
 
-Thanks for being here. **agentci-guard** is a static linter for GitHub Actions workflows that use AI coding agents (Claude Code, Aider, OpenHands, Codex, and friends). It flags risky patterns — untrusted input reaching a write-capable agent, unpinned AI actions, broad permissions — and emits SARIF. It ships as the npm package [`agentci-guard`](https://www.npmjs.com/package/agentci-guard) and as the GitHub Action `David-Wu1119/agentci-guard@v0`.
+**agentci-guard** is an experimental static linter for GitHub Actions workflows
+that use AI coding agents. It flags risky patterns and emits SARIF. v0.1.0's
+CLI is published, but its Action entrypoint is broken; the dedicated Action
+entrypoint is part of unreleased v0.1.1.
 
 Contributions are very welcome, especially **new agent detectors**. That's the centerpiece of this guide.
 
@@ -26,15 +29,14 @@ pnpm test --watch
 
 > Detect AI-agent usage only from **specific, load-bearing signals** — known agent actions, agent CLI invocations, and provider credentials / model identifiers. **Never** from generic words.
 
-This is not a style preference; it's the lesson from the real-world scan. We ran agentci-guard across **75 public repos** whose `.github/workflows` reference `anthropics/claude-code-action` (found via GitHub code search). Generic tokens like `agent`, `ai`, `node`, `codex`, and `mcp` legitimately appear all over ordinary CI — self-hosted runner labels (`build-agent`), `User-Agent` headers, action slugs (`datadog/agent-action`), and everyday tooling. Match on those and the tool cries wolf, then gets uninstalled after the first run.
+Generic tokens like `agent`, `ai`, `node`, `codex`, and `mcp` legitimately
+appear throughout ordinary CI—runner labels, `User-Agent` headers, action
+slugs, and tooling. Match on those and the linter becomes unusable.
 
-The self-audit drove this home. Our **first scan reported 59 criticals**. Auditing those against well-configured repos exposed three false-positive classes **in the tool itself**:
-
-1. `id-token: write` was being counted as repo write.
-2. Untrusted content inside an `if:` guard was treated as a prompt sink.
-3. `ai-with-secrets` was rated high, even though nearly every AI action needs a provider key.
-
-After fixing all three: reported criticals fell **78% (59 -> 13)**. Every new detector should be held to that same bar — a specific signal, not a generic word. (A later exploitability triage found most remaining critical *ratings* are gated by `claude-code-action`'s default write-access check — see `WRITEUP.md`. Treat rule output as scanner ratings, not confirmed exploits.)
+Every semantic fix needs a minimal case in `corpus/adversarial/`. Accuracy
+changes must be developed on the labeled benchmark's `dev` split and evaluated
+once on its sealed `eval` split. The historical 75-repository scan had no
+durable snapshot or labels and is not admissible evidence.
 
 ### Responsible-use note
 
@@ -88,11 +90,11 @@ Detectors find AI usage; **rules** decide what's risky and how loud to be. All r
 
 ```ts
 type RuleDefinition = {
-  id: string;          // e.g. "agentci/untrusted-ai-write-token"
+  id: string; // e.g. "agentci/untrusted-ai-write-token"
   title: string;
-  severity: Severity;  // "critical" | "high" | "medium" | "low"
-  why: string;         // the threat model, in plain language
-  fix: string[];       // concrete remediation steps
+  severity: Severity; // "critical" | "high" | "medium" | "low"
+  why: string; // the threat model, in plain language
+  fix: string[]; // concrete remediation steps
 };
 ```
 
@@ -101,7 +103,7 @@ There are **8 rules** today, spanning critical to medium. A few worth knowing as
 - `agentci/untrusted-ai-write-token` (**critical**) — untrusted event content can reach a write-capable agent.
 - `agentci/pull-request-target-ai` (**critical**) — agent runs in the base-repo security context.
 - `agentci/untrusted-input-in-prompt` (**high**) and `agentci/ai-shell-access` (**high**).
-- `agentci/ai-with-secrets` (**medium**) — deliberately *not* high. Most AI actions need a provider key, so this is a baseline exposure to review, not a vulnerability on its own; it escalates only when combined with untrusted input or write permissions. This is one of the three self-audit fixes — keep severities honest the same way.
+- `agentci/ai-with-secrets` (**medium**) — deliberately _not_ high. Most AI actions need a provider key, so this is a baseline exposure to review, not a vulnerability on its own; it escalates only when combined with untrusted input or write permissions.
 
 If you change a severity or add a rule, update the `why`/`fix` text to match the threat model, and make sure the precision tests still reflect reality.
 
@@ -117,4 +119,5 @@ If you change a severity or add a rule, update the `why`/`fix` text to match the
 
 agentci-guard is MIT licensed. By contributing, you agree your contributions are licensed under the same terms. Maintained by David Wu ([@David-Wu1119](https://github.com/David-Wu1119)).
 
-Happy hunting — and thank you for keeping the false-positive rate low.
+Keep claims narrower than the evidence. A green adversarial corpus proves only
+that known regressions did not return; it does not prove real-world accuracy.

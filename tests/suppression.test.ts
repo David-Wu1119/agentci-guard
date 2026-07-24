@@ -70,9 +70,9 @@ describe("matchesPath", () => {
     expect(matchesPath("**/noisy.yml", ".github/workflows/noisy.yml")).toBe(
       true,
     );
-    expect(matchesPath(".github/workflows/*.yml", ".github/workflows/ci.yml")).toBe(
-      true,
-    );
+    expect(
+      matchesPath(".github/workflows/*.yml", ".github/workflows/ci.yml"),
+    ).toBe(true);
     expect(matchesPath("**/noisy.yml", ".github/workflows/vuln.yml")).toBe(
       false,
     );

@@ -47,32 +47,63 @@ export const AI_AGENT_PATTERNS = [
   /\bmodel context protocol\b/i,
 ];
 
-const UNTRUSTED_CONTEXT_PATTERNS = [
-  /github\.event\.pull_request\.(body|title|head\.ref|head\.sha)/i,
-  /github\.event\.issue\.(body|title)/i,
-  /github\.event\.comment\.body/i,
-  /github\.event\.review\.body/i,
-  /github\.event\.head_commit\.message/i,
-  /github\.head_ref/i,
-  /github\.ref_name/i,
+const UNTRUSTED_CONTEXT_PATTERNS: Array<{
+  pattern: RegExp;
+  events: string[];
+}> = [
+  {
+    pattern: /github\.event\.pull_request\.(body|title|head\.ref|head\.sha)/i,
+    events: ["pull_request", "pull_request_target"],
+  },
+  {
+    pattern: /github\.event\.issue\.(body|title)/i,
+    events: ["issues", "issue_comment"],
+  },
+  {
+    pattern: /github\.event\.discussion\.(body|title)/i,
+    events: ["discussion", "discussion_comment"],
+  },
+  {
+    pattern: /github\.event\.comment\.body/i,
+    events: [
+      "issue_comment",
+      "discussion_comment",
+      "pull_request_review_comment",
+    ],
+  },
+  {
+    pattern: /github\.event\.review\.body/i,
+    events: ["pull_request_review"],
+  },
+  {
+    pattern: /github\.event\.review_comment\.body/i,
+    events: ["pull_request_review_comment"],
+  },
+  {
+    pattern: /github\.event\.head_commit\.message/i,
+    events: ["push"],
+  },
+  {
+    pattern: /github\.head_ref/i,
+    events: ["pull_request", "pull_request_target"],
+  },
+  {
+    pattern: /github\.ref_name/i,
+    events: ["*"],
+  },
 ];
 
 const SECRET_PATTERNS = [
-  /secrets\./i,
-  /GITHUB_TOKEN/i,
-  /\b[A-Z0-9_]*TOKEN\b/,
-  /\b[A-Z0-9_]*KEY\b/,
+  /secrets\.[A-Za-z0-9_]+/i,
+  /github\.token/i,
+  /\$\{\{\s*(?:env\.)?[A-Z0-9_]*(?:TOKEN|KEY)\s*\}\}/,
 ];
-const SHELL_PATTERNS = [
-  /\bshell\b/i,
-  /\bbash\b/i,
-  /\bsh\b/i,
-  /\bcurl\b/i,
-  /\bwget\b/i,
-  /\bnpx\b/i,
-  /\bpython\b/i,
-  /\bnode\b/i,
-  /\bexec\b/i,
+const EXPLICIT_SHELL_CAPABILITY_PATTERNS = [
+  /--allowedTools?\s+[^\n]*(?:Bash|Shell)/i,
+  /allowed[_-]?tools?["']?\s*[:=][^\n]*(?:Bash|Shell)/i,
+  /\b(?:Bash|Shell)\s*\([^)]*\)/i,
+  /dangerously[_-]?skip[_-]?permissions/i,
+  /(?:enable|allow)[_-]?(?:shell|commands?)/i,
 ];
 
 export function looksLikeAiUsage(value: string): boolean {
@@ -80,7 +111,17 @@ export function looksLikeAiUsage(value: string): boolean {
 }
 
 export function containsUntrustedGitHubContext(value: string): boolean {
-  return UNTRUSTED_CONTEXT_PATTERNS.some((pattern) => pattern.test(value));
+  return untrustedGitHubContextEvents(value).length > 0;
+}
+
+export function untrustedGitHubContextEvents(value: string): string[] {
+  const events = new Set<string>();
+  for (const candidate of UNTRUSTED_CONTEXT_PATTERNS) {
+    if (candidate.pattern.test(value)) {
+      for (const event of candidate.events) events.add(event);
+    }
+  }
+  return [...events];
 }
 
 export function containsSecretReference(value: string): boolean {
@@ -88,7 +129,9 @@ export function containsSecretReference(value: string): boolean {
 }
 
 export function containsShellAccess(value: string): boolean {
-  return SHELL_PATTERNS.some((pattern) => pattern.test(value));
+  return EXPLICIT_SHELL_CAPABILITY_PATTERNS.some((pattern) =>
+    pattern.test(value),
+  );
 }
 
 export function isPinnedAction(uses: string): boolean {

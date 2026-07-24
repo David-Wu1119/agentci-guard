@@ -1,0 +1,77 @@
+name: PR Review — Recovery/WAL
+
+on:
+  pull_request:
+    types: [opened, ready_for_review, reopened]
+    paths:
+      - 'src/FlashSkink.Core/Metadata/Migrations/**'
+      - 'src/FlashSkink.Core/Metadata/WalRepository.cs'
+      - 'src/FlashSkink.Core/Healing/**'
+      - 'src/FlashSkink.Core/Usb/**'
+      - 'src/FlashSkink.Core/Orchestration/**'
+
+jobs:
+  recovery-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Pre-compute ALL inputs into a single context file so Claude has
+      # nothing to explore — it reads one file and posts the comment.
+      - name: Build review context
+        shell: bash
+        run: |
+          BASE_REF="${{ github.base_ref }}"
+          mkdir -p /tmp/review
+
+          {
+            echo "# Recovery/WAL Review Context"
+            echo ""
+
+            echo "## Changed files"
+            echo '```'
+            git diff --name-only "origin/$BASE_REF...HEAD"
+            echo '```'
+            echo ""
+
+            echo "## Full diff"
+            echo '```diff'
+            git diff "origin/$BASE_REF...HEAD" --output=/tmp/review/diff.full
+            head -c 200000 /tmp/review/diff.full
+            echo '```'
+          } > /tmp/review/context.md
+
+          echo "Context built: $(wc -l < /tmp/review/context.md) lines, $(wc -c < /tmp/review/context.md) bytes"
+
+      - uses: anthropics/claude-code-action@64de744025ca9e24df2b88204b4f1e968f39f009  # v1.0.139
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: >-
+            --model claude-opus-4-6
+            --max-turns 15
+            --allowed-tools "Read"
+          prompt: |
+            All inputs you need are in /tmp/review/context.md
+            Read it ONCE. Post the review comment below. Then STOP.
+
+            Do NOT read any other files. Do NOT run any commands. Do NOT explore the repo.
+            If something is unclear from the context file, say so in the comment rather than looking for it.
+
+            ## Review comment format
+
+            Cover every category — write "clean" explicitly if no issue found.
+
+            - **Idempotent recovery steps**: can each WAL recovery step be run twice safely? Any non-idempotent op in a recovery path?
+            - **fsync sequencing**: is write → fsync → rename → fsync-directory followed exactly?
+            - **Transaction boundaries**: are SQLite transactions scoped so a crash leaves the DB consistent?
+            - **CancellationToken.None literal**: in all compensation/recovery paths, does every await use `CancellationToken.None` literally (not via a local variable)?
+            - **Crash-consistency invariant**: can a crash leave an orphaned blob row without a file row, or a file row with a missing blob?
+
+            After posting, you are done.

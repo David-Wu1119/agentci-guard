@@ -1,0 +1,48 @@
+# Automated Claude code review on every pull request
+# Triggers on PR open, update, and reopen — posts review comments automatically
+
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  id-token: write  # claude-code-action's OIDC handshake needs this
+
+jobs:
+  review:
+    name: Automated Review
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
+        with:
+          fetch-depth: 0
+
+      - name: Claude Code Review
+        uses: anthropics/claude-code-action@b8af2aac9666eb9921246e2d2b46a8e8fcfabc88  # v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: '--model claude-sonnet-4-20250514 --allowedTools "Bash,Read,Glob,Grep"'
+          prompt: |
+            Review this pull request. Read the CLAUDE.md file at the repository root for project context.
+
+            Focus on:
+            1. **Correctness** — Does the code do what the PR claims?
+            2. **Workflow contracts** — For YAML changes: input/output types, job dependencies, reusability across sub-repos
+            3. **Security** — No secrets in logs, pinned action versions, no injection vectors
+            4. **Testing** — Are changes covered? Do tests follow project conventions?
+            5. **Style** — .editorconfig compliance, conventional commit title
+            6. **Documentation** — README/inline docs updated where needed
+
+            Be concise and actionable. Reference file paths and line numbers.
+            If the PR is clean, approve with a brief summary — do not fabricate issues.

@@ -1,102 +1,86 @@
-# Real-World Findings
+# Historical v0.1 Exploratory Scan
 
-A **v0.1** scan of public GitHub repositories that run AI coding agents in CI, to
-(a) validate AgentCI Guard against real workflows and (b) get an honest read on
-how common the risky patterns actually are. The severity counts below are v0.1
-**scanner ratings** — pattern matches, not confirmed exploits (see "Follow-up:
-exploitability triage").
+## Evidence status
 
-## Method
+**This study is not reproducible and is not an accuracy evaluation.**
 
-- **Corpus:** 75 public repositories whose `.github/workflows/*.yml` reference
-  `anthropics/claude-code-action`, discovered via GitHub code search.
-- **Tool:** `agentci scan` at the commit this document ships in.
-- **What's counted:** findings at job/step granularity, aggregated by severity
-  and rule. No repository is named here (see "Responsible use").
+In June 2026, v0.1 was run over GitHub code-search results described as 75
+public repositories whose workflow files referenced
+`anthropics/claude-code-action`. The surviving local transcript contains the
+search query, generated scan script, selected manual inspections, and printed
+aggregate summaries. It does **not** contain the exact 75-file list, repository
+commit SHAs, fetched workflow snapshot, or raw report. Those artifacts were
+written under `/tmp` and are gone.
 
-## Results
+The full recovery inventory is frozen in
+[`studies/v0.1.0-baseline/artifact-inventory.md`](../studies/v0.1.0-baseline/artifact-inventory.md).
+The tables below are retained only to document what v0.1 previously claimed.
+They must not be cited as reproducible results, ecosystem prevalence, confirmed
+vulnerabilities, or measured scanner accuracy.
+
+## Archived aggregate output
+
+The historical report stated:
 
 | Severity | Findings |
-| --- | ---: |
-| Critical | 13 |
-| High | 69 |
-| Medium | 225 |
-| Low | 0 |
+| -------- | -------: |
+| Critical |       13 |
+| High     |       69 |
+| Medium   |      225 |
+| Low      |        0 |
 
-Repositories by their **worst** finding (of 75 scanned):
+It grouped repositories by their worst scanner rating as:
 
-| Worst severity | Repos | Share |
-| --- | ---: | ---: |
-| Critical | 8 | 11% |
-| High | 32 | 43% |
-| Medium | 35 | 47% |
-| Clean | 0 | 0% |
+| Worst severity | Repositories | Reported share |
+| -------------- | -----------: | -------------: |
+| Critical       |            8 |            11% |
+| High           |           32 |            43% |
+| Medium         |           35 |            47% |
+| Clean          |            0 |             0% |
 
-By rule:
+And it reported these rule totals:
 
-| Count | Rule |
-| ---: | --- |
-| 90 | `agentci/unpinned-ai-action` |
-| 82 | `agentci/ai-with-secrets` |
-| 57 | `agentci/ai-shell-access` |
-| 53 | `agentci/broad-write-permissions` |
-| 11 | `agentci/untrusted-input-in-prompt` |
-| 11 | `agentci/untrusted-ai-write-token` |
-| 2 | `agentci/pull-request-target-ai` |
-| 1 | `agentci/unsafe-checkout` |
+| Count | Rule                                |
+| ----: | ----------------------------------- |
+|    90 | `agentci/unpinned-ai-action`        |
+|    82 | `agentci/ai-with-secrets`           |
+|    57 | `agentci/ai-shell-access`           |
+|    53 | `agentci/broad-write-permissions`   |
+|    11 | `agentci/untrusted-input-in-prompt` |
+|    11 | `agentci/untrusted-ai-write-token`  |
+|     2 | `agentci/pull-request-target-ai`    |
+|     1 | `agentci/unsafe-checkout`           |
 
-**Read this as:** the *medium* findings (unpinned actions, a provider key
-present in the job) are near-universal hygiene items, not alarms. The signal
-worth acting on is the small **critical** set — an AI agent with repo-write
-scope on an untrusted trigger, with untrusted event content reaching it.
+These are unverified scanner counts. They are not labels.
 
-## The tool found its own false positives first
+## What the exploratory pass did reveal
 
-The first pass reported **59 criticals**. Auditing those against real,
-well-configured repositories surfaced three over-firing patterns, each since
-fixed:
+The transcript supports a narrower engineering observation: reading selected
+workflows exposed at least three implementation mistakes in v0.1:
 
-1. **`id-token: write` treated as repo-write.** OIDC token minting can't modify
-   a repo; counting it inflated the write-token and broad-write rules. Now only
-   `contents` / `pull-requests` / `issues` / `packages` / `deployments` count.
-2. **Untrusted content in an `if:` guard treated as a prompt sink.** A
-   `contains(github.event.comment.body, '@claude')` gate is a guard, not a value
-   that reaches the agent. `if:` conditions are now excluded from sink detection.
-3. **"AI job has a secret" rated high.** Almost every AI action needs a provider
-   key, so this is a baseline exposure to review, not a vulnerability on its own.
-   Recalibrated to medium.
+1. `id-token: write` was treated as repository write capability.
+2. untrusted text referenced only inside `if:` was treated as a prompt sink;
+3. `ai-with-secrets` had been assigned an unjustifiably high severity.
 
-After these fixes: **59 → 13 criticals.** The remaining drop in the headline
-"share of repos affected" (100% → 53% high-or-critical) is the false alarms
-leaving.
+The old scanner's reported critical count changed from 59 to 13 after code and
+severity changes. Without the raw pre/post outputs and human labels, that change
+cannot be called a measured false-positive reduction.
 
-## Responsible use
+A later informal triage also suggested that action-level authorization gates
+could make some matched patterns unreachable. That triage was not preserved as
+a labeled dataset either, so no exploitability or prevalence claim survives.
 
-AgentCI Guard flags **patterns in workflow YAML**, not proven exploits. Several
-repositories that match a critical pattern have author-side mitigations a static
-scanner cannot see — output allowlists, `author_association` gates, fork checks,
-or SHA-pinned actions. Treat a finding as "review this," not "this is hacked."
+## Replacement
 
-For that reason, this document reports only aggregates. Genuinely exploitable
-cases should be reported privately to the maintainer, not published.
+v0.1.1 uses:
 
-## Follow-up: exploitability triage
+- a public synthetic adversarial corpus for known semantic regressions;
+- a frozen, licensed real-workflow candidate corpus with fixed commits and
+  hashes;
+- repository-disjoint development/evaluation splits;
+- two independent human annotators plus adjudication;
+- scripts for precision, recall, F1, support, confidence intervals, analysis
+  coverage, diagnostics, and error taxonomy.
 
-A later hand-triage checked the critical ratings against how
-`anthropics/claude-code-action` actually behaves. It **gates on repository write
-access by default**, so the comment-triggered "critical" matches are not directly
-attacker-reachable, and the configs that *remove* the gate
-(`allowed_non_write_users`, `allowed_bots: '*'`, `pull_request_target` + untrusted
-checkout) appear in ≈0 public repos. The risky pattern is common; confirmed
-exposure is rare. "Eight repositories rated critical" describes v0.1 scanner
-output **before** this triage, not eight confirmed-exploitable repositories. A
-scanner recalibration to model the gate is in local review and **not yet released**.
-
-## Prior art
-
-AgentCI Guard is not the first tool to examine GitHub Actions security and does
-not claim to prove RCE from static evidence. See CodeQL Actions queries, general
-workflow scanners, and prompt-injection / `pull_request_target` tooling (PromptPwnd
-/ OpenGrep rules, prompt-injection scanners, TaintAWI, GitInject). Its narrower
-contribution is an AI-agent-specific ruleset shipped as an npm CLI + GitHub Action
-with SARIF output.
+The replacement benchmark remains **unscored** until the required human labels
+exist. No accuracy number should appear in project claims before that point.

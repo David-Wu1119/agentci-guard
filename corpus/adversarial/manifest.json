@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "purpose": "synthetic adversarial regression corpus; not an accuracy benchmark",
+  "cases": [
+    {
+      "id": "workflow-env-secret",
+      "path": "cases/workflow-env-secret",
+      "targets": ["environment precedence"],
+      "expected_rules": ["agentci/ai-with-secrets"],
+      "expected_diagnostics": []
+    },
+    {
+      "id": "env-precedence-override",
+      "path": "cases/env-precedence-override",
+      "targets": ["environment precedence"],
+      "expected_rules": [],
+      "expected_diagnostics": []
+    },
+    {
+      "id": "run-shell-semantics",
+      "path": "cases/run-shell-semantics",
+      "targets": ["run shell semantics"],
+      "expected_rules": ["agentci/ai-shell-access"],
+      "expected_diagnostics": []
+    },
+    {
+      "id": "action-prose-no-shell",
+      "path": "cases/action-prose-no-shell",
+      "targets": ["shell false positive"],
+      "expected_rules": [],
+      "expected_diagnostics": []
+    },
+    {
+      "id": "event-gated-push",
+      "path": "cases/event-gated-push",
+      "targets": ["event-specific reachability"],
+      "expected_rules": [],
+      "expected_diagnostics": []
+    },
+    {
+      "id": "event-gated-prt",
+      "path": "cases/event-gated-prt",
+      "targets": ["event-specific reachability"],
+      "expected_rules": [
+        "agentci/pull-request-target-ai",
+        "agentci/untrusted-input-in-prompt"
+      ],
+      "expected_diagnostics": []
+    },
+    {
+      "id": "permissions-unknown",
+      "path": "cases/permissions-unknown",
+      "targets": ["permissions defaults"],
+      "expected_rules": [],
+      "expected_diagnostics": ["agentci/analysis-permissions-unknown"]
+    },
+    {
+      "id": "configured-default-read",
+      "path": "cases/configured-default-read",
+      "targets": ["permissions defaults"],
+      "expected_rules": [],
+      "expected_diagnostics": []
+    },
+    {
+      "id": "discussion-write",
+      "path": "cases/discussion-write",
+      "targets": ["discussion events", "discussions permission"],
+      "expected_rules": [
+        "agentci/broad-write-permissions",
+        "agentci/untrusted-ai-write-token",
+        "agentci/untrusted-input-in-prompt"
+      ],
+      "expected_diagnostics": []
+    },
+    {
+      "id": "parse-error",
+      "path": "cases/parse-error",
+      "targets": ["parse diagnostics"],
+      "expected_rules": [],
+      "expected_diagnostics": ["agentci/parse-error"]
+    },
+    {
+      "id": "local-reusable",
+      "path": "cases/local-reusable",
+      "targets": ["local reusable workflow", "input taint propagation"],
+      "expected_rules": [
+        "agentci/broad-write-permissions",
+        "agentci/untrusted-ai-write-token",
+        "agentci/untrusted-input-in-prompt"
+      ],
+      "expected_diagnostics": []
+    },
+    {
+      "id": "local-reusable-cycle",
+      "path": "cases/local-reusable-cycle",
+      "targets": ["reusable workflow cycle"],
+      "expected_rules": [],
+      "expected_diagnostics": ["agentci/analysis-reusable-cycle"]
+    },
+    {
+      "id": "remote-reusable",
+      "path": "cases/remote-reusable",
+      "targets": ["remote reusable workflow completeness"],
+      "expected_rules": [],
+      "expected_diagnostics": ["agentci/analysis-remote-reusable-workflow"]
+    },
+    {
+      "id": "unsafe-checkout-head",
+      "path": "cases/unsafe-checkout-head",
+      "targets": ["checkout semantics"],
+      "expected_rules": ["agentci/unsafe-checkout"],
+      "expected_diagnostics": []
+    },
+    {
+      "id": "safe-checkout-base",
+      "path": "cases/safe-checkout-base",
+      "targets": ["checkout semantics"],
+      "expected_rules": [],
+      "expected_diagnostics": []
+    },
+    {
+      "id": "job-permissions-none",
+      "path": "cases/job-permissions-none",
+      "targets": ["job permission override"],
+      "expected_rules": ["agentci/untrusted-input-in-prompt"],
+      "expected_diagnostics": []
+    },
+    {
+      "id": "explicit-shell-capability",
+      "path": "cases/explicit-shell-capability",
+      "targets": ["action shell capability"],
+      "expected_rules": ["agentci/ai-shell-access"],
+      "expected_diagnostics": []
+    },
+    {
+      "id": "negated-event-condition",
+      "path": "cases/negated-event-condition",
+      "targets": ["event-specific reachability", "negated event condition"],
+      "expected_rules": [],
+      "expected_diagnostics": []
+    },
+    {
+      "id": "unsupported-event-condition",
+      "path": "cases/unsupported-event-condition",
+      "targets": ["reachability completeness"],
+      "expected_rules": [],
+      "expected_diagnostics": ["agentci/analysis-event-condition"]
+    }
+  ]
+}

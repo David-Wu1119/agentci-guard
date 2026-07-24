@@ -1,0 +1,41 @@
+name: Merge changelog
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release
+        required: false
+        default: 'auto'
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  generate-pr:
+    runs-on: ubuntu-latest
+    name: Generate release PR
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+
+    - uses: jdx/mise-action@v4
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - id: run
+      run: |
+        changie batch ${{ inputs.version }}
+        changie merge
+        echo "latest=$(changie latest)" >> "$GITHUB_OUTPUT"
+
+    - name: Create Pull Request
+      uses: peter-evans/create-pull-request@v8
+      with:
+        title: Release ${{ steps.run.outputs.latest }}
+        branch: release/${{ steps.run.outputs.latest }}
+        commit-message: Release ${{ steps.run.outputs.latest }}
+        token: ${{ secrets.GITHUB_TOKEN }}

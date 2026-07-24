@@ -1,0 +1,7 @@
+name: remote-reusable
+on: push
+permissions:
+  contents: read
+jobs:
+  agent:
+    uses: example/agent-workflows/.github/workflows/agent.yml@0123456789abcdef0123456789abcdef01234567

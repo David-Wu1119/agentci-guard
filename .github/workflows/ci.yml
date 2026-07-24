@@ -16,21 +16,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 10.11.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Format
+        run: pnpm format:check
 
       - name: Typecheck
         run: pnpm typecheck
@@ -41,11 +44,56 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: CLI smoke
+      - name: Action smoke - vulnerable, non-blocking
+        id: vulnerable
+        uses: ./
+        with:
+          path: examples/vulnerable
+          sarif: artifacts/vulnerable.sarif
+          fail-on: none
+
+      - name: Verify vulnerable Action outputs
         run: |
-          node dist/cli.js scan examples/vulnerable --json --fail-on none
-          node dist/cli.js scan examples/vulnerable --sarif agentci-results.sarif --fail-on none
-          test -f agentci-results.sarif
+          test -s artifacts/vulnerable.sarif
+          test "${{ steps.vulnerable.outputs.findings }}" -gt 0
+          test "${{ steps.vulnerable.outputs.critical }}" -gt 0
+          test "${{ steps.vulnerable.outputs.sarif-path }}" = "artifacts/vulnerable.sarif"
+          test "${{ steps.vulnerable.outputs.analysis-complete }}" = "true"
+
+      - name: Action smoke - hardened
+        id: hardened
+        uses: ./
+        with:
+          path: examples/hardened
+          sarif: artifacts/hardened.sarif
+          fail-on: none
+
+      - name: Verify hardened Action outputs
+        run: |
+          test -s artifacts/hardened.sarif
+          test "${{ steps.hardened.outputs.findings }}" = "0"
+
+      - name: Action smoke - threshold failure
+        id: threshold
+        continue-on-error: true
+        uses: ./
+        with:
+          path: examples/vulnerable
+          sarif: artifacts/threshold.sarif
+          fail-on: high
+
+      - name: Verify Action threshold behavior
+        if: always()
+        run: |
+          test "${{ steps.threshold.outcome }}" = "failure"
+          test -s artifacts/threshold.sarif
+          test "${{ steps.threshold.outputs.high }}" -gt 0
+
+      - name: CLI smoke
+        run: node dist/cli.js scan examples/vulnerable --json --fail-on none
 
       - name: Package smoke test
         run: npm pack --dry-run
+
+      - name: Verify frozen benchmark snapshot
+        run: node scripts/benchmark/verify-snapshot.mjs

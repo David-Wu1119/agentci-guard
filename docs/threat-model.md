@@ -1,6 +1,7 @@
 # Threat Model
 
-AgentCI Guard scans GitHub Actions workflows for static patterns that make AI coding-agent jobs dangerous.
+AgentCI Guard experimentally scans GitHub Actions workflow YAML for static
+patterns that can increase the risk of AI coding-agent jobs.
 
 ## In Scope
 
@@ -9,8 +10,11 @@ AgentCI Guard scans GitHub Actions workflows for static patterns that make AI co
 - Untrusted GitHub event fields passed into prompts, environment variables, or shell commands
 - Privileged triggers such as `pull_request_target`
 - Repository write permissions
+- Explicit, absent, and configured permission defaults
 - Secret and token exposure
 - Shell access and untrusted checkout patterns
+- Local reusable workflows and remote-resolution diagnostics
+- Event-specific job and step reachability
 - SARIF output for GitHub code scanning
 
 ## Out of Scope
@@ -21,6 +25,9 @@ AgentCI Guard scans GitHub Actions workflows for static patterns that make AI co
 - Proving that an LLM did or did not follow a prompt injection
 - Secret scanning inside repository contents
 - Dynamic analysis of downloaded third-party actions
+- Resolving remote reusable workflows
+- Organization/repository permission defaults unless configured locally
+- Action-internal authorization gates unless explicitly modeled
 
 ## Failure Modes
 
@@ -28,5 +35,10 @@ AgentCI Guard scans GitHub Actions workflows for static patterns that make AI co
 - Wrapper actions can invoke AI agents without obvious names.
 - A workflow can be safe despite matching a conservative high-risk pattern.
 - A workflow can be unsafe in ways not represented in YAML.
+- Complex expressions can force conservative event reachability.
+- An incomplete-analysis diagnostic means the scanner could not close the
+  static-analysis boundary; it is not a security finding.
 
-Treat AgentCI Guard as a high-signal review gate, not a formal proof.
+Treat AgentCI Guard as an experimental review aid, not a security gate or a
+formal proof. Its precision and recall remain unreported until the frozen
+real-workflow benchmark is independently labeled and adjudicated.

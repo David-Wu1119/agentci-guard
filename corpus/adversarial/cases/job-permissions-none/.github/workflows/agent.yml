@@ -1,0 +1,12 @@
+name: job-permissions-none
+on: pull_request
+permissions:
+  contents: write
+jobs:
+  agent:
+    permissions: {}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          prompt: ${{ github.event.pull_request.body }}
