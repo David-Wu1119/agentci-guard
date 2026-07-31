@@ -1,0 +1,72 @@
+name: Published npm v0.1.1 smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  consumer:
+    if: github.ref == 'refs/tags/v0.1.1'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout consumer fixtures
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install the public package in an empty consumer project
+        run: |
+          consumer_dir="$(mktemp -d)"
+          npm --prefix "$consumer_dir" init --yes
+          npm --prefix "$consumer_dir" install \
+            --ignore-scripts \
+            --no-audit \
+            --no-fund \
+            agentci-guard@0.1.1
+          mkdir -p artifacts
+          "$consumer_dir/node_modules/.bin/agentci" \
+            scan "$GITHUB_WORKSPACE/examples/vulnerable" \
+            --json \
+            --fail-on none > artifacts/npm-vulnerable.json
+          "$consumer_dir/node_modules/.bin/agentci" \
+            scan "$GITHUB_WORKSPACE/examples/hardened" \
+            --json \
+            --fail-on none > artifacts/npm-hardened.json
+
+      - name: Verify installed CLI results
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+
+          const vulnerable = JSON.parse(
+            fs.readFileSync("artifacts/npm-vulnerable.json", "utf8"),
+          );
+          const hardened = JSON.parse(
+            fs.readFileSync("artifacts/npm-hardened.json", "utf8"),
+          );
+          const expected = {
+            findings: 9,
+            critical: 2,
+            high: 4,
+            medium: 3,
+            low: 0,
+          };
+          for (const [key, value] of Object.entries(expected)) {
+            const actual =
+              key === "findings"
+                ? vulnerable.findings.length
+                : vulnerable.summary[key];
+            if (actual !== value) {
+              throw new Error(
+                `Unexpected vulnerable ${key}: ${String(actual)}; expected ${value}.`,
+              );
+            }
+          }
+          if (
+            vulnerable.analysis_complete !== true ||
+            hardened.analysis_complete !== true ||
+            hardened.findings.length !== 0
+          ) {
+            throw new Error("Published npm consumer smoke returned unexpected results.");
+          }
+          NODE

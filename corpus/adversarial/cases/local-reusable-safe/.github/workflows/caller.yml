@@ -1,0 +1,7 @@
+name: local-reusable-safe-caller
+on: push
+permissions:
+  contents: read
+jobs:
+  agent:
+    uses: ./.github/workflows/reusable.yml

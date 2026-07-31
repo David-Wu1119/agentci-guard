@@ -63,8 +63,8 @@ body:
     id: agentci-version
     attributes:
       label: AgentCI version
-      description: Output of `agentci --version`, the npm package version, or the Action ref (e.g. David-Wu1119/agentci-guard@v0).
-      placeholder: "agentci-guard@0.1.0 / David-Wu1119/agentci-guard@v0"
+      description: Output of `agentci --version`, the npm package version, or the exact Action ref.
+      placeholder: "agentci-guard@0.1.1 / full Action commit SHA"
     validations:
       required: true
 

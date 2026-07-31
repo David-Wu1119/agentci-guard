@@ -1,0 +1,42 @@
+name: Claude Code Action
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  claude_task:
+    if: contains(github.event.comment.body, '@claude') || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Claude Action
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            You are an expert Next.js / TypeScript developer maintaining the CypAI SaaS platform (cypai.app).
+            Review this PR for bugs, security issues, and style violations.
+            If you find fixes, commit them directly to this branch.
+            Always run `npm run build` mentally before committing — never break the build.
+            Follow all rules in CLAUDE.md.

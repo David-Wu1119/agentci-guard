@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: main
+  pull_request:
+    branches: main
+
+permissions:
+  contents: read
+
+jobs:
+
+  run-tests:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        install: [full]
+        deps: [latest]
+
+        include:
+          - python: "3.8"
+            install: full
+            deps: pinned
+          - python: "3.11"
+            install: light
+            deps: latest
+
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+
+      - name: Setup Python ${{ matrix.python }}
+        uses: actions/setup-python@0a5c61591373683505ea898e09a3ea4f39ef2b9c # v5.0.0
+        with:
+          python-version: ${{ matrix.python }}
+          allow-prereleases: true
+
+      - name: Install Requirements
+        run: !
+          python -m pip install -r requirements.txt
+      - name: Install Test Requirements
+        run: |
+          python -m pip install pytest
+      - name: Install myplotlib
+        run: |
+          python setup.py develop --user
+      - name: Run tests
+        run: !
+          pytest

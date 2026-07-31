@@ -71,6 +71,74 @@ jobs:
     expect(rules).toContain("agentci/untrusted-input-in-prompt");
   });
 
+  it("does not treat a fixed-format pull request SHA as prompt injection text", () => {
+    const rules = rulesFor(`
+on: pull_request
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          prompt: Review commit \${{ github.event.pull_request.head.sha }}
+`);
+    expect(rules.has("agentci/untrusted-input-in-prompt")).toBe(false);
+  });
+
+  it("does not infer shell access from capability words in prompt prose", () => {
+    const rules = rulesFor(`
+on: push
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          prompt: Do not enable shell or commands.
+`);
+    expect(rules.has("agentci/ai-shell-access")).toBe(false);
+  });
+
+  it("propagates untrusted workflow environment into an AI step", () => {
+    const rules = rulesFor(`
+on: issue_comment
+permissions:
+  issues: write
+env:
+  AGENT_REQUEST: \${{ github.event.comment.body }}
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - run: claude -p "$AGENT_REQUEST"
+`);
+    expect(rules).toContain("agentci/untrusted-input-in-prompt");
+    expect(rules).toContain("agentci/untrusted-ai-write-token");
+  });
+
+  it("honors a step override of an untrusted workflow environment key", () => {
+    const rules = rulesFor(`
+on: issue_comment
+permissions:
+  issues: write
+env:
+  AGENT_REQUEST: \${{ github.event.comment.body }}
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - run: claude -p "$AGENT_REQUEST"
+        env:
+          AGENT_REQUEST: fixed trusted request
+`);
+    expect(rules.has("agentci/untrusted-input-in-prompt")).toBe(false);
+    expect(rules.has("agentci/untrusted-ai-write-token")).toBe(false);
+  });
+
   it("flags shell access combined with AI usage", () => {
     const rules = rulesFor(`
 on: push
@@ -78,8 +146,8 @@ jobs:
   agent:
     runs-on: ubuntu-latest
     steps:
-      - name: claude
-        run: bash ./do.sh
+      - name: Run Claude
+        run: claude -p "apply the requested change"
 `);
     expect(rules).toContain("agentci/ai-shell-access");
   });
@@ -117,11 +185,26 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: \${{ github.event.pull_request.head.sha }}
+          allow-unsafe-pr-checkout: true
+`);
+    expect(rules).toContain("agentci/unsafe-checkout");
+  });
+
+  it("does not flag a protected floating checkout major", () => {
+    const rules = rulesFor(`
+on: pull_request_target
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
       - uses: actions/checkout@v4
         with:
           ref: \${{ github.event.pull_request.head.sha }}
 `);
-    expect(rules).toContain("agentci/unsafe-checkout");
+    expect(rules.has("agentci/unsafe-checkout")).toBe(false);
   });
 });
 

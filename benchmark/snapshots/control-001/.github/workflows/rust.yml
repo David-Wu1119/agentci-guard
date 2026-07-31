@@ -1,0 +1,219 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+name: "Rust checks"
+
+on:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-paths:
+    runs-on: ubuntu-latest
+    outputs:
+      any_changed: ${{ steps.changed-files.outputs.any_changed }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v45
+        with:
+          files: |
+            rs/**
+            python/handlebarrz/**
+            Cargo.toml
+            Cargo.lock
+            .github/workflows/rust.yml
+
+  cargo-lock-check:
+    needs: check-paths
+    if: needs.check-paths.outputs.any_changed == 'true'
+    name: Cargo.lock Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        env:
+          RUSTUP_MAX_RETRIES: 3
+
+      - name: Check if this is a release-please PR
+        id: check-release-please
+        run: |
+          if [[ "${GITHUB_HEAD_REF}" == release-please--* ]]; then
+            echo "is_release_please=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_release_please=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update Cargo.lock for release-please PR
+        if: steps.check-release-please.outputs.is_release_please == 'true'
+        run: |
+          echo "Updating Cargo.lock for release-please PR..."
+          cargo update --workspace
+
+      - name: Commit Cargo.lock updates
+        if: steps.check-release-please.outputs.is_release_please == 'true'
+        run: |
+          # Use CLA-covered maintainer identity from MAINTAINERS.yaml
+          git config user.name "$(yq '.ci.commit_author.name' MAINTAINERS.yaml)"
+          git config user.email "$(yq '.ci.commit_author.email' MAINTAINERS.yaml)"
+          if ! git diff --quiet Cargo.lock; then
+            git add Cargo.lock
+            git commit -m "chore: update Cargo.lock"
+            git push
+            echo "Cargo.lock updated and pushed"
+          else
+            echo "No Cargo.lock changes needed"
+          fi
+
+      - name: Check Cargo.lock is up to date
+        run: |
+          cargo check --locked --workspace
+          echo "✅ Cargo.lock is up to date"
+
+  format-check:
+    needs: check-paths
+    if: needs.check-paths.outputs.any_changed == 'true'
+    name: Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+        env:
+          RUSTUP_MAX_RETRIES: 3
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+  clippy-lint:
+    needs: check-paths
+    if: needs.check-paths.outputs.any_changed == 'true'
+    name: Clippy Linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+        env:
+          RUSTUP_MAX_RETRIES: 3
+
+      - name: Run clippy
+        run: cargo clippy --all-targets --workspace -- -D warnings
+
+  check-build-test:
+    needs: check-paths
+    if: needs.check-paths.outputs.any_changed == 'true'
+    name: Check, Build & Test (${{ matrix.toolchain }}, ${{ matrix.os_config.os }}-${{ matrix.os_config.arch }})
+    runs-on: ${{ matrix.os_config.os }}
+    env:
+      PYO3_USE_ABI3_FORWARD_COMPATIBILITY: 1
+      # Enable sccache for Rust builds
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: "sccache"
+    strategy:
+      fail-fast: false
+      matrix:
+        os_config:
+          - { os: ubuntu-latest, arch: x64 }
+          - { os: ubuntu-24.04-arm, arch: arm64 }  # Native ARM64 runner
+          - { os: macos-latest, arch: arm64 }
+        toolchain: [stable, nightly]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.toolchain }}
+        env:
+          RUSTUP_MAX_RETRIES: 3
+
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Check code
+        run: cargo check --all-targets --workspace
+        continue-on-error: ${{ matrix.toolchain == 'nightly' }}
+
+      - name: Build code
+        run: cargo build --all-targets --workspace
+        continue-on-error: ${{ matrix.toolchain == 'nightly' }}
+
+      - name: Run tests
+        env:
+          RUST_BACKTRACE: 1
+        run: cargo test --all-targets --workspace
+        continue-on-error: ${{ matrix.toolchain == 'nightly' }}
+
+      - name: Show sccache stats
+        run: sccache --show-stats
+
+      - name: Verify SPEC_FILE support
+        env:
+          RUST_BACKTRACE: 1
+        run: |
+          find spec -name "*.yaml" | while read -r spec_file; do
+            relative_spec_file="../../$spec_file"
+            echo "Testing SPEC_FILE=$relative_spec_file"
+            SPEC_FILE="$relative_spec_file" cargo test --test spec_test -- --nocapture > /dev/null || exit 1
+          done
+        continue-on-error: ${{ matrix.toolchain == 'nightly' }}
+
+  rust-checks-all:
+    if: always()
+    needs: [cargo-lock-check, format-check, clippy-lint, check-build-test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check overall status
+        run: |
+          if [[ "${NEEDS_CARGO_LOCK_CHECK_RESULT}" == "failure" || "${NEEDS_FORMAT_CHECK_RESULT}" == "failure" || "${NEEDS_CLIPPY_LINT_RESULT}" == "failure" || "${NEEDS_CHECK_BUILD_TEST_RESULT}" == "failure" ]]; then
+            echo "Rust checks failed"
+            exit 1
+          fi
+          echo "Rust checks passed or were skipped"
+          exit 0
+
+        env:
+          NEEDS_CARGO_LOCK_CHECK_RESULT: ${{ needs.cargo-lock-check.result }}
+
+          NEEDS_FORMAT_CHECK_RESULT: ${{ needs.format-check.result }}
+
+          NEEDS_CLIPPY_LINT_RESULT: ${{ needs.clippy-lint.result }}
+
+          NEEDS_CHECK_BUILD_TEST_RESULT: ${{ needs.check-build-test.result }}

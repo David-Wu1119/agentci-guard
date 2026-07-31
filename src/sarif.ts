@@ -7,7 +7,8 @@ export function toSarif(findings: Finding[]): SarifLog {
   );
   return {
     version: "2.1.0",
-    $schema: "https://json.schemastore.org/sarif-2.1.0.json",
+    $schema:
+      "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
     runs: [
       {
         tool: {
@@ -31,11 +32,20 @@ export function toSarif(findings: Finding[]): SarifLog {
           ruleId: finding.rule_id,
           level: sarifLevel(finding.severity),
           message: { text: `${finding.title}: ${finding.evidence}` },
+          properties: {
+            "agentci/severity": finding.severity,
+            "agentci/reachableEvents": finding.reachable_events ?? [],
+            ...(finding.job ? { "agentci/job": finding.job } : {}),
+            ...(finding.step ? { "agentci/step": finding.step } : {}),
+            ...(finding.step_index === undefined
+              ? {}
+              : { "agentci/stepIndex": finding.step_index }),
+          },
           locations: [
             {
               physicalLocation: {
                 artifactLocation: { uri: finding.file },
-                region: { startLine: 1 },
+                region: { startLine: finding.line ?? 1 },
               },
             },
           ],

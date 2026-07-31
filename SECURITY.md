@@ -1,10 +1,14 @@
 # Security Policy
 
-AgentCI Guard is security-sensitive CI/CD tooling. Do not publish exploit details for unfixed vulnerabilities in public issues.
+AgentCI Guard is experimental security-adjacent CI tooling, not a production
+security control. Do not publish exploit details for unfixed vulnerabilities
+in public issues.
 
 ## Supported Versions
 
-During the `0.x` phase, only the latest `main` branch and latest published package are supported.
+During the `0.x` research phase, fixes target the latest `main` branch and
+latest published package. No service-level or security-detection guarantee is
+provided.
 
 ## Reporting a Vulnerability
 

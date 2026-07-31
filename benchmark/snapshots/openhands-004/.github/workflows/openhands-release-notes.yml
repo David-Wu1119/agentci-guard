@@ -1,0 +1,52 @@
+name: OpenHands Release Notes
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag or version label to prepare
+        required: true
+      compare_from:
+        description: Optional base tag or ref
+        required: false
+        default: ''
+      compare_to:
+        description: Optional head ref
+        required: false
+        default: master
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: openhands-release-notes-${{ github.event.inputs.release_tag }}
+  cancel-in-progress: false
+
+jobs:
+  release-notes:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dispatcher dependencies
+        run: pip install httpx
+
+      - name: Start OpenHands release notes run
+        env:
+          OPENHANDS_API_KEY: ${{ secrets.OPENHANDS_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SKILL_NAME: releasenotes
+          SELECTED_BRANCH: ${{ github.event.inputs.compare_to || github.event.repository.default_branch }}
+          POST_ACK_COMMENT: 'false'
+          CONVERSATION_TITLE: 'Release notes ${{ github.event.inputs.release_tag }}'
+        run: python .github/openhands/dispatch.py

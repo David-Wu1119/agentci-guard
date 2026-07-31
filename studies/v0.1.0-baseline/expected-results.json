@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "baseline_commit": "cdba825972d577fe57579836a48a2fec6708c7c3",
+  "vulnerable": {
+    "workflow_count": 1,
+    "summary": {
+      "low": 0,
+      "medium": 3,
+      "high": 4,
+      "critical": 2
+    },
+    "findings": [
+      {
+        "rule_id": "agentci/pull-request-target-ai",
+        "job": "claude"
+      },
+      {
+        "rule_id": "agentci/untrusted-ai-write-token",
+        "job": "claude"
+      },
+      {
+        "rule_id": "agentci/ai-with-secrets",
+        "job": "claude"
+      },
+      {
+        "rule_id": "agentci/broad-write-permissions",
+        "job": "claude"
+      },
+      {
+        "rule_id": "agentci/unsafe-checkout",
+        "job": "claude",
+        "step": "step 1"
+      },
+      {
+        "rule_id": "agentci/untrusted-input-in-prompt",
+        "job": "claude",
+        "step": "Run Claude Code"
+      },
+      {
+        "rule_id": "agentci/unpinned-ai-action",
+        "job": "claude",
+        "step": "Run Claude Code"
+      },
+      {
+        "rule_id": "agentci/untrusted-input-in-prompt",
+        "job": "claude",
+        "step": "Shell agent fallback"
+      },
+      {
+        "rule_id": "agentci/ai-shell-access",
+        "job": "claude",
+        "step": "Shell agent fallback"
+      }
+    ]
+  },
+  "hardened": {
+    "workflow_count": 1,
+    "summary": {
+      "low": 0,
+      "medium": 0,
+      "high": 0,
+      "critical": 0
+    },
+    "findings": []
+  }
+}

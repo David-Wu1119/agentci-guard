@@ -10,6 +10,7 @@ import {
   toSarif,
   hasFindingAtOrAbove,
 } from "./index.js";
+import { parseFailOn } from "./options.js";
 import type { Severity } from "./types.js";
 
 type ScanOptions = {
@@ -24,7 +25,7 @@ async function main(): Promise<void> {
   const program = new Command()
     .name("agentci")
     .description("Scan CI/CD workflows for unsafe AI coding-agent usage.")
-    .version("0.1.0");
+    .version("0.1.1");
 
   program
     .command("scan")
@@ -46,7 +47,9 @@ async function main(): Promise<void> {
     )
     .action(async (target: string, options: ScanOptions) => {
       const failOn = parseFailOn(options.failOn);
-      const result = await scanRepository(target, { configPath: options.config });
+      const result = await scanRepository(target, {
+        configPath: options.config,
+      });
 
       if (options.sarif)
         await fs.writeFile(
@@ -70,6 +73,13 @@ async function main(): Promise<void> {
           formatGithubOutputs(result, options.sarif),
           "utf8",
         );
+
+      if (
+        result.diagnostics.some((diagnostic) => diagnostic.severity === "error")
+      ) {
+        process.exitCode = 1;
+        return;
+      }
 
       if (failOn !== "none" && hasFindingAtOrAbove(result.findings, failOn)) {
         process.exitCode = 2;
@@ -97,20 +107,6 @@ async function main(): Promise<void> {
     });
 
   await program.parseAsync(process.argv);
-}
-
-function parseFailOn(value: string): "none" | Severity {
-  if (
-    value === "none" ||
-    value === "low" ||
-    value === "medium" ||
-    value === "high" ||
-    value === "critical"
-  )
-    return value;
-  throw new Error(
-    "--fail-on must be one of none, low, medium, high, critical.",
-  );
 }
 
 main().catch((error: unknown) => {

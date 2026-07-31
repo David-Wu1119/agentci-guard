@@ -1,0 +1,133 @@
+# Auto-managed by ~/Desktop/automation/dependabot-rollout/rollout.py  (one-tap "让 Claude 修复")
+# RECEIVING workflow for the generic Lark one-tap fix loop. When you tap
+# "🔧 让 Claude 修复" on a finding card in Lark, the mailpulse engine dispatches
+# this via `workflow_dispatch` with `kind`/`target`/`context` for any finding that
+# ISN'T a runtime 5xx (those go to claude-fix-runtime.yml). A Claude agent diagnoses
+# the finding and opens a DRAFT fix PR. Never pushes to the default branch; never
+# auto-merges directly — the branch prefix `claude/fix-ci-finding-*` is picked up by
+# the Tier-1 auto-merge-fix-pr.yml once CI is green + low-risk (migrations/workflows/
+# secrets are blocked from auto-merge and always wait for human review).
+#
+# Model backend is pluggable via secrets (swap without editing this file):
+#   - Claude Max plan:  set CLAUDE_CODE_OAUTH_TOKEN  (run `claude setup-token`)
+#   - Anthropic API:    set ANTHROPIC_API_KEY        (and remove the oauth line)
+#   - DeepSeek/GLM/Kimi: set ANTHROPIC_API_KEY + ANTHROPIC_BASE_URL + a cheaper model
+#
+# Cost guard: only fires on explicit, human-approved dispatch (no schedule/push
+# trigger). Each tap is one deliberate click by the fleet owner, so there is no
+# flapping-source amplification to rate-limit here.
+name: Claude auto-fix finding
+
+on:
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: "Finding kind (e.g. supabase_rls_disabled_in_public, failed_deployment, service_down)"
+        required: true
+      target:
+        description: "What the fix should focus on — a table, service, or component named by the finding"
+        required: false
+      context:
+        description: "Finding summary from the Railway audit"
+        required: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: read
+  id-token: write   # required by claude-code-action for OIDC
+
+jobs:
+  finding-fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20   # room for the fix → run-checks-until-green loop
+    # Skip entirely if no model credential is configured (safe no-op until you set the secret).
+    steps:
+      - name: Check credentials
+        id: cred
+        env:
+          OAUTH: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          APIKEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -n "$OAUTH" ] || [ -n "$APIKEY" ]; then echo "ok=true" >> "$GITHUB_OUTPUT"; else
+            echo "ok=false" >> "$GITHUB_OUTPUT"; echo "No Claude credential set — skipping (configure CLAUDE_CODE_OAUTH_TOKEN)."; fi
+
+      - name: Checkout
+        if: steps.cred.outputs.ok == 'true'
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Claude diagnose finding + draft fix PR
+        if: steps.cred.outputs.ok == 'true'
+        continue-on-error: true   # never let a fix attempt itself become a red run / failure email
+        uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ secrets.CLAUDE_FIX_PAT || secrets.GITHUB_TOKEN }}
+        with:
+          # Max-plan OAuth token (active backend). To switch to pay-per-use, replace this
+          # line with `anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}` (+ optional
+          # ANTHROPIC_BASE_URL/model env for DeepSeek/GLM/Kimi).
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # PAT with `repo` + `workflow` scope so Claude can open PRs that modify workflows.
+          github_token: ${{ secrets.CLAUDE_FIX_PAT || secrets.GITHUB_TOKEN }}
+          claude_args: '--max-turns 80 --allowedTools "Bash,Edit,Write,Read,Glob,Grep,Bash(git:*),Bash(gh:*),Bash(npm:*),Bash(pnpm:*),Bash(npx:*),Bash(yarn:*),Bash(make:*)"'
+          prompt: |
+            The Railway fleet audit flagged a finding on ${{ github.repository }} that the fleet
+            owner just approved for an automated fix attempt (one-tap from Lark).
+              • kind:    ${{ github.event.inputs.kind }}
+              • target:  ${{ github.event.inputs.target }}
+              • context: ${{ github.event.inputs.context }}
+
+            Act autonomously and DECISIVELY — your output is a DRAFT PR, which a human reviews
+            before merge, so it is safe to attempt even when you are not fully certain. Make the
+            SMALLEST correct change that resolves the finding and nothing else.
+
+            Tailor your approach to the `kind`:
+
+            - `supabase_rls_disabled_in_public` / any `supabase_*` RLS finding:
+              The `target`/`context` names a table (often `public.<table>`) with Row Level Security
+              disabled or missing policies. Add a NEW database migration (match this repo's existing
+              migration tooling and file-naming — Drizzle, supabase/migrations, raw SQL under
+              migrations/, etc.; never edit an already-applied migration) that:
+                • enables RLS on exactly that table, and
+                • adds least-privilege policies consistent with how the app already accesses it
+                  (study sibling tables' policies first; do NOT invent broad `USING (true)` policies
+                  unless that genuinely matches the table's access model).
+              Do not touch unrelated tables.
+
+            - `supabase_sensitive_columns_exposed` or other `supabase_*` advisor lints:
+              Address exactly what the advisor names (revoke/secure the exposed column/view), again
+              via a new migration, mirroring existing patterns.
+
+            - `failed_deployment` / `service_down`:
+              The latest deploy failed or crashed. Inspect build/start config, recent commits, and
+              (if reachable via `gh run view` / logs) the actual failure. Make the minimal code/config
+              fix to get a clean build/boot. If the cause is a missing secret or external infra (not a
+              code change), do NOT force a PR — see the escape hatch below.
+
+            - anything else:
+              Diagnose from the finding text + code, make the minimal defensive fix.
+
+            Then:
+            1. VERIFY locally before shipping: run the repo's checks (`npm ci` then whatever exists —
+               `npm run test` / `npx tsc --noEmit` / `npm run lint -- --max-warnings 0` / `npm run build`)
+               and make sure your change keeps them green. Iterate until they pass. (For a migration you
+               can't apply to prod here, at least confirm the code still compiles and tests pass.)
+            2. Create branch `claude/fix-ci-finding-<short-desc>` (the `claude/fix-ci-` prefix lets the
+               Tier-1 auto-merge pick it up), commit the fix — never push to the default branch.
+            3. Open a PR to the default branch titled
+               `fix(${{ github.event.inputs.kind }}): ${{ github.event.inputs.target }}`:
+               • If your checks passed → open it **ready for review** and paste the passing output. The
+                 Tier-1 gate auto-merges only if cloud CI is also green AND the diff is low-risk (and it
+                 always holds migrations/workflows/secrets for a human). If the PR's own CI still fails,
+                 the self-healing retry loop continues it for up to 3 rounds.
+               • If you could not verify → open a **draft** and write exactly what is unverified.
+               Body: the finding, root cause, the change you made, how you verified, confidence level.
+            4. ONLY skip the PR if the finding is NOT fixable by a code/migration change (e.g. a missing
+               secret/credential or required external infra). In that case open an issue titled
+               `[Fix] ${{ github.event.inputs.kind }} ${{ github.event.inputs.target }}` stating exactly
+               what the human must provide, then stop.
+
+            Do NOT touch secrets, CI credentials, or unrelated code.

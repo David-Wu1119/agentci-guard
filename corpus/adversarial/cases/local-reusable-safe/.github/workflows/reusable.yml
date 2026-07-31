@@ -1,0 +1,9 @@
+name: local-reusable-safe-callee
+on: workflow_call
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          prompt: Summarize the trusted repository documentation.

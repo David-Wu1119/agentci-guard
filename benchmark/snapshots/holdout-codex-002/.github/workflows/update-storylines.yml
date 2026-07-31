@@ -1,0 +1,216 @@
+name: Update storylines
+
+on:
+  # Monday 07:00 UTC (16:00 KST) — race weekend has wrapped, news cycle settled.
+  schedule:
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+concurrency:
+  group: update-storylines
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # ── 1. Claude drafts the update ─────────────────────────────────────
+      - uses: anthropics/claude-code-action@af0559ee4f514d1ef21826982bed13f7edc3c35e # v1.0.178
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Update data/storylines.md with recent F1 2026 news.
+
+            Procedure:
+            1. Read data/storylines.md and note its current "Last update" date.
+            2. Use WebSearch to find F1 2026 events that happened AFTER that date.
+               Focus on: race weekends (recap, key incidents), driver/team news,
+               regulation drama, paddock controversies, viral fan moments.
+            3. Update the file:
+               - Add new items to existing sections (Big Stories, Rivalries,
+                 Memes & Fan Culture, Recent Incidents & Controversies).
+               - DEDUP: before adding an item, scan the relevant section for an
+                 entry already covering the same event. If one exists, update it
+                 in place — never create a second entry for an event already
+                 covered (e.g. a race that already has a recap).
+               - Refresh existing storylines only if status changed materially.
+               - Update the "Last update" line at the top.
+               - Keep tone conversational; this feeds a race-watching companion,
+                 not a news article.
+            4. If nothing significant happened since the last update, leave the
+               file unchanged. Empty diff is a valid outcome.
+            5. Do NOT fabricate events. If you cannot find a concrete primary
+               source for a claim, drop the claim entirely — do NOT write it
+               with a "no source found" disclaimer, just omit it.
+
+            6. SOURCES (mandatory):
+               For every item you ADD or MATERIALLY CHANGE, append an entry to
+               /tmp/storylines-sources.md in this exact format:
+
+                   ### <one-line summary of the item>
+                   - https://url.you.actually.fetched.example.com
+                   - https://second.source.example.com (optional but better)
+
+               - Use only URLs you actually opened with WebFetch or WebSearch
+                 returned as a result. Never invent URLs.
+               - One ### block per item. Multiple bullet URLs allowed.
+               - If you couldn't find a source for a candidate item, you must
+                 not have added that item to the file (see step 5).
+               - If the run results in zero changes to storylines.md, do not
+                 create the sources file at all.
+
+            7. Do NOT run git commit or git push. Just edit data/storylines.md
+               in place; later steps fact-check it and open the PR.
+          claude_args: '--model opus --max-turns 40 --allowed-tools "Read,Edit,WebSearch,WebFetch,Write"'
+
+      - name: Detect changes
+        id: changes
+        run: |
+          if git diff --quiet -- data/storylines.md; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No storylines changes this run — skipping fact-check and PR."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── 2. Codex fact-checks the draft (working-tree diff) ──────────────
+      # Codex verifies Claude's claims against the URLs it reported using.
+      # Different model family → independent failure modes vs same-model self-review.
+      - name: Prepare Codex inputs
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git diff -- data/storylines.md > /tmp/storylines.diff
+          touch /tmp/storylines-sources.md
+          echo "Draft prepared ($(wc -l < /tmp/storylines.diff) diff lines)"
+
+      - name: Codex fact-check
+        if: steps.changes.outputs.changed == 'true'
+        uses: openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56 # v1.11
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          allow-bots: "true"
+          effort: high
+          sandbox: workspace-write
+          codex-args: '--config web_search="live" --config sandbox_workspace_write.network_access=true'
+          output-file: codex-review.md
+          prompt: |
+            You are fact-checking a draft update to data/storylines.md
+            (F1 2026 narrative content) before it becomes a PR.
+
+            Inputs on disk:
+            - /tmp/storylines.diff          — the draft's diff for that file
+            - /tmp/storylines-sources.md    — the sources the generator claims
+                                              to have used (### blocks with URLs)
+
+            For each substantive new or materially changed claim in the diff:
+            1. State the claim in one line of plain English.
+            2. Find its source URLs in the sources file.
+            3. Fetch each URL and read it.
+            4. Classify alignment:
+               - VERIFIED     — source clearly states the claim
+               - PARTIAL      — source touches the topic but the exact detail
+                                or wording differs
+               - UNSUPPORTED  — no source given, or source unrelated
+               - CONTRADICTED — source actively says something different
+
+            Output STRICTLY in this markdown format. No preamble, no extra prose:
+
+            | Status | Claim | Source check |
+            |---|---|---|
+            | VERIFIED | <one-line claim> | <brief note> |
+            | PARTIAL | <one-line claim> | <which detail differs> |
+            | UNSUPPORTED | <one-line claim> | (no source / unrelated) |
+            | CONTRADICTED | <one-line claim> | <what the source actually says> |
+
+            End with one summary line:
+            **Summary:** Verified A · Partial B · Unsupported C · Contradicted D
+
+            Rules:
+            - Be conservative — if unsure, mark PARTIAL.
+            - Do NOT judge writing style; only facts.
+            - Do NOT search for new sources beyond what the sources file lists.
+            - Skip cosmetic edits (whitespace, the "Last update" line, etc.).
+
+      # ── 3. Claude revises the draft per Codex's findings ────────────────
+      - uses: anthropics/claude-code-action@af0559ee4f514d1ef21826982bed13f7edc3c35e # v1.0.178
+        if: steps.changes.outputs.changed == 'true'
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Codex has fact-checked the current draft of
+            data/storylines.md. Its review is in the file `codex-review.md` at
+            the repo root — a markdown table classifying each claim as
+            VERIFIED / PARTIAL / UNSUPPORTED / CONTRADICTED.
+
+            Read codex-review.md, then revise data/storylines.md accordingly:
+            - CONTRADICTED — remove the claim entirely.
+            - UNSUPPORTED  — try to find a concrete primary source with
+                             WebSearch/WebFetch. If you find one, keep the claim
+                             and record its URL. If not, remove the claim.
+            - PARTIAL      — correct the wording/detail so it matches what the
+                             source actually says.
+            - VERIFIED     — leave as-is.
+
+            Then rewrite /tmp/storylines-sources.md so it reflects the FINAL
+            state of the file: one ### block per surviving item, with the URLs
+            you actually opened. Keep the same format the draft step used.
+
+            Do NOT fabricate sources or events. Do NOT touch any file other than
+            data/storylines.md. Do NOT run git commit or git push.
+          claude_args: '--model opus --max-turns 30 --allowed-tools "Read,Edit,WebSearch,WebFetch,Write"'
+
+      # ── 4. Open the PR with the reviewed, revised content ───────────────
+      - name: Compose PR body
+        id: pr_body
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          SOURCES=/tmp/storylines-sources.md
+          REVIEW=codex-review.md
+          DELIM="PR_BODY_EOF_$(date +%s%N)"
+          {
+            echo "body<<${DELIM}"
+            echo "Auto-generated by Claude Code, fact-checked by Codex, then revised by Claude."
+            echo
+            echo "⚠️ AI content can still slip through. The URLs below are what Claude *says* it used — spot-check before merging."
+            echo
+            if [ -s "$SOURCES" ]; then
+              echo "## Sources Claude reports having used"
+              echo
+              cat "$SOURCES"
+              echo
+            else
+              echo "_No sources file produced for this run._"
+              echo
+            fi
+            if [ -s "$REVIEW" ]; then
+              echo "## 🤖 Codex cross-check — on the first draft"
+              echo
+              echo "_Codex reviewed Claude's initial draft; Claude then revised the file per these findings, so some entries below may no longer match the final diff._"
+              echo
+              cat "$REVIEW"
+              echo
+            fi
+            echo "${DELIM}"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        id: cpr
+        if: steps.changes.outputs.changed == 'true'
+        with:
+          branch: storylines/auto-update
+          delete-branch: true
+          add-paths: data/storylines.md
+          commit-message: "chore(data): auto-update storylines"
+          title: "chore(data): auto-update storylines"
+          body: ${{ steps.pr_body.outputs.body }}
+          assignees: crizin
+          labels: |
+            ai-generated
+            data-update

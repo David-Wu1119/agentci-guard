@@ -1,0 +1,9 @@
+name: run-shell-semantics
+on: push
+permissions:
+  contents: read
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - run: claude --print "review the checked-out code"

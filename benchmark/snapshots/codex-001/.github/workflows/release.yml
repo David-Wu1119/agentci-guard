@@ -1,0 +1,204 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - beta
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          token: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '22.13.1'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Upgrade npm for Trusted Publishers
+        run: npm install -g npm@11.5.1
+
+      - name: Install pnpm
+        run: |
+          npm install -g corepack@latest
+          corepack enable
+          corepack prepare pnpm@11.3.0 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Configure git
+        run: |
+          git config --local user.email "${{ secrets.GIT_USER_EMAIL }}"
+          git config --local user.name "${{ secrets.GIT_USER_NAME }}"
+
+      - name: Bump version
+        id: version
+        run: |
+          if [ "${{ github.event.inputs.version_type }}" = "beta" ]; then
+            npm version prerelease --preid=beta --no-git-tag-version
+          else
+            npm version ${{ github.event.inputs.version_type }} --no-git-tag-version
+          fi
+
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          NEW_VERSION="v$PACKAGE_VERSION"
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "package_version=$PACKAGE_VERSION" >> $GITHUB_OUTPUT
+
+          git add package.json pnpm-lock.yaml
+          git commit -m "🔖 v$PACKAGE_VERSION"
+
+      - name: Get previous published version
+        id: prev_version
+        run: |
+          PUBLISHED_VERSION=$(npm view @vizzly-testing/cli version 2>/dev/null || echo "")
+          if [ -n "$PUBLISHED_VERSION" ] && git rev-parse "v$PUBLISHED_VERSION" >/dev/null 2>&1; then
+            PREV_TAG="v$PUBLISHED_VERSION"
+          else
+            PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+          fi
+          echo "tag=$PREV_TAG" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes
+        continue-on-error: true
+        uses: openai/codex-action@a26d2d4d8b78a694338b8e3715c3630254340b2c # v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          sandbox: workspace-write
+          safety-strategy: drop-sudo
+          prompt: |
+            Generate release notes for Vizzly CLI ${{ steps.version.outputs.new_version }}.
+
+            Context:
+            - Previous release tag: `${{ steps.prev_version.outputs.tag }}`
+            - New release tag: `${{ steps.version.outputs.new_version }}`
+            - Package version: `${{ steps.version.outputs.package_version }}`
+            - Package name: `@vizzly-testing/cli`
+
+            Instructions:
+            1. Use git commands to inspect commits and changed files for this release.
+               - If a previous release tag exists, inspect `${{ steps.prev_version.outputs.tag }}..HEAD`.
+               - If there is no previous release tag, inspect the latest 10 commits.
+            2. Read relevant diffs or files when commit messages are too vague.
+            3. Write concise, user-facing release notes. Keep it grounded in the real diff.
+            4. Use Keep a Changelog-style sections, but omit empty sections.
+            5. Prefer these headings when they apply: `### Added`, `### Changed`, `### Fixed`, `### Developer Experience`.
+            6. Do not invent features, fixes, migration steps, or breaking changes.
+            7. Do not include a raw list of commits or commands run.
+            8. Include a full changelog link at the bottom:
+               - If a previous release tag exists: `**Full Changelog**: https://github.com/vizzly-testing/cli/compare/${{ steps.prev_version.outputs.tag }}...${{ steps.version.outputs.new_version }}`
+               - Otherwise: `**Full Changelog**: https://github.com/vizzly-testing/cli/releases/tag/${{ steps.version.outputs.new_version }}`
+            9. Save the release notes to `RELEASE_NOTES.md`.
+
+            Use this format:
+
+            ## What's Changed
+
+            ### Added
+            - Short, concrete item grounded in the diff.
+
+            ### Changed
+            - Short, concrete item grounded in the diff.
+
+            ### Fixed
+            - Short, concrete item grounded in the diff.
+
+            **Full Changelog**: https://github.com/vizzly-testing/cli/compare/<previous-tag>...<new-tag>
+
+      - name: Read release notes
+        id: release_notes
+        run: |
+          if [ ! -s RELEASE_NOTES.md ]; then
+            if [ -n "${{ steps.prev_version.outputs.tag }}" ]; then
+              CHANGELOG_URL="https://github.com/vizzly-testing/cli/compare/${{ steps.prev_version.outputs.tag }}...${{ steps.version.outputs.new_version }}"
+            else
+              CHANGELOG_URL="https://github.com/vizzly-testing/cli/releases/tag/${{ steps.version.outputs.new_version }}"
+            fi
+
+            {
+              echo "## What's Changed"
+              echo
+              if [ -n "${{ steps.prev_version.outputs.tag }}" ]; then
+                git log ${{ steps.prev_version.outputs.tag }}..HEAD --pretty=format:"- %s"
+              else
+                git log --pretty=format:"- %s" -10
+              fi
+              echo
+              echo
+              echo "**Full Changelog**: $CHANGELOG_URL"
+            } > RELEASE_NOTES.md
+          fi
+
+          {
+            echo 'notes<<RELEASE_EOF'
+            cat RELEASE_NOTES.md
+            echo 'RELEASE_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Restore Node.js for publishing
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '22.13.1'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Restore npm and pnpm for publishing
+        run: |
+          npm install -g npm@11.5.1
+          npm install -g corepack@latest
+          corepack enable
+          corepack prepare pnpm@11.3.0 --activate
+
+      - name: Verify package version is unpublished
+        run: |
+          if npm view @vizzly-testing/cli@${{ steps.version.outputs.package_version }} version >/dev/null 2>&1; then
+            echo "@vizzly-testing/cli@${{ steps.version.outputs.package_version }} is already published"
+            exit 1
+          fi
+
+      - name: Build package
+        run: pnpm run build
+
+      - name: Publish to NPM
+        run: |
+          if [ "${{ github.event.inputs.version_type }}" = "beta" ]; then
+            npm publish --provenance --access public --tag beta --ignore-scripts
+          else
+            npm publish --provenance --access public --ignore-scripts
+          fi
+
+      - name: Push version and tag
+        run: |
+          git push origin main
+          git tag "${{ steps.version.outputs.new_version }}"
+          git push origin "${{ steps.version.outputs.new_version }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          tag_name: ${{ steps.version.outputs.new_version }}
+          name: ${{ github.event.inputs.version_type == 'beta' && '🧪' || '✨' }} ${{ steps.version.outputs.new_version }}
+          body: ${{ steps.release_notes.outputs.notes }}
+          draft: false
+          prerelease: ${{ github.event.inputs.version_type == 'beta' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

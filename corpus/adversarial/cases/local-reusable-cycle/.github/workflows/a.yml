@@ -1,0 +1,5 @@
+name: reusable-cycle-a
+on: push
+jobs:
+  call-b:
+    uses: ./.github/workflows/b.yml

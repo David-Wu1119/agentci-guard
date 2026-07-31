@@ -7,19 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Documentation
+### Fixed
 
-- Clarified the 75-repo real-world findings as **v0.1 scanner ratings** (pattern
-  matches, not confirmed exploits), and added a follow-up exploitability triage:
-  most critical ratings are not attacker-reachable because
-  `anthropics/claude-code-action` gates on repository write access by default;
-  the configs that remove the gate appear in ≈0 public repos.
-- Reframed "59 → 13" as an **78% reduction in reported criticals**, and clarified
-  that "eight critical" means eight repositories that received a critical scanner
-  rating before exploitability triage — not eight confirmed-exploitable repos.
-- Added a **prior-art** note (CodeQL Actions queries, prompt-injection /
-  `pull_request_target` scanners) and removed any implication of proven RCE or
-  first-of-kind novelty.
+- Replaced the broken v0.1.0 Action wiring with a dedicated `dist/action.js`
+  entrypoint that reads `INPUT_*`, writes SARIF and declared outputs, validates
+  inputs, and implements `fail-on` exit behavior.
+- Bundled every runtime dependency into the committed Action/CLI artifacts and
+  added a tarball smoke that executes them without `node_modules`; the earlier
+  in-repository smoke could hide external imports.
+- CI now executes the real `action.yml` through `uses: ./` and checks vulnerable,
+  hardened, and expected-threshold-failure cases.
+- Resolved known semantic defects around workflow/job/step environment
+  precedence (including untrusted values), `run:` shell semantics,
+  event-specific reachability, absent and overridden permission defaults,
+  discussion events/permissions, nested local and remote reusable workflows,
+  YAML parse errors, current checkout protection, and SARIF lines.
+- Restricted agent observations to structured Action targets and executable
+  coding-agent CLI commands; provider keys, model names, prose, install
+  commands, and version/help checks no longer establish agent execution.
+
+### Added
+
+- Explicit workflow analysis model with parse/incomplete-analysis diagnostics.
+- Public synthetic adversarial regression corpus.
+- Frozen, licensed, repo-disjoint real-workflow candidate benchmark with fixed
+  commits, blob hashes, snapshots, a 7,056-unit annotation protocol, independent
+  review plan, schema validation, separate agent-detection and rule metrics,
+  supported/overall universes, confidence intervals, abstention coverage, and
+  generated error analysis. Accuracy remains unreported until human labeling
+  and adjudication are complete.
+- A non-rule `agent_usages` observation stream with stable job and step
+  locations so agent identification can be measured independently.
+- Targeted Codex Action, Aider CLI, Cursor Agent CLI, and OpenHands benchmark
+  strata. Unlabeled v1/v2 candidates are archived; v2 replaced 15 noncanonical
+  mis-cased control paths, and v3 moved 16 inspected diversity cases to
+  development and froze 16 unseen replacements before labeling.
+- Reproducible v0.1.0 baseline and historical artifact inventory.
+- Draft 2020-12 schemas that are compiled and applied to the benchmark manifest
+  and any published annotation records in CI.
+- Generated license notices for every production dependency included in the
+  committed bundles.
+- Cross-file label provenance checks, stable adjudicator identities, computed
+  Git blob verification, and clean-worktree capture before metric outputs are
+  created.
+
+### Changed
+
+- Positioned AgentCI Guard as an experimental AI-workflow linter, not a
+  production security gate.
+- Retracted the reproducibility and accuracy implications of the historical
+  75-repository exploratory scan. Its raw corpus, fixed commits, and outputs do
+  not survive; archived aggregates remain historical only.
 
 ## [0.1.0] - 2026-06-22
 
@@ -66,10 +104,14 @@ permissions, shell access, or performs unsafe checkout.
 - **GitHub Action** (`David-Wu1119/agentci-guard@v0`) on the `node24` runtime,
   with `path`, `sarif`, and `fail-on` inputs and outputs `findings`,
   `critical`, `high`, `medium`, `low`, and `sarif-path` for downstream steps to
-  react to.
-- **Real-world findings report** ([`docs/real-world-findings.md`](docs/real-world-findings.md)):
+  react to. **Known defect discovered after release:** the manifest used
+  unsupported JavaScript Action `runs.args`, so v0.1.0 did not actually pass
+  inputs or run a scan through `uses:`.
+- **Historical real-world findings report** ([`docs/real-world-findings.md`](docs/real-world-findings.md)):
   a scan of 75 public repositories whose workflows reference
   `anthropics/claude-code-action`, found via GitHub code search.
+  The raw corpus, fixed commits, and output files were not preserved, so these
+  numbers are non-reproducible historical scanner output, not accuracy evidence.
   - Severity totals across the corpus: 13 critical, 69 high, 225 medium, 0 low.
   - Repositories by worst finding (of 75): 8 critical (11%), 32 high (43%),
     35 medium (47%), 0 clean.

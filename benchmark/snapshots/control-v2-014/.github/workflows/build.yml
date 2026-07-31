@@ -1,0 +1,84 @@
+name: build
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest]
+        build_type: [RelWithDebInfo, Debug]
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: 'recursive'
+    - uses: seanmiddleditch/gha-setup-ninja@master
+    - uses: ilammy/msvc-dev-cmd@v1
+    - name: Generating Makefiles
+      shell: bash
+      run: |
+        cmake -S . -B build -G Ninja \
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+    - name: Compiling
+      shell: bash
+      run: |
+        cd build && ninja
+    - name: Running Tests
+      shell: bash
+      run: |
+        cd build && ctest --output-on-failure
+    - name: Copying Files
+      shell: bash
+      run: |
+        export dst=$(pwd)/Vaca-${{ matrix.build_type }}-Library
+        mkdir lib && \
+          cp build/lib/vaca.dll \
+             build/lib/vaca.lib \
+             lib
+        mkdir $dst &&
+          cp -R --parents \
+            vaca/*.h \
+            lib/vaca.dll \
+            lib/vaca.lib \
+            $dst
+        export dst=$(pwd)/Vaca-${{ matrix.build_type }}-Examples
+        mkdir $dst && \
+          cd build/examples && \
+          cp -R --parents \
+            *.dll \
+            *.exe \
+            $dst
+    - name: Uploading Library
+      uses: actions/upload-artifact@v1
+      with:
+        name: Vaca-${{ matrix.build_type }}-Library
+        path: Vaca-${{ matrix.build_type }}-Library
+    - name: Uploading Examples
+      if: matrix.build_type == 'RelWithDebInfo'
+      uses: actions/upload-artifact@v1
+      with:
+        name: Vaca-${{ matrix.build_type }}-Examples
+        path: Vaca-${{ matrix.build_type }}-Examples
+  mingw:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest]
+        sys: [mingw64, mingw32, ucrt64, clang64]
+        build_type: [RelWithDebInfo, Debug]
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+    - uses: msys2/setup-msys2@v2
+      with:
+        release: false
+        msystem: ${{matrix.sys}}
+        pacboy: cc:p cmake:p ninja:p
+    - uses: actions/checkout@v2
+    - name: Generating Makefiles
+      run: cmake -S . -B build -G Ninja
+    - name: Compiling
+      run: cd build && ninja
+    - name: Test
+      run: cd build && ctest --output-on-failure

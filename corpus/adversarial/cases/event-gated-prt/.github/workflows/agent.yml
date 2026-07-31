@@ -1,0 +1,14 @@
+name: event-gated-prt
+on:
+  push:
+  pull_request_target:
+permissions:
+  contents: read
+jobs:
+  agent:
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          prompt: ${{ github.event.pull_request.body }}

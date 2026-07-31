@@ -1,0 +1,7 @@
+name: local-reusable-missing
+on: push
+permissions:
+  contents: read
+jobs:
+  call:
+    uses: ./.github/workflows/does-not-exist.yml

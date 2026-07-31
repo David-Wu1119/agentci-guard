@@ -1,0 +1,261 @@
+name: PR
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      # Documentation
+      - '**/*.md'
+      - 'docs/**'
+      - 'LICENSE'
+      # GitHub repository configuration
+      - '.github/dependabot.yaml'
+      - '.github/settings.yml'
+      - '.github/SECURITY.md'
+      - '.github/release-header.md'
+      # Editor and formatting configuration
+      - '.editorconfig'
+      - '.prettierrc'
+      - '.prettierignore'
+      # Playground (has its own workflows)
+      - 'internal/playground/**'
+      # Ansible infrastructure
+      - 'platform/ansible/**'
+
+# Only allow one of these to run per branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write # Dependabot
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup CI environment
+        uses: ./.github/actions/setup
+
+      - name: Lint Go
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: latest
+          skip-cache: true
+          args: --verbose
+          working-directory: ./
+
+      - name: Biome
+        run: biome ci .
+
+      - name: Lint Terraform
+        run: |
+          export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
+          brew install tflint
+          make lint
+        working-directory: ./platform/terraform
+
+      - name: Diff
+        run: git diff
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup CI environment
+        uses: ./.github/actions/setup
+
+      - name: Install dependencies with pnpm
+        run: pnpm install
+
+      - name: Test Go
+        # TODO, add race.
+        env:
+          SOPS_AGE_KEY: ${{ secrets.ORG_AGE_SECRET }}
+          DO_API_KEY: ${{ secrets.ORG_DO_ACCESS_TOKEN }}
+          DO_SPACES_ACCESS_KEY: ${{ secrets.ORG_DO_SPACES_ACCESS_KEY }}
+          DO_SPACES_SECRET_KEY: ${{ secrets.ORG_DO_SPACES_SECRET_KEY }}
+          HETZNER_TOKEN: ${{ secrets.ORG_HETZNER_TOKEN }}
+          BACK_BLAZE_BUCKET: ${{ secrets.ORG_BACK_BLAZE_TF_BUCKET }}
+          BACK_BLAZE_KEY_ID: ${{ secrets.ORG_BACK_BLAZE_KEY_ID }}
+          BACK_BLAZE_APPLICATION_KEY: ${{ secrets.ORG_BACK_BLAZE_APPLICATION_KEY }}
+          TURSO_TOKEN: ${{ secrets.ORG_TURSO_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN }}
+          GITHUB_TOKEN_CLASSIC: ${{ secrets.ORG_GITHUB_TOKEN_CLASSIC }}
+          SLACK_BOT_TOKEN: ${{ secrets.ORG_SLACK_BOT_TOKEN }}
+          SLACK_USER_TOKEN: ${{ secrets.ORG_SLACK_USER_TOKEN }}
+          PEEKAPING_ENDPOINT: ${{ secrets.ORG_PEEKAPING_ENDPOINT }}
+          PEEKAPING_API_KEY: ${{ secrets.ORG_PEEKAPING_API_KEY }}
+        run: |
+          go test $(go list ./... | grep -v '/internal/mocks') -coverprofile=./coverage.out -covermode=atomic
+
+      - name: Test JS
+        run: pnpm test:js
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5.5.2
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.out
+          verbose: true
+          commit_parent: ${{ github.event.pull_request.base.sha }}
+
+      - name: Diff
+        run: git diff
+
+  secret-scan:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.ORG_GITLEAKS_LICENSE }}
+
+  claude-code-review:
+    # Skip automated bot PRs (dependabot, ainsley-dev-bot, github-actions)
+    if: github.actor != 'dependabot[bot]' && github.actor != 'ainsley-dev-bot[bot]' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      # Workaround for duplicate comments: Minimize old Claude reviews before creating new one.
+      # See: https://github.com/anthropics/claude-code-action/issues/419
+      - name: Dismiss old Claude bot comments
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REPO="${{ github.repository }}"
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+
+          gh api "repos/$REPO/issues/$PR_NUMBER/comments" --jq '.[] | select(.user.login == "claude[bot]") | .node_id' | while read -r comment_node_id; do
+            if [ -n "$comment_node_id" ]; then
+              echo "Hiding comment: $comment_node_id"
+              gh api graphql -f query='
+                mutation($id: ID!) {
+                  minimizeComment(input: {subjectId: $id, classifier: OUTDATED}) {
+                    minimizedComment {
+                      isMinimized
+                    }
+                  }
+                }' -f id="$comment_node_id"
+            fi
+          done
+
+      - name: Run Claude Code Review
+        id: claude-review
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.ORG_CLAUDE_CODE_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Review this pull request using the following structure:
+
+            ## Review summary
+
+            - **Overall score**: X/10 (use scoring rubric below)
+            - **Critical issues**: X
+            - **Warnings**: X
+            - **Suggestions**: X
+            - **Recommendation**: [✅ Approve | ⚠️ Approve with comments | ❌ Request changes]
+
+            [1-2 sentence summary of overall quality and key concerns]
+
+            ## Critical issues 🔴
+
+            [Security vulnerabilities, data loss risks, breaking changes - maximum 3, or state "None"]
+
+            ## Warnings 🟡
+
+            [Bugs, performance issues, missing tests, code smells - maximum 5, or state "None"]
+
+            ## Suggestions 🟢
+
+            [Style improvements, refactoring opportunities, best practices - maximum 3, or state "None"]
+
+            ---
+
+            **Scoring guide** (1-10):
+            - 9-10: Production ready, excellent quality
+            - 7-8: Minor improvements needed, safe to merge
+            - 5-6: Notable issues but functional
+            - 3-4: Significant problems requiring fixes
+            - 1-2: Critical issues, do not merge
+
+            **Review focus**:
+            - Follow AGENTS.md conventions (British English, sentence case headings, no unnecessary emojis outside severity indicators)
+            - Code quality and adherence to project style
+            - Potential bugs or logic errors
+            - Security concerns
+            - Test coverage (Go: parallel tests, table-driven; JS: vitest patterns)
+            - Performance considerations
+
+            **Guidelines**:
+            - Only report actionable issues
+            - Skip trivial issues that linters catch
+            - For large PRs (>500 lines), focus on critical/high-impact issues only
+            - Use `<details>` sections for lengthy explanations
+            - Keep feedback concise and professional
+
+            Use `gh pr comment` to post your review on the pull request.
+
+          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
+          # or https://docs.claude.com/en/docs/claude-code/cli-reference for available options
+          claude_args: '--allowed-tools "Bash(gh api:*),Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"'
+
+      - name: Prepare Claude review failure comment
+        if: steps.claude-review.outcome == 'failure' && github.event_name == 'pull_request'
+        id: claude-review-failure
+        run: |
+          {
+            echo 'comment_body<<EOF'
+            echo "<!-- claude-review-failure -->"
+            echo "### Claude Code review failed"
+            echo ""
+            echo "<details>"
+            echo "<summary>View failure details</summary>"
+            echo ""
+            echo "**Reason**: ${{ steps.claude-review.outputs.error || 'Unavailable. Check the workflow logs for the full error.' }}"
+            echo ""
+            echo "</details>"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Comment on PR
+        if: steps.claude-review.outcome == 'failure' && github.event_name == 'pull_request'
+        uses: ./.github/actions/pr-comment
+        with:
+          body-includes: '<!-- claude-review-failure -->'
+          comment-body: ${{ steps.claude-review-failure.outputs.comment_body }}
+          issue-number: ${{ github.event.pull_request.number }}
+          private-key: ${{ secrets.ORG_GITHUB_APP_PRIVATE_KEY }}

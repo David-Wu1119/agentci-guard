@@ -1,0 +1,76 @@
+name: Claude Code
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened, assigned]
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  claude:
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Run Claude Code
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            CRITICAL PR REVIEW RULES — VIOLATIONS CAUSE PRODUCTION BUGS:
+
+            1. NEVER suggest changes to security enforcement logic. The classification system,
+               taint propagation, canFlowTo checks, policy hooks, sandbox boundaries, and
+               SSRF prevention are ALL intentionally designed. You do NOT understand the
+               security architecture well enough to suggest changes. Every time you have
+               suggested "this should block" or "this shouldn't block", you have been WRONG
+               and introduced a bug.
+
+            2. What you SHOULD review:
+               - Actual coding bugs (null refs, off-by-one, logic errors, race conditions)
+               - Type errors, missing awaits, incorrect function signatures
+               - Import violations (check .claude/rules/dependency-layers.md)
+               - Dead code, unused variables, missing error handling
+               - Style violations (check .claude/rules/code-style.md)
+               - Test coverage gaps
+
+            3. What you MUST NOT review or suggest changes to:
+               - Whether a tool call should be blocked or allowed
+               - Whether a classification level is correct
+               - Whether taint should escalate in a given scenario
+               - Whether a sandbox should permit or deny an operation
+               - Whether SSRF checks are too strict or too lenient
+               - Any "security improvement" suggestions whatsoever
+
+            4. If you see security code you don't understand, SKIP IT. Do not comment.
+               Do not suggest alternatives. The security architecture is correct.
+          settings: |
+            {
+              "model": "claude-opus-4-6"
+            }
+          additional_permissions: |
+            actions: read

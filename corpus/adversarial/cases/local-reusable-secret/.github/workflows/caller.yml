@@ -1,0 +1,8 @@
+name: local-reusable-secret-caller
+on: push
+permissions:
+  contents: read
+jobs:
+  agent:
+    uses: ./.github/workflows/reusable.yml
+    secrets: inherit
