@@ -1,65 +1,73 @@
-# v0.1.1 Release Gate
+# v0.1.1 Functional Release Gate
 
-The immutable `v0.1.1` tag must not be created until every pre-tag gate below
-has evidence. npm publication and movement of the floating `v0` tag additionally
-require the post-tag consumer smoke.
+v0.1.1 repairs the broken v0.1.0 JavaScript Action entrypoint. It is a
+functional-correctness release, not an accuracy-calibration milestone. Human
+labels and measured precision/recall remain required before any calibrated or
+production-security claim, but they do not justify leaving the public `v0`
+Action reference on a known no-op release.
 
-## Pre-tag required
+## Pre-release required
 
-- [x] v0.1.0 baseline, environment, outputs, defects, and historical artifact
-      inventory are frozen.
-- [x] `action.yml` points to a dedicated bundled JavaScript entrypoint.
-- [x] CI contains real `uses: ./` executions for vulnerable, hardened, and
-      threshold-failure behavior.
-- [x] Local Action harness verifies SARIF, outputs, exit 0, exit 2, and parse
-      error exit 1.
+- [x] The v0.1.0 baseline, environment, defects, and missing historical
+      artifacts are frozen.
+- [x] `action.yml` points to a dedicated bundled JavaScript entrypoint and
+      declares its inputs and outputs.
+- [x] Hosted CI executes the real Action through `uses: ./` for vulnerable,
+      hardened, and threshold-failure behavior.
+- [x] Local tests cover Action exit codes, SARIF, outputs, invalid paths, parse
+      failures, and CLI report paths.
 - [x] Workflow environment precedence, shell semantics, event reachability,
-      permission defaults, discussions, reusable workflows, parse diagnostics,
-      checkout semantics, and SARIF locations have adversarial regression cases.
-- [x] Public adversarial corpus is explicitly separated from accuracy evidence.
-- [x] Real-workflow candidate benchmark contains at least 100 workflows from at
-      least 50 repositories, with fixed commits, blob/hash provenance,
-      repository-disjoint splits, and snapshot verification.
-- [x] Benchmark v3 contains multiple agent Action/CLI families, exact-case
-      workflow paths, granular annotation units, a deterministic independent
-      review plan, replacement holdouts for inspected development cases,
-      schemas, separate task metrics, and a reproduction smoke test.
-- [x] CI validates the committed Action bundle, manifest, SARIF against the
-      checksum-pinned official OASIS schema, project severity and locations,
-      package contents, benchmark schemas, and full dependency audit.
-- [x] The candidate npm tarball runs its Action and CLI after extraction outside
-      the repository with no `node_modules`.
-- [x] A release-triggered consumer workflow is fixed to the immutable
-      `David-Wu1119/agentci-guard@v0.1.1` reference and verifies vulnerable,
-      hardened, and threshold behavior without installing project dependencies.
-- [x] A manual post-publication workflow installs `agentci-guard@0.1.1` into an
-      empty consumer project and verifies vulnerable and hardened CLI results.
-- [x] Hosted GitHub Actions run passes the actual manifest-based CI job
-      ([commit `81921f0`](https://github.com/David-Wu1119/agentci-guard/commit/81921f0546c10635dc63aec67525af84f9f13c95),
-      [run `30132192081`](https://github.com/David-Wu1119/agentci-guard/actions/runs/30132192081)).
-- [ ] A primary human completes all units and a second human completes the
-      predeclared independent-review plan without seeing predictions.
-- [ ] Disagreements are adjudicated with a stable human pseudonym, preserved,
-      and mechanically cross-checked against both independent label files.
-- [ ] Evaluation metrics report agent detection separately; per-rule, micro,
-      and macro precision/recall/F1; support and 95% intervals; supported and
-      overall universes; decision coverage; abstentions; diagnostics; and error
-      types.
-- [ ] README reports the measured result and limitations without calling the
-      tool a production gate.
-- [ ] The exact final release tarball matches the reviewed candidate and repeats
-      the standalone CLI and Action smoke.
-- [ ] A human reviews the final diff, release notes, tag target, and npm
-      provenance.
+      permission defaults, discussions, reusable workflows, checkout behavior,
+      and incomplete-analysis diagnostics have adversarial regression cases.
+- [x] The candidate package runs its bundled Action and CLI after extraction
+      outside the repository without `node_modules`.
+- [x] The benchmark, annotation sheets, review plan, pilot, schemas, and
+      v0.1.0 baseline remain mechanically reproducible and explicitly
+      uncalibrated.
+- [x] The README states that accuracy is unmeasured and that findings are
+      review hypotheses rather than a production merge gate.
+- [x] Hosted CI passed the exact functional candidate at commit
+      [`3158601`](https://github.com/David-Wu1119/agentci-guard/commit/31586017cf86957ecaefe765599fa65456bcccfb)
+      in [run `30602326580`](https://github.com/David-Wu1119/agentci-guard/actions/runs/30602326580).
+- [x] The final policy commit passes the full local verification and its
+      generated `dist/` matches the committed bundle.
+- [x] The repository operator explicitly authorized releasing v0.1.1 as an
+      uncalibrated functional correction and moving `v0` only after the
+      immutable-tag consumer smoke passes.
 
-## Post-tag required
+## Published Action sequence
 
-- [ ] The release-triggered consumer workflow passes against the immutable
-      `David-Wu1119/agentci-guard@v0.1.1` reference.
-- [ ] The matching npm package is published and its installed CLI passes an
-      external consumer smoke.
-- [ ] Only after both checks pass, the floating `v0` tag is moved to the
+- [ ] Create the annotated immutable `v0.1.1` tag at the reviewed policy commit.
+- [ ] Publish the matching GitHub release to trigger
+      `.github/workflows/published-tag-smoke.yml`.
+- [ ] Verify the published `David-Wu1119/agentci-guard@v0.1.1` consumer smoke
+      passes for vulnerable, hardened, and threshold behavior.
+- [ ] Only after that smoke passes, move the floating `v0` tag to the exact
       `v0.1.1` commit.
+
+## npm sequence is separately gated
+
+- [ ] Publish the already reviewed `agentci-guard@0.1.1` tarball only with
+      separate operator authorization.
+- [ ] Dispatch `.github/workflows/published-npm-smoke.yml` at the immutable
+      `v0.1.1` ref and verify the installed CLI in an empty consumer project.
+
+The Action release and moving `v0` do not imply npm publication.
+
+## Post-release calibration milestones
+
+- [ ] Freeze a human-label protocol that truthfully matches the available
+      annotators. Do not represent repeated labels from one human as
+      independent human review.
+- [ ] Complete the declared labels and review or test-retest procedure without
+      consulting evaluation predictions.
+- [ ] Publish agent-detection and per-rule precision, recall, F1, support,
+      intervals, decision coverage, abstentions, and error classifications.
+- [ ] Update the README and data card with the measured result and limitations.
+
+Until those milestones are complete, the permitted description is
+“experimental scanner with unmeasured accuracy,” not “calibrated linter” or
+“production security gate.”
 
 ## Local verification
 
@@ -72,16 +80,4 @@ npm pack --dry-run --json --ignore-scripts --foreground-scripts=false
 pnpm package:smoke
 ```
 
-## External actions requiring explicit authorization
-
-1. Push `feat/v0.1.1-research-prototype` and open a pull request so GitHub can
-   execute the hosted manifest test.
-2. After labels and metrics pass review, merge the exact reviewed commit.
-3. Create the annotated immutable tag `v0.1.1` and its GitHub release. The
-   release triggers `.github/workflows/published-tag-smoke.yml`.
-4. After the published-tag smoke passes, publish the already reviewed matching
-   npm tarball and dispatch `.github/workflows/published-npm-smoke.yml` at the
-   `v0.1.1` tag ref.
-5. Move `v0` only after both remote consumer checks pass.
-
-No release action should be inferred from local completion.
+No npm publication is authorized by completion of this document.
