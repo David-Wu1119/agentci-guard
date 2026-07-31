@@ -1,20 +1,25 @@
 # AgentCI Guard blind annotation pilot
 
 This packet contains six frozen development workflows and 168 blank annotation
-units. It measures annotation time and protocol agreement. It is not an accuracy
-benchmark.
+units. It measures annotation time and single-annotator test-retest
+repeatability. It is not an accuracy benchmark or an inter-rater study.
 
 ## Rules
 
 1. Work only from the files in this packet.
 2. Do not run AgentCI Guard or search for its predictions.
-3. Do not inspect another annotator's sheet before both independent passes are
-   complete.
+3. Do not inspect the completed sheet, notes, or results from the other pass.
 4. Follow `ANNOTATION_GUIDE.md`, `RULES.md`, and `analysis-model.md`.
-5. AI may help navigate a file, but a human must verify every accepted label.
+5. An AI helper may navigate only if it receives this packet and no scanner
+   code, output, or prior-pass context. A human must verify every accepted
+   label.
 6. Use the frozen workflow under
    `workflows/<case-id>/<original-workflow-path>`. Do not replace it with the
    current upstream file.
+7. Use the same stable pseudonym in pass 1 and pass 2. Do not create a second
+   identity for the same person.
+8. If this is pass 2, begin only after seven full days have elapsed since the
+   latest pass-1 completion timestamp.
 
 ## Files to fill
 

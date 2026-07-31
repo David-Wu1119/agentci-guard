@@ -7,7 +7,8 @@
 - Size: 152 workflow files from 152 public repositories
 - Splits: 57 development, 95 evaluation
 - Primary units: 7,056
-- Independent-review plan: 5,676 units
+- Secondary-pass candidate plan: 5,676 units. The current formal tooling still
+  encodes it as independent review, but no second human is available.
 - Frozen provenance: `benchmark/manifest.json`
 - Record schema: `benchmark/schemas/annotation-record.schema.json`
 
@@ -115,8 +116,12 @@ contact maintainers, execute untrusted code, or attempt exploitation.
 - GitHub repository permission defaults are not captured by workflow YAML.
 - Licensing metadata, platform semantics, and public source availability can
   drift after the frozen commit.
-- Human labels can disagree; raw agreement, Cohen's kappa, review coverage, and
-  adjudication status must accompany metrics.
+- Only one human annotator is currently available. The development pilot can
+  measure test-retest repeatability after a washout, but it cannot estimate
+  inter-rater agreement or remove that person's systematic labeling bias.
+- Human decisions can disagree across passes; repeatability, secondary-pass
+  coverage, disagreement-resolution provenance, and the single-annotator
+  limitation must accompany metrics.
 
 ## Maintenance and leakage policy
 

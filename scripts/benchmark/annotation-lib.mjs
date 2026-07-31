@@ -21,6 +21,11 @@ export const PERMISSION_STATUS = new Set([
   "unknown",
   "not-applicable",
 ]);
+const SOURCE_REVIEW_STATUS_BY_ROLE = new Map([
+  ["independent", "independent"],
+  ["test-retest pass 1", "test-retest-pass-1"],
+  ["test-retest pass 2", "test-retest-pass-2"],
+]);
 
 export function loadContext(registryName = "annotation-sheet.csv") {
   const manifest = JSON.parse(
@@ -44,7 +49,7 @@ export function loadContext(registryName = "annotation-sheet.csv") {
 
 export function recordFromCsvRow(row, annotator, reviewStatus = "independent") {
   if (!annotator || annotator === "adjudicated") {
-    throw new Error("Independent labels need a stable human pseudonym.");
+    throw new Error("Source labels need a stable human pseudonym.");
   }
   const groundTruth = normalized(row.ground_truth);
   const reachability = normalized(row.reachability);
@@ -140,8 +145,8 @@ export function validateAnnotationSet(
       `${role} annotator is ${annotator}; expected ${expectedAnnotator}.`,
     );
   }
-  if (role === "independent" && annotator === "adjudicated") {
-    throw new Error("Independent labels cannot use the adjudicated identity.");
+  if (SOURCE_REVIEW_STATUS_BY_ROLE.has(role) && annotator === "adjudicated") {
+    throw new Error("Source labels cannot use the adjudicated identity.");
   }
   if (role === "final" && annotator !== "adjudicated") {
     throw new Error('Final labels must use annotator: "adjudicated".');
@@ -379,14 +384,15 @@ function validateRecord(record, registry, context, role) {
     );
   }
 
-  if (role === "independent" && record.review_status !== "independent") {
+  const expectedSourceStatus = SOURCE_REVIEW_STATUS_BY_ROLE.get(role);
+  if (expectedSourceStatus && record.review_status !== expectedSourceStatus) {
     throw new Error(
-      `${record.unit_id}: independent record has invalid review_status.`,
+      `${record.unit_id}: ${role} record has invalid review_status.`,
     );
   }
-  if (role === "independent" && record.adjudicator !== null) {
+  if (expectedSourceStatus && record.adjudicator !== null) {
     throw new Error(
-      `${record.unit_id}: independent records cannot name an adjudicator.`,
+      `${record.unit_id}: source records cannot name an adjudicator.`,
     );
   }
   if (

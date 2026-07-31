@@ -16,7 +16,9 @@ Current immutable data:
   Action, Aider CLI, Cursor Agent CLI, and OpenHands configurations/lookalikes.
 - 16 unseen, mechanically selected replacements in evaluation: four per family.
 - 7,056 primary annotation units.
-- 5,676 units in the deterministic independent-review plan (80.4%).
+- 5,676 units in the deterministic secondary-pass candidate plan (80.4%).
+  Existing formal tooling still names this independent review, but no second
+  human annotator is currently available.
 
 The synthetic cases under `corpus/adversarial/` are development fixtures and
 are never counted as accuracy data.
@@ -77,27 +79,28 @@ is `benchmark/schemas/annotation-record.schema.json`.
 
 ## Human review protocol
 
-- Before formal labeling, two humans run the deterministic development-only
-  feasibility pilot under `benchmark/pilot/`. It measures active time,
-  agreement, and protocol ambiguity on 168 units without opening evaluation
-  labels or consulting scanner predictions. Pilot decisions are not accuracy
-  evidence.
-- Annotator A labels all 7,056 units without running AgentCI Guard or viewing
-  predictions.
-- Annotator B independently labels all agent-detection and high/critical rule
-  units plus a seeded 22% sample of the remaining units. The checked-in plan
-  covers 5,676 units.
-- All substantive disagreements are adjudicated under a stable human
-  pseudonym. Agreed, single-pass, and adjudicated records remain
-  distinguishable, and final records are cross-checked against both source
-  files.
-- Raw ground-truth agreement, categorical-dimension agreement, Cohen's kappa,
-  and independent review coverage are generated from the two source files.
-- AI assistance may navigate a file but cannot supply an accepted label without
-  human verification.
-- Evaluation predictions remain sealed until labels are adjudicated and the
-  scanner commit is frozen. If rules change after evaluation errors are seen,
-  the affected evaluation data becomes development data.
+- Before formal labeling, the sole available human runs the deterministic
+  development-only feasibility pilot under `benchmark/pilot/`.
+- The same stable pseudonym is used for both pilot passes. Pass 2 starts at
+  least seven full days after pass 1 ends, and pass-1 decisions remain closed
+  until pass 2 is complete.
+- The pilot measures active time, raw exact agreement, chance-corrected
+  test-retest agreement, and protocol ambiguity on 168 development units. It
+  is not accuracy or inter-rater agreement evidence.
+- Formal evaluation labeling has not begun. The current formal comparison,
+  adjudication, validation, and scoring path still requires two genuinely
+  independent human identities. It must not be bypassed by assigning two
+  aliases to one person.
+- After the pilot, the formal single-annotator secondary-pass and disagreement
+  resolution protocol must be frozen and implemented before any evaluation
+  labels are opened. The checked-in 5,676-unit plan is only a candidate input
+  to that future protocol.
+- AI assistance may navigate a file only when isolated from scanner code,
+  predictions, and prior-pass context; it cannot supply an accepted label
+  without human verification.
+- Evaluation predictions remain sealed until final labels and the scanner
+  commit are frozen. If rules change after evaluation errors are seen, the
+  affected evaluation data becomes development data.
 
 See [`ANNOTATION_GUIDE.md`](ANNOTATION_GUIDE.md) for the decision rules.
 
@@ -136,10 +139,18 @@ percentage claims; exact counts remain public.
   positives counted as false negatives;
 - decision coverage ≥ 80% separately for agent detection, security rules, and
   all tasks combined;
-- independently reviewed coverage ≥ 80%;
+- secondary-pass coverage ≥ 80%, with the mode disclosed and never described as
+  independent review unless a second human actually supplied it;
+- published test-retest agreement, disagreement counts, and resolution
+  provenance;
 - high/critical per-rule precision ≥ 80% with sufficient support;
 - complete error classification;
 - a clean scanner worktree at the recorded commit.
+
+The current scorer still implements the existing two-human wording for this
+gate. The gate is therefore not executable until the formal protocol and scorer
+are versioned after the pilot. This is a blocker, not permission to relabel one
+person as two reviewers.
 
 Failure does not invalidate the artifact. It means the honest description
 remains “experimental scanner” and the missed targets are published.

@@ -116,6 +116,8 @@
     "review_status": {
       "enum": [
         "independent",
+        "test-retest-pass-1",
+        "test-retest-pass-2",
         "single-pass",
         "independently-reviewed",
         "adjudicated"
