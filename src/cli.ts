@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import fs from "node:fs/promises";
+import path from "node:path";
 import { Command } from "commander";
 import pc from "picocolors";
 import {
@@ -51,18 +52,26 @@ async function main(): Promise<void> {
         configPath: options.config,
       });
 
-      if (options.sarif)
+      if (options.sarif) {
+        await fs.mkdir(path.dirname(path.resolve(options.sarif)), {
+          recursive: true,
+        });
         await fs.writeFile(
           options.sarif,
           `${JSON.stringify(toSarif(result.findings), null, 2)}\n`,
           "utf8",
         );
-      if (options.markdown)
+      }
+      if (options.markdown) {
+        await fs.mkdir(path.dirname(path.resolve(options.markdown)), {
+          recursive: true,
+        });
         await fs.writeFile(
           options.markdown,
           renderMarkdownReport(result),
           "utf8",
         );
+      }
 
       if (options.json) console.log(JSON.stringify(result, null, 2));
       else console.log(renderTextReport(result));
