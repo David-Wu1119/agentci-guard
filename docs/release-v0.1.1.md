@@ -37,13 +37,16 @@ Action reference on a known no-op release.
 
 ## Published Action sequence
 
-- [ ] Create the annotated immutable `v0.1.1` tag at the reviewed policy commit.
-- [ ] Publish the matching GitHub release to trigger
-      `.github/workflows/published-tag-smoke.yml`.
-- [ ] Verify the published `David-Wu1119/agentci-guard@v0.1.1` consumer smoke
-      passes for vulnerable, hardened, and threshold behavior.
-- [ ] Only after that smoke passes, move the floating `v0` tag to the exact
-      `v0.1.1` commit.
+- [x] Created the annotated immutable `v0.1.1` tag at reviewed commit
+      [`696697e`](https://github.com/David-Wu1119/agentci-guard/commit/696697ec83ebc1ed58032d706c1254d5e894d21d).
+- [x] Published the matching
+      [GitHub release](https://github.com/David-Wu1119/agentci-guard/releases/tag/v0.1.1)
+      to trigger `.github/workflows/published-tag-smoke.yml`.
+- [x] Verified the published `David-Wu1119/agentci-guard@v0.1.1` consumer smoke
+      passed vulnerable, hardened, and threshold behavior in
+      [run `30603107903`](https://github.com/David-Wu1119/agentci-guard/actions/runs/30603107903).
+- [x] After that smoke passed, moved the floating `v0` tag to the exact
+      `v0.1.1` commit and verified both remote tags peel to `696697e`.
 
 ## npm sequence is separately gated
 
