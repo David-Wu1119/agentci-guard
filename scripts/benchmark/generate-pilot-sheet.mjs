@@ -15,7 +15,7 @@ const sourceRegistryPath = path.join(benchmarkRoot, "annotation-sheet.csv");
 const pilotManifestPath = path.join(pilotRoot, "manifest.json");
 const pilotRegistryPath = path.join(pilotRoot, "annotation-sheet.csv");
 const timingTemplatePath = path.join(pilotRoot, "timing-sheet.csv");
-const pilotId = "agentci-v0.1.1-annotation-feasibility-v1";
+const pilotId = "agentci-v0.1.1-annotation-feasibility-v2";
 const selectionSeed = "agentci-guard-annotation-pilot-v1";
 const mode = process.argv[2] ?? "--check";
 if (!["--check", "--write"].includes(mode)) {
@@ -131,11 +131,15 @@ for (const row of pilotRows) {
 }
 
 const pilotManifest = {
-  schema_version: 1,
+  schema_version: 2,
   pilot_id: pilotId,
   purpose:
-    "Development-only blind annotation feasibility and agreement pilot; not accuracy evidence.",
+    "Development-only blind single-annotator test-retest feasibility pilot; not accuracy or inter-rater agreement evidence.",
   status: "template",
+  review_mode: "test-retest",
+  pass_count: 2,
+  annotator_identity_policy: "same-stable-pseudonym",
+  minimum_washout_days: 7,
   source_benchmark_id: sourceManifest.benchmark_id,
   source_frozen_at: sourceManifest.frozen_at,
   source_selection_inputs_sha256: sha256(

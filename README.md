@@ -19,7 +19,9 @@ The old 75-repository scan is retained as a
 [historical, non-reproducible exploratory result](docs/real-world-findings.md).
 It is not accuracy evidence. The new 152-workflow, 152-repository
 [real-workflow benchmark](BENCHMARK.md) is frozen but has no accuracy result
-until its blind human-labeling and independent-review protocol is complete.
+until its blind human-labeling and versioned review protocol is complete. Only
+one annotator is currently available, so the development pilot measures
+test-retest repeatability after a washout period, not inter-rater agreement.
 
 ![AgentCI Guard scanning a vulnerable workflow](docs/demo.gif)
 

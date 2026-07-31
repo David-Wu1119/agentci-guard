@@ -95,9 +95,11 @@ This command:
 - checks the archived v1/v2 provenance and v3 holdout correction;
 - regenerates the 7,056-unit blank annotation registry in memory and compares
   it byte-for-byte with the checked-in CSV;
-- regenerates the 5,676-unit independent-review plan;
-- regenerates the six-case, 168-unit development-only annotation feasibility
-  pilot without consulting predictions or evaluation workflow content;
+- regenerates the 5,676-unit secondary-pass candidate plan, which the current
+  formal tooling still encodes as independent review;
+- regenerates the six-case, 168-unit development-only single-annotator
+  test-retest pilot without consulting predictions or evaluation workflow
+  content;
 - smoke-tests an allowlisted annotator packet that excludes scanner code,
   built bundles, evaluation snapshots, and predictions;
 - validates annotation schemas and any published label package.
@@ -115,12 +117,21 @@ pnpm benchmark:smoke
 
 The smoke test fills temporary synthetic labels, runs import, comparison,
 adjudication, dev scoring, and schema validation, then deletes the temporary
-directory. It never writes benchmark labels or metrics.
+directory. Its pilot path uses one stable pseudonym across two passes and
+enforces the predeclared washout; its formal path remains a synthetic test of
+the existing two-human code. It never writes benchmark labels or metrics.
 
 ## Human label import
 
-Follow `ANNOTATION_GUIDE.md`. The public package is incomplete unless all three
-files exist together:
+Do not begin formal evaluation labeling yet. Only one human annotator is
+available, while the current formal toolchain requires two genuinely
+independent humans and an adjudicated output. The development pilot must finish
+first; then the formal single-annotator protocol and scorer must be versioned.
+Using two aliases for one person would invalidate the review evidence.
+
+The existing scorer expects all three files below together. This list documents
+the current implementation; it is not authorization to produce them under the
+one-annotator study:
 
 ```text
 benchmark/labels/annotator-a.jsonl
@@ -128,13 +139,16 @@ benchmark/labels/annotator-b.jsonl
 benchmark/labels/adjudicated.jsonl
 ```
 
-After adjudication, update `benchmark/manifest.json` status from `unlabeled` to
-`adjudicated` in the same reviewed commit that freezes the label files. Do not
-run the evaluation split before that commit.
+If a genuine two-human protocol is used, update `benchmark/manifest.json`
+status from `unlabeled` to `adjudicated` in the same reviewed commit that
+freezes the label files. Otherwise, wait for the versioned single-annotator
+replacement. Do not run the evaluation split before the applicable protocol is
+frozen and completed.
 
 ## Metrics and error analysis
 
-Development scoring may be run while refining only against development data:
+After the formal protocol blocker above is resolved, development scoring may be
+run while refining only against development data:
 
 ```bash
 pnpm build

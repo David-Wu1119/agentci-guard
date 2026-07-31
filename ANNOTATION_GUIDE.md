@@ -1,8 +1,8 @@
 # AgentCI Guard Annotation Guide
 
 Write labels from the frozen workflow snapshot and the rule contract. Do not
-run AgentCI Guard, inspect SARIF, inspect scanner findings, or read another
-annotator's decisions during an independent pass.
+run AgentCI Guard, inspect SARIF, inspect scanner findings, or read decisions
+from another person or an earlier pass during blind annotation.
 
 ## Files
 
@@ -16,10 +16,13 @@ The sheets are generated from YAML structure only. Their job/step units and
 configured triggers do not contain scanner predictions.
 
 The development-only feasibility pilot under `benchmark/pilot/` uses the same
-schema and decision rules. Both humans label the same 168 units without seeing
-each other's work. Its timing and agreement results decide whether the full
-annotation protocol is operationally feasible; pilot labels are not accuracy
-evidence.
+schema and decision rules. Because only one human annotator is available, that
+person labels the same 168 units twice under the same stable pseudonym, with a
+minimum seven-day washout and no access to pass-1 decisions during pass 2. Its
+timing and test-retest results measure feasibility and intra-annotator
+repeatability. They are not accuracy or inter-rater agreement evidence.
+Any AI navigation helper used during the pilot must be isolated to the packet
+and must not have seen scanner code, predictions, or the earlier pass.
 
 ## Ground-truth values
 
@@ -125,7 +128,17 @@ generic “safe” or “unsafe” judgment.
   known-unprotected checkout v1. Current floating v2-v7 majors without the
   opt-out are negative; ambiguous fixed refs are indeterminate.
 
-## Independent review and adjudication
+## Formal two-human tooling is not the active protocol
+
+The commands below describe the repository's existing formal two-human
+toolchain. They require two actual humans with different stable pseudonyms.
+They are retained for reproducibility, but they are **not authorized for the
+current one-annotator study**. Do not run the same person's labels through this
+path under two aliases.
+
+Formal evaluation labeling remains blocked until the development pilot is
+complete and a versioned single-annotator resolution protocol replaces or
+explicitly limits this tooling.
 
 Annotator A fills the primary sheet. Annotator B fills only the deterministic
 review sheet. Use different stable pseudonyms.

@@ -30,9 +30,15 @@ const pilotManifest = JSON.parse(
 if (
   pilotManifest.status !== "template" ||
   pilotManifest.split !== "dev" ||
+  pilotManifest.review_mode !== "test-retest" ||
+  pilotManifest.pass_count !== 2 ||
+  pilotManifest.annotator_identity_policy !== "same-stable-pseudonym" ||
+  pilotManifest.minimum_washout_days !== 7 ||
   pilotManifest.evaluation_content_inspected_for_selection !== false
 ) {
-  throw new Error("Pilot manifest is not a blind development-only template.");
+  throw new Error(
+    "Pilot manifest is not the predeclared blind development-only test-retest template.",
+  );
 }
 
 for (const [source, destination] of [

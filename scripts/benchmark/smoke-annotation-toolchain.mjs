@@ -31,19 +31,40 @@ try {
   run([
     "scripts/benchmark/import-annotation-csv.mjs",
     pilotACsv,
-    "pilot-a",
+    "pilot-solo",
     pilotAJsonl,
     "--coverage",
     "pilot",
+    "--review-mode",
+    "test-retest",
+    "--pass",
+    "1",
   ]);
   run([
     "scripts/benchmark/import-annotation-csv.mjs",
     pilotBCsv,
-    "pilot-b",
+    "pilot-solo",
     pilotBJsonl,
     "--coverage",
     "pilot",
+    "--review-mode",
+    "test-retest",
+    "--pass",
+    "2",
   ]);
+  assertReviewStatus(pilotAJsonl, "test-retest-pass-1");
+  assertReviewStatus(pilotBJsonl, "test-retest-pass-2");
+  expectFailure(
+    [
+      "scripts/benchmark/compare-annotations.mjs",
+      pilotAJsonl,
+      pilotBJsonl,
+      path.join(temporary, "pilot-invalid-independent-disagreements.csv"),
+      "--coverage",
+      "pilot",
+    ],
+    "independent record has invalid review_status.",
+  );
   run([
     "scripts/benchmark/compare-annotations.mjs",
     pilotAJsonl,
@@ -51,20 +72,47 @@ try {
     path.join(temporary, "pilot-disagreements.csv"),
     "--coverage",
     "pilot",
+    "--review-mode",
+    "test-retest",
   ]);
   const pilotTimingA = path.join(temporary, "pilot-timing-a.csv");
   const pilotTimingB = path.join(temporary, "pilot-timing-b.csv");
+  const pilotTimingTooSoon = path.join(temporary, "pilot-timing-too-soon.csv");
   fillTiming(
     path.join(benchmarkRoot, "pilot", "timing-sheet.csv"),
     pilotTimingA,
-    "pilot-a",
+    "pilot-solo",
+    "2026-01-01T00:00:00Z",
+    "2026-01-01T00:30:00Z",
+  );
+  fillTiming(
+    path.join(benchmarkRoot, "pilot", "timing-sheet.csv"),
+    pilotTimingTooSoon,
+    "pilot-solo",
+    "2026-01-08T00:00:00Z",
+    "2026-01-08T00:30:00Z",
   );
   fillTiming(
     path.join(benchmarkRoot, "pilot", "timing-sheet.csv"),
     pilotTimingB,
-    "pilot-b",
+    "pilot-solo",
+    "2026-01-09T00:00:00Z",
+    "2026-01-09T00:30:00Z",
   );
   const pilotSummary = path.join(temporary, "pilot-summary.json");
+  expectFailure(
+    [
+      "scripts/benchmark/summarize-pilot.mjs",
+      pilotTimingA,
+      pilotTimingTooSoon,
+      pilotAJsonl,
+      pilotBJsonl,
+      path.join(temporary, "pilot-invalid-washout-summary.json"),
+      "--review-mode",
+      "test-retest",
+    ],
+    "the predeclared minimum is 7 days.",
+  );
   run([
     "scripts/benchmark/summarize-pilot.mjs",
     pilotTimingA,
@@ -72,12 +120,15 @@ try {
     pilotAJsonl,
     pilotBJsonl,
     pilotSummary,
+    "--review-mode",
+    "test-retest",
   ]);
   const pilotReport = JSON.parse(fs.readFileSync(pilotSummary, "utf8"));
   if (
     pilotReport.status !== "complete" ||
-    pilotReport.annotation_units_per_annotator !== 168 ||
-    pilotReport.agreement.independently_reviewed_units !== 168
+    pilotReport.review_mode !== "test-retest" ||
+    pilotReport.annotation_units_per_pass !== 168 ||
+    pilotReport.agreement.repeated_units !== 168
   ) {
     throw new Error("Pilot smoke produced an unexpected feasibility report.");
   }
@@ -176,6 +227,20 @@ function fillSynthetic(source, destination) {
   fs.writeFileSync(destination, renderCsv([header, ...rows]));
 }
 
+function assertReviewStatus(file, expected) {
+  const records = fs
+    .readFileSync(file, "utf8")
+    .trim()
+    .split(/\r?\n/)
+    .map((line) => JSON.parse(line));
+  if (
+    records.length === 0 ||
+    records.some((record) => record.review_status !== expected)
+  ) {
+    throw new Error(`${file} did not preserve ${expected} provenance.`);
+  }
+}
+
 function introduceReviewerDisagreement(file) {
   const [header, ...rows] = parseCsv(fs.readFileSync(file, "utf8"));
   const column = Object.fromEntries(header.map((name, index) => [name, index]));
@@ -187,13 +252,13 @@ function introduceReviewerDisagreement(file) {
   fs.writeFileSync(file, renderCsv([header, ...rows]));
 }
 
-function fillTiming(source, destination, annotator) {
+function fillTiming(source, destination, annotator, startedAt, completedAt) {
   const [header, ...rows] = parseCsv(fs.readFileSync(source, "utf8"));
   const column = Object.fromEntries(header.map((name, index) => [name, index]));
   for (const row of rows) {
     row[column.annotator_pseudonym] = annotator;
-    row[column.started_at_utc] = "2026-01-01T00:00:00Z";
-    row[column.completed_at_utc] = "2026-01-01T00:30:00Z";
+    row[column.started_at_utc] = startedAt;
+    row[column.completed_at_utc] = completedAt;
     row[column.active_minutes] = "20";
     row[column.interruption_minutes] = "0";
     row[column.notes] = "Synthetic smoke timing.";
@@ -227,10 +292,16 @@ function verifyPilotPacket(packetRoot) {
   );
   if (
     manifest.split !== "dev" ||
+    manifest.review_mode !== "test-retest" ||
+    manifest.pass_count !== 2 ||
+    manifest.annotator_identity_policy !== "same-stable-pseudonym" ||
+    manifest.minimum_washout_days !== 7 ||
     manifest.case_count !== 6 ||
     manifest.annotation_unit_count !== 168
   ) {
-    throw new Error("Pilot packet manifest is not development-only.");
+    throw new Error(
+      "Pilot packet manifest is not the predeclared development-only test-retest protocol.",
+    );
   }
   for (const item of manifest.cases) {
     const workflow = path.join(
@@ -314,6 +385,21 @@ function run(arguments_, environment = {}) {
     stdio: "pipe",
     env: { ...process.env, ...environment },
   });
+}
+
+function expectFailure(arguments_, expectedMessage) {
+  try {
+    run(arguments_);
+  } catch (error) {
+    const message = `${error.message ?? ""}\n${error.stderr?.toString() ?? ""}`;
+    if (message.includes(expectedMessage)) return;
+    throw new Error(
+      `Command failed for an unexpected reason; wanted ${JSON.stringify(expectedMessage)}.\n${message}`,
+    );
+  }
+  throw new Error(
+    `Command unexpectedly succeeded; wanted ${JSON.stringify(expectedMessage)}.`,
+  );
 }
 
 function walk(directory) {

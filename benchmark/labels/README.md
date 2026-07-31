@@ -60,6 +60,10 @@ Each JSONL line follows
 }
 ```
 
+Development-pilot source records are not part of this formal label package.
+They use `test-retest-pass-1` or `test-retest-pass-2` so the raw JSONL cannot be
+mistaken for independent human review.
+
 The final file uses `annotator: "adjudicated"`, preserves abbreviated source
 annotations, and names a stable human `adjudicator` pseudonym on disputed
 records. `review_status` is one of:
