@@ -79,6 +79,10 @@ export async function scanRepository(
 ): Promise<ScanResult> {
   const cwd = options.cwd ?? process.cwd();
   const scanRoot = path.resolve(cwd, root);
+  const rootStat = await fs.stat(scanRoot).catch(() => null);
+  if (!rootStat?.isDirectory()) {
+    throw new Error(`scan path is not a directory: ${root}`);
+  }
   const config = await loadConfig(scanRoot, options.configPath);
   const workflows = await loadWorkflowFiles(scanRoot);
   const repository: RepositoryAnalysis = {

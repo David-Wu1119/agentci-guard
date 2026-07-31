@@ -13961,6 +13961,10 @@ var EMPTY_REUSABLE_CONTEXT = {
 async function scanRepository(root, options = {}) {
   const cwd = options.cwd ?? process.cwd();
   const scanRoot = path2.resolve(cwd, root);
+  const rootStat = await fs2.stat(scanRoot).catch(() => null);
+  if (!rootStat?.isDirectory()) {
+    throw new Error(`scan path is not a directory: ${root}`);
+  }
   const config = await loadConfig(scanRoot, options.configPath);
   const workflows = await loadWorkflowFiles(scanRoot);
   const repository = {

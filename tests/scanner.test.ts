@@ -95,6 +95,14 @@ jobs:
     ).rejects.toThrow("Unable to read config file");
   });
 
+  it("rejects a missing scan path instead of reporting a clean repository", async () => {
+    await expect(
+      scanRepository("tests/fixtures/does-not-exist"),
+    ).rejects.toThrow(
+      "scan path is not a directory: tests/fixtures/does-not-exist",
+    );
+  });
+
   it("reports malformed YAML as a diagnostic, not a security finding", async () => {
     const result = await scanRepository("corpus/adversarial/cases/parse-error");
 

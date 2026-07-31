@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Restricted agent observations to structured Action targets and executable
   coding-agent CLI commands; provider keys, model names, prose, install
   commands, and version/help checks no longer establish agent execution.
+- Reject nonexistent or non-directory scan roots instead of returning a false
+  clean result, and create missing parent directories for CLI SARIF and Markdown
+  report paths.
 
 ### Added
 
