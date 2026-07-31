@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-07-31
+
 ### Fixed
 
 - Replaced the broken v0.1.0 Action wiring with a dedicated `dist/action.js`
@@ -58,6 +60,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Positioned AgentCI Guard as an experimental AI-workflow linter, not a
   production security gate.
+- Separated the functional Action correction from later accuracy calibration:
+  v0.1.1 is released with explicit unmeasured-accuracy warnings rather than
+  leaving the public major Action tag on the broken v0.1.0 entrypoint.
 - Retracted the reproducibility and accuracy implications of the historical
   75-repository exploratory scan. Its raw corpus, fixed commits, and outputs do
   not survive; archived aggregates remain historical only.
@@ -147,5 +152,6 @@ permissions, shell access, or performs unsafe checkout.
 
   After these fixes: **59 → 13 criticals.**
 
-[Unreleased]: https://github.com/David-Wu1119/agentci-guard/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/David-Wu1119/agentci-guard/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/David-Wu1119/agentci-guard/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/David-Wu1119/agentci-guard/releases/tag/v0.1.0

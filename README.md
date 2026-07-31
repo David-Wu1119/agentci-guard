@@ -10,10 +10,10 @@ agent with secrets, write permissions, shell capability, or an unsafe checkout.
 It is not a production security gate. Its v0.1.1 candidate is **not yet
 calibrated**: human labels and accuracy measurements are still pending.
 
-> **Release status:** v0.1.0's JavaScript Action entrypoint is broken. The CLI
-> works, but `uses: David-Wu1119/agentci-guard@v0` does not pass manifest inputs
-> to it. v0.1.1 fixes the entrypoint and will not be tagged until manifest-based
-> CI passes. Do not use v0.1.0 as an Action.
+> **Release status:** v0.1.1 is the functional-correctness release for
+> v0.1.0's broken JavaScript Action entrypoint. It passes manifest-based CI but
+> does not claim calibrated accuracy: human labels and measurements remain
+> pending. Treat findings as review hypotheses, not a production merge gate.
 
 The old 75-repository scan is retained as a
 [historical, non-reproducible exploratory result](docs/real-world-findings.md).
@@ -77,7 +77,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # Available after the v0.1.1 release is published.
+      # Pin the immutable functional-correctness release.
       - uses: David-Wu1119/agentci-guard@v0.1.1
         with:
           path: .
