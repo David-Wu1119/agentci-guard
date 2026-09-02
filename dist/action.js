@@ -2105,7 +2105,7 @@ var require_parse2 = __commonJS({
     var syntaxError = (type, char) => {
       return `Missing ${type}: "${char}" - use "\\\\${char}" to match literal characters`;
     };
-    var splitTopLevel = (input2) => {
+    var splitTopLevel2 = (input2) => {
       const parts = [];
       let bracket = 0;
       let paren = 0;
@@ -2262,7 +2262,7 @@ var require_parse2 = __commonJS({
         if (!match || match.type !== "*") {
           return;
         }
-        const branches = splitTopLevel(match.body).map((branch2) => branch2.trim());
+        const branches = splitTopLevel2(match.body).map((branch2) => branch2.trim());
         if (branches.length !== 1) {
           return;
         }
@@ -2295,7 +2295,7 @@ var require_parse2 = __commonJS({
         return { risky: false };
       }
       const max = typeof options.maxExtglobRecursion === "number" ? options.maxExtglobRecursion : constants.DEFAULT_MAX_EXTGLOB_RECURSION;
-      const branches = splitTopLevel(body).map((branch) => branch.trim());
+      const branches = splitTopLevel2(body).map((branch) => branch.trim());
       if (branches.length > 1) {
         if (branches.some((branch) => branch === "") || branches.some((branch) => /^[*?]+$/.test(branch)) || hasRepeatedCharPrefixOverlap(branches)) {
           return { risky: true };
@@ -13950,6 +13950,111 @@ function toPermissionLevel(value) {
 function isRecord(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
+var TRUSTED_ACTOR_ATOMS = [
+  // Restricted to the repository owner.
+  /^(?:github\.actor|github\.event\.sender\.login|github\.event\.comment\.user\.login|github\.event\.issue\.user\.login)\s*(?:==|===)\s*github\.repository_owner$/i,
+  /^github\.repository_owner\s*(?:==|===)\s*(?:github\.actor|github\.event\.sender\.login)$/i,
+  // Restricted to pull requests that originate in the base repository.
+  /^github\.event\.pull_request\.head\.repo\.full_name\s*(?:==|===)\s*github\.repository$/i,
+  /^github\.repository\s*(?:==|===)\s*github\.event\.pull_request\.head\.repo\.full_name$/i,
+  // Restricted to non-fork pull requests.
+  /^!\s*github\.event\.pull_request\.head\.repo\.fork$/i,
+  /^github\.event\.pull_request\.head\.repo\.fork\s*(?:==|===)\s*false$/i
+];
+var TRUSTED_ASSOCIATIONS = /* @__PURE__ */ new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
+var ASSOCIATION_EQUALITY = /^github\.event\.(?:comment|issue|pull_request|review)\.author_association\s*(?:==|===)\s*(['"])([A-Za-z_]+)\1$/i;
+var ASSOCIATION_MEMBERSHIP = /^contains\s*\(\s*fromJSON\s*\(\s*(['"])(.*?)\1\s*\)\s*,\s*github\.event\.(?:comment|issue|pull_request|review)\.author_association\s*\)$/i;
+function hasTrustedActorGate(rawCondition) {
+  if (typeof rawCondition !== "string") return false;
+  return conditionImpliesTrustedActor(unwrapExpression(rawCondition));
+}
+function conditionImpliesTrustedActor(condition) {
+  const trimmed = stripOuterParens(condition.trim());
+  if (trimmed.length === 0) return false;
+  const disjuncts = splitTopLevel(trimmed, "||");
+  if (disjuncts.length > 1) {
+    return disjuncts.every((part) => conditionImpliesTrustedActor(part));
+  }
+  const conjuncts = splitTopLevel(trimmed, "&&");
+  if (conjuncts.length > 1) {
+    return conjuncts.some((part) => conditionImpliesTrustedActor(part));
+  }
+  return isTrustedActorAtom(trimmed);
+}
+function isTrustedActorAtom(atom) {
+  const normalized = atom.replace(/\s+/g, " ").trim();
+  if (TRUSTED_ACTOR_ATOMS.some((pattern) => pattern.test(normalized))) {
+    return true;
+  }
+  const equality = ASSOCIATION_EQUALITY.exec(normalized);
+  if (equality) return TRUSTED_ASSOCIATIONS.has(equality[2].toUpperCase());
+  const membership = ASSOCIATION_MEMBERSHIP.exec(normalized);
+  if (membership) {
+    try {
+      const decoded = JSON.parse(membership[2]);
+      return Array.isArray(decoded) && decoded.length > 0 && decoded.every(
+        (value) => typeof value === "string" && TRUSTED_ASSOCIATIONS.has(value.toUpperCase())
+      );
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+function stripOuterParens(value) {
+  let current = value.trim();
+  while (current.startsWith("(") && current.endsWith(")") && wrapsWholeExpression(current)) {
+    current = current.slice(1, -1).trim();
+  }
+  return current;
+}
+function wrapsWholeExpression(value) {
+  let depth = 0;
+  let quote = null;
+  for (let index = 0; index < value.length; index++) {
+    const character = value[index];
+    if (quote) {
+      if (character === quote) quote = null;
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+    if (character === "(") depth++;
+    else if (character === ")") {
+      depth--;
+      if (depth === 0) return index === value.length - 1;
+    }
+  }
+  return false;
+}
+function splitTopLevel(value, operator) {
+  const parts = [];
+  let depth = 0;
+  let quote = null;
+  let start = 0;
+  for (let index = 0; index < value.length; index++) {
+    const character = value[index];
+    if (quote) {
+      if (character === quote) quote = null;
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+    if (character === "(") depth++;
+    else if (character === ")") depth--;
+    else if (depth === 0 && value.startsWith(operator, index)) {
+      parts.push(value.slice(start, index));
+      index += operator.length - 1;
+      start = index + 1;
+    }
+  }
+  parts.push(value.slice(start));
+  return parts.map((part) => part.trim()).filter((part) => part.length > 0);
+}
 
 // src/scanner.ts
 var EMPTY_REUSABLE_CONTEXT = {
@@ -14101,6 +14206,7 @@ function analyzeWorkflow(workflow, repository, context) {
     if (!isRecord2(rawJob)) continue;
     const jobLine = locateJobLine(workflow.raw, jobName);
     const jobReachability = narrowEvents(workflowEvents, rawJob.if);
+    const jobActorGate = hasTrustedActorGate(rawJob.if);
     if (!jobReachability.complete) {
       output.diagnostics.push({
         code: "agentci/analysis-event-condition",
@@ -14185,10 +14291,8 @@ function analyzeWorkflow(workflow, repository, context) {
           context.inputValues
         )
       );
-      const hasUntrustedSink = contextCanReach(
-        stepReachability.events,
-        untrustedEvents
-      );
+      const stepActorGate = jobActorGate || hasTrustedActorGate(rawStep.if);
+      const hasUntrustedSink = !stepActorGate && contextCanReach(stepReachability.events, untrustedEvents);
       const hasSecret = context.inheritedSecrets || containsSecretReference(JSON.stringify(effectiveEnvironment)) || containsSecretReference(
         materializeInputs(
           JSON.stringify({
@@ -14260,7 +14364,7 @@ function analyzeWorkflow(workflow, repository, context) {
           );
         }
       }
-      if (stepReachability.events.includes("pull_request_target")) {
+      if (!stepActorGate && stepReachability.events.includes("pull_request_target")) {
         const checkout = assessPullRequestTargetCheckout(rawStep);
         if (checkout === "unsafe") {
           output.findings.push(
@@ -14290,9 +14394,7 @@ function analyzeWorkflow(workflow, repository, context) {
     }
     if (aiSteps.length === 0) continue;
     const jobHasWrite = hasSensitiveWrite(jobPermissions);
-    const aiOnPullRequestTarget = aiSteps.some(
-      (step) => step.events.includes("pull_request_target")
-    );
+    const aiOnPullRequestTarget = !jobActorGate && aiSteps.some((step) => step.events.includes("pull_request_target"));
     const untrustedAiSink = aiSteps.some(
       (step) => step.hasUntrustedSink && step.events.some((event) => UNTRUSTED_EVENTS.has(event))
     );

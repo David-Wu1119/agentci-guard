@@ -27,6 +27,7 @@ import {
   hasSensitiveWrite,
   hasUnknownSensitivePermission,
   mergeEnvironment,
+  hasTrustedActorGate,
   narrowEvents,
   normalizeTriggers,
   resolvePermissions,
@@ -272,6 +273,7 @@ function analyzeWorkflow(
     if (!isRecord(rawJob)) continue;
     const jobLine = locateJobLine(workflow.raw, jobName);
     const jobReachability = narrowEvents(workflowEvents, rawJob.if);
+    const jobActorGate = hasTrustedActorGate(rawJob.if);
     if (!jobReachability.complete) {
       output.diagnostics.push({
         code: "agentci/analysis-event-condition",
@@ -373,10 +375,10 @@ function analyzeWorkflow(
           context.inputValues,
         ),
       );
-      const hasUntrustedSink = contextCanReach(
-        stepReachability.events,
-        untrustedEvents,
-      );
+      const stepActorGate = jobActorGate || hasTrustedActorGate(rawStep.if);
+      const hasUntrustedSink =
+        !stepActorGate &&
+        contextCanReach(stepReachability.events, untrustedEvents);
       const hasSecret =
         context.inheritedSecrets ||
         containsSecretReference(JSON.stringify(effectiveEnvironment)) ||
@@ -465,7 +467,10 @@ function analyzeWorkflow(
         }
       }
 
-      if (stepReachability.events.includes("pull_request_target")) {
+      if (
+        !stepActorGate &&
+        stepReachability.events.includes("pull_request_target")
+      ) {
         const checkout = assessPullRequestTargetCheckout(rawStep);
         if (checkout === "unsafe") {
           output.findings.push(
@@ -497,9 +502,9 @@ function analyzeWorkflow(
 
     if (aiSteps.length === 0) continue;
     const jobHasWrite = hasSensitiveWrite(jobPermissions);
-    const aiOnPullRequestTarget = aiSteps.some((step) =>
-      step.events.includes("pull_request_target"),
-    );
+    const aiOnPullRequestTarget =
+      !jobActorGate &&
+      aiSteps.some((step) => step.events.includes("pull_request_target"));
     const untrustedAiSink = aiSteps.some(
       (step) =>
         step.hasUntrustedSink &&

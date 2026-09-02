@@ -486,3 +486,153 @@ function toPermissionLevel(value: unknown): PermissionLevel {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
+
+/**
+ * Actor and provenance guards that GitHub evaluates before a job starts.
+ *
+ * These are the standard mitigations for untrusted-event risk, so a job that
+ * is restricted by one of them is not reachable by an untrusted actor even
+ * though its trigger appears in {@link UNTRUSTED_EVENTS}. Only guards that
+ * GitHub itself resolves are trusted here; anything decided by workflow code
+ * at runtime is deliberately excluded, because such a check can run after
+ * untrusted content has already been fetched or executed.
+ */
+const TRUSTED_ACTOR_ATOMS: RegExp[] = [
+  // Restricted to the repository owner.
+  /^(?:github\.actor|github\.event\.sender\.login|github\.event\.comment\.user\.login|github\.event\.issue\.user\.login)\s*(?:==|===)\s*github\.repository_owner$/i,
+  /^github\.repository_owner\s*(?:==|===)\s*(?:github\.actor|github\.event\.sender\.login)$/i,
+  // Restricted to pull requests that originate in the base repository.
+  /^github\.event\.pull_request\.head\.repo\.full_name\s*(?:==|===)\s*github\.repository$/i,
+  /^github\.repository\s*(?:==|===)\s*github\.event\.pull_request\.head\.repo\.full_name$/i,
+  // Restricted to non-fork pull requests.
+  /^!\s*github\.event\.pull_request\.head\.repo\.fork$/i,
+  /^github\.event\.pull_request\.head\.repo\.fork\s*(?:==|===)\s*false$/i,
+];
+
+const TRUSTED_ASSOCIATIONS = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
+
+const ASSOCIATION_EQUALITY =
+  /^github\.event\.(?:comment|issue|pull_request|review)\.author_association\s*(?:==|===)\s*(['"])([A-Za-z_]+)\1$/i;
+
+const ASSOCIATION_MEMBERSHIP =
+  /^contains\s*\(\s*fromJSON\s*\(\s*(['"])(.*?)\1\s*\)\s*,\s*github\.event\.(?:comment|issue|pull_request|review)\.author_association\s*\)$/i;
+
+/**
+ * Report whether an `if:` condition restricts a job or step to trusted actors.
+ *
+ * The analysis is an implication check, not an evaluation: a conjunction is
+ * trusted when *either* operand is trusted (`A && B` implies `A`), while a
+ * disjunction is trusted only when *every* operand is trusted. Everything
+ * else, negation included, is treated as untrusted.
+ */
+export function hasTrustedActorGate(rawCondition: unknown): boolean {
+  if (typeof rawCondition !== "string") return false;
+  return conditionImpliesTrustedActor(unwrapExpression(rawCondition));
+}
+
+function conditionImpliesTrustedActor(condition: string): boolean {
+  const trimmed = stripOuterParens(condition.trim());
+  if (trimmed.length === 0) return false;
+
+  const disjuncts = splitTopLevel(trimmed, "||");
+  if (disjuncts.length > 1) {
+    return disjuncts.every((part) => conditionImpliesTrustedActor(part));
+  }
+  const conjuncts = splitTopLevel(trimmed, "&&");
+  if (conjuncts.length > 1) {
+    return conjuncts.some((part) => conditionImpliesTrustedActor(part));
+  }
+  return isTrustedActorAtom(trimmed);
+}
+
+function isTrustedActorAtom(atom: string): boolean {
+  const normalized = atom.replace(/\s+/g, " ").trim();
+  if (TRUSTED_ACTOR_ATOMS.some((pattern) => pattern.test(normalized))) {
+    return true;
+  }
+
+  const equality = ASSOCIATION_EQUALITY.exec(normalized);
+  if (equality) return TRUSTED_ASSOCIATIONS.has(equality[2].toUpperCase());
+
+  const membership = ASSOCIATION_MEMBERSHIP.exec(normalized);
+  if (membership) {
+    try {
+      const decoded = JSON.parse(membership[2]) as unknown;
+      return (
+        Array.isArray(decoded) &&
+        decoded.length > 0 &&
+        decoded.every(
+          (value) =>
+            typeof value === "string" &&
+            TRUSTED_ASSOCIATIONS.has(value.toUpperCase()),
+        )
+      );
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+function stripOuterParens(value: string): string {
+  let current = value.trim();
+  while (
+    current.startsWith("(") &&
+    current.endsWith(")") &&
+    wrapsWholeExpression(current)
+  ) {
+    current = current.slice(1, -1).trim();
+  }
+  return current;
+}
+
+/** True when the leading parenthesis is closed only by the trailing one. */
+function wrapsWholeExpression(value: string): boolean {
+  let depth = 0;
+  let quote: string | null = null;
+  for (let index = 0; index < value.length; index++) {
+    const character = value[index];
+    if (quote) {
+      if (character === quote) quote = null;
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+    if (character === "(") depth++;
+    else if (character === ")") {
+      depth--;
+      if (depth === 0) return index === value.length - 1;
+    }
+  }
+  return false;
+}
+
+/** Split on a boolean operator at parenthesis depth zero, ignoring strings. */
+function splitTopLevel(value: string, operator: "&&" | "||"): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let quote: string | null = null;
+  let start = 0;
+  for (let index = 0; index < value.length; index++) {
+    const character = value[index];
+    if (quote) {
+      if (character === quote) quote = null;
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+    if (character === "(") depth++;
+    else if (character === ")") depth--;
+    else if (depth === 0 && value.startsWith(operator, index)) {
+      parts.push(value.slice(start, index));
+      index += operator.length - 1;
+      start = index + 1;
+    }
+  }
+  parts.push(value.slice(start));
+  return parts.map((part) => part.trim()).filter((part) => part.length > 0);
+}

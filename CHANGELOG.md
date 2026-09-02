@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Event reachability now recognizes actor and provenance guards, so a job
+  restricted to the repository owner, to same-repository pull requests, or to a
+  trusted `author_association` no longer raises untrusted-reachability
+  findings. Recognition is an implication check: `A && B` is gated when either
+  operand is gated, a disjunction only when every operand is. Gates computed by
+  workflow code at runtime remain untrusted by design. Measured against the
+  frozen 152-workflow benchmark, this removes 2 of 5 critical and 2 of 40 high
+  findings, all of them on workflows that were correctly hardened; the 36-case
+  adversarial corpus is unchanged.
+
 ## [0.1.1] - 2026-07-31
 
 ### Fixed

@@ -32,6 +32,37 @@ Any nonconstant job or step condition outside this subset does not silently
 choose a reachability state. It retains the conservative event set and emits
 `agentci/analysis-event-condition`.
 
+## Actor and provenance guards
+
+An untrusted trigger does not by itself mean an untrusted actor can reach a job.
+A job or step condition is treated as _actor-gated_ when it restricts execution
+to the repository owner (`github.actor` or `github.event.sender.login` compared
+against `github.repository_owner`), to pull requests originating in the base
+repository (`github.event.pull_request.head.repo.full_name ==
+github.repository`, or a negated `head.repo.fork`), or to a trusted
+`author_association` — `OWNER`, `MEMBER`, or `COLLABORATOR` — by equality or by
+`contains(fromJSON(...), ...)` membership.
+
+Recognition is an implication check rather than an evaluation. A conjunction is
+gated when _either_ operand is gated, because `A && B` implies `A`. A
+disjunction is gated only when _every_ operand is gated. Negation and every
+unrecognized construct are treated as ungated.
+
+Actor-gated jobs and steps do not raise `agentci/untrusted-ai-write-token`,
+`agentci/untrusted-input-in-prompt`, `agentci/pull-request-target-ai`, or
+`agentci/unsafe-checkout`. Findings that do not depend on who can trigger the
+workflow — permission breadth, action pinning, and secret exposure — are
+unaffected, because a guard restricts the attacker, not the blast radius.
+
+Only guards GitHub resolves before the job starts are trusted. A gate computed
+by workflow code at runtime, such as a step that queries collaborator
+permission and exports an `allowed` output, is **not** trusted even though it
+is a legitimate pattern: a static reader cannot confirm that such a check runs
+before untrusted content is fetched or executed, and trusting an arbitrary step
+output named `allowed` would be trivial to spoof. This is a deliberate source
+of false positives, chosen over the false negatives the alternative would
+introduce.
+
 GitHub's [`discussion` and `discussion_comment` events](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#discussion)
 are included. GitHub currently documents those events as public preview.
 
