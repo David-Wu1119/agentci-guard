@@ -13249,7 +13249,12 @@ var AI_AGENT_ACTION_PATTERNS = [
   /\banthropics\/[\w.-]*claude/i,
   /\baider-ai\/aider\b/i,
   /\bsweepai\//i,
-  /(?:all-hands-ai|opendevin)\/(?:openhands|opendevin)/i,
+  // The OpenHands organization renamed from All-Hands-AI and publishes agents
+  // under repositories other than `openhands` (extensions, software-agent-sdk),
+  // so the org is anchored and the repository left open. Both legacy org names
+  // are kept because pinned older references stay valid indefinitely.
+  /^openhands\/[\w.-]+/i,
+  /(?:all-hands-ai|opendevin)\/[\w.-]*(?:openhands|opendevin|extensions|software-agent-sdk)/i,
   /\bcontinuedev\//i,
   /\bblock\/goose\b|\bgoose-ai\//i,
   /\bgithub\/copilot[\w-]*agent/i,

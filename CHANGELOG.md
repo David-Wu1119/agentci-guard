@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Agent detection now anchors the OpenHands organization and leaves the
+  repository open, covering the rename from All-Hands-AI and agents published
+  under `extensions` and `software-agent-sdk`. The previous pattern required
+  both a legacy org and a repository named `openhands`, so
+  `OpenHands/extensions/plugins/pr-review@main` matched nothing: corpus case
+  openhands-003 (cloudera/cybersec) produced zero observations on a
+  `pull_request`-triggered review agent holding `pull-requests: write` and
+  `issues: write`. Eval corpus effect: critical 32 to 33, medium 181 to 184,
+  confined to that one case.
+
 - Agent detection now recognizes hosted agent-dispatch HTTP endpoints, a shape
   that uses no action and no local binary. Found by running the frozen
   benchmark's 16 held-out agent-diversity workflows, where two cases invoked a
