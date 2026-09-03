@@ -32,6 +32,47 @@ Any nonconstant job or step condition outside this subset does not silently
 choose a reachability state. It retains the conservative event set and emits
 `agentci/analysis-event-condition`.
 
+## Coverage floor: agents invoked outside the workflow
+
+A workflow can name no agent at all and still run one. Several patterns in the
+frozen benchmark do exactly that:
+
+- `run: ./run_pipeline.sh`, where the script installs and drives an agent
+- `run: make all`, where a Makefile target reaches an agent
+- `run: python .github/openhands/dispatch.py`, which posts to a hosted agent
+- a matrix whose values name providers, consumed by a shell script
+
+In each case the only in-workflow evidence is an installation step, an
+environment variable, or a secret name. This analyzer reads workflow files, so
+these are invisible and will stay invisible: inferring an agent from
+`pip install` or from an `OPENHANDS_*` variable would flag installation and
+configuration as execution, which the version/help exclusions exist to prevent.
+
+This is a floor on static workflow analysis, not a defect to be patched. Runtime
+monitoring of the runner observes this layer; a workflow reader cannot.
+
+## Why an uninterpretable condition is not a false negative
+
+Roughly two thirds of real workflows carry at least one condition outside the
+supported subset, and the diagnostic count can look alarming. Auditing the
+frozen benchmark, the dominant constructs are runtime values: step outputs
+(`steps.*`), job outputs (`needs.*`), and `env.*`, `inputs.*`, `matrix.*`, and
+`vars.*` references, none of which a static reader can resolve even in
+principle.
+
+Conservative handling retains the event set, so an uninterpretable condition
+errs toward reporting more, never less. Actor-gate recognition is separate and
+also fails closed: an unrecognized guard leaves the job ungated. So this class
+costs precision and reporting noise, and does not hide findings.
+
+One tempting cleanup is worth naming as a trap. The status functions
+`always()`, `success()`, `failure()`, and `cancelled()` are event-independent
+and account for a visible share of the diagnostics, so substituting `true` for
+them looks free. It is not: `!cancelled()` would then evaluate to false, empty
+the event set, and silently skip the job. Event-independence has to be modeled
+as non-narrowing, not as truth, and until that distinction is built these
+conditions stay unknown.
+
 ## What counts as an agent
 
 Three invocation shapes are recognized: an **action** reference, a local
