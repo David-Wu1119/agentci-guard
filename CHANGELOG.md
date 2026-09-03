@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `agentci/untrusted-ai-write-token` now recognizes agent actions that read
+  event content through their own token instead of through a `${{ }}`
+  expansion. The rule previously required interpolation, which missed the
+  dominant real-world shape: an agent action on `issue_comment` or `issues`
+  holding a write scope, gated only on a trigger phrase any stranger can type.
+  Measured against the frozen 152-workflow benchmark, critical findings rise
+  from 3 to 32 across 30 repositories, with no change to the 74 flagged
+  repositories or the 78 clean ones — existing findings were escalated rather
+  than new noise introduced. Three of the recovered cases were hand-verified
+  against the upstream workflows. Agent CLI invocations still require
+  interpolation, since a `run:` step receives only what the shell passes it.
+
 - Event reachability now recognizes actor and provenance guards, so a job
   restricted to the repository owner, to same-repository pull requests, or to a
   trusted `author_association` no longer raises untrusted-reachability

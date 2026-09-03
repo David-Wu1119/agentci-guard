@@ -320,6 +320,7 @@ function analyzeWorkflow(
     const aiSteps: Array<{
       hasSecret: boolean;
       hasUntrustedSink: boolean;
+      hasUntrustedIngestion: boolean;
       events: string[];
     }> = [];
 
@@ -363,8 +364,11 @@ function analyzeWorkflow(
         rawStep.with,
         context.inputValues,
       );
+      const stepUsesAiAction = looksLikeAiAction(
+        materializeInputs(stepUses, context.inputValues),
+      );
       const stepUsesAi =
-        looksLikeAiAction(materializeInputs(stepUses, context.inputValues)) ||
+        stepUsesAiAction ||
         looksLikeAiCli(materializeInputs(stepRun, context.inputValues));
       const untrustedEvents = untrustedGitHubContextEvents(
         materializeInputs(
@@ -379,6 +383,16 @@ function analyzeWorkflow(
       const hasUntrustedSink =
         !stepActorGate &&
         contextCanReach(stepReachability.events, untrustedEvents);
+      // Agent *actions* read issue, comment, and pull-request content through
+      // their own token, so an untrusted trigger is itself the ingestion path.
+      // Requiring a `${{ }}` expansion in the workflow misses the dominant
+      // real-world shape entirely. A `run:` invocation is different: it only
+      // receives what the shell hands it, so it still needs interpolation.
+      const hasUntrustedIngestion =
+        hasUntrustedSink ||
+        (stepUsesAiAction &&
+          !stepActorGate &&
+          stepReachability.events.some((event) => UNTRUSTED_EVENTS.has(event)));
       const hasSecret =
         context.inheritedSecrets ||
         containsSecretReference(JSON.stringify(effectiveEnvironment)) ||
@@ -418,6 +432,7 @@ function analyzeWorkflow(
         aiSteps.push({
           hasSecret,
           hasUntrustedSink,
+          hasUntrustedIngestion,
           events: stepReachability.events,
         });
         if (hasUntrustedSink) {
@@ -507,8 +522,11 @@ function analyzeWorkflow(
       aiSteps.some((step) => step.events.includes("pull_request_target"));
     const untrustedAiSink = aiSteps.some(
       (step) =>
-        step.hasUntrustedSink &&
+        step.hasUntrustedIngestion &&
         step.events.some((event) => UNTRUSTED_EVENTS.has(event)),
+    );
+    const untrustedViaInterpolation = aiSteps.some(
+      (step) => step.hasUntrustedSink,
     );
 
     if (aiOnPullRequestTarget) {
@@ -528,12 +546,13 @@ function analyzeWorkflow(
         makeFinding("agentci/untrusted-ai-write-token", {
           file,
           job: jobName,
-          evidence:
-            "reachable untrusted event content + AI usage + effective write permission",
+          evidence: untrustedViaInterpolation
+            ? "reachable untrusted event content + AI usage + effective write permission"
+            : "AI agent action reachable on an untrusted event reads that event's content through its own token + effective write permission",
           line: jobLine,
           events: unionEvents(
             aiSteps
-              .filter((step) => step.hasUntrustedSink)
+              .filter((step) => step.hasUntrustedIngestion)
               .flatMap((step) => step.events),
           ),
           callChain: context.callChain,

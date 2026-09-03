@@ -17800,7 +17800,10 @@ function analyzeWorkflow(workflow, repository, context) {
         rawStep.with,
         context.inputValues
       );
-      const stepUsesAi = looksLikeAiAction(materializeInputs(stepUses, context.inputValues)) || looksLikeAiCli(materializeInputs(stepRun, context.inputValues));
+      const stepUsesAiAction = looksLikeAiAction(
+        materializeInputs(stepUses, context.inputValues)
+      );
+      const stepUsesAi = stepUsesAiAction || looksLikeAiCli(materializeInputs(stepRun, context.inputValues));
       const untrustedEvents = untrustedGitHubContextEvents(
         materializeInputs(
           JSON.stringify({
@@ -17812,6 +17815,7 @@ function analyzeWorkflow(workflow, repository, context) {
       );
       const stepActorGate = jobActorGate || hasTrustedActorGate(rawStep.if);
       const hasUntrustedSink = !stepActorGate && contextCanReach(stepReachability.events, untrustedEvents);
+      const hasUntrustedIngestion = hasUntrustedSink || stepUsesAiAction && !stepActorGate && stepReachability.events.some((event) => UNTRUSTED_EVENTS.has(event));
       const hasSecret = context.inheritedSecrets || containsSecretReference(JSON.stringify(effectiveEnvironment)) || containsSecretReference(
         materializeInputs(
           JSON.stringify({
@@ -17838,6 +17842,7 @@ function analyzeWorkflow(workflow, repository, context) {
         aiSteps.push({
           hasSecret,
           hasUntrustedSink,
+          hasUntrustedIngestion,
           events: stepReachability.events
         });
         if (hasUntrustedSink) {
@@ -17915,7 +17920,10 @@ function analyzeWorkflow(workflow, repository, context) {
     const jobHasWrite = hasSensitiveWrite(jobPermissions);
     const aiOnPullRequestTarget = !jobActorGate && aiSteps.some((step) => step.events.includes("pull_request_target"));
     const untrustedAiSink = aiSteps.some(
-      (step) => step.hasUntrustedSink && step.events.some((event) => UNTRUSTED_EVENTS.has(event))
+      (step) => step.hasUntrustedIngestion && step.events.some((event) => UNTRUSTED_EVENTS.has(event))
+    );
+    const untrustedViaInterpolation = aiSteps.some(
+      (step) => step.hasUntrustedSink
     );
     if (aiOnPullRequestTarget) {
       output.findings.push(
@@ -17934,10 +17942,10 @@ function analyzeWorkflow(workflow, repository, context) {
         makeFinding("agentci/untrusted-ai-write-token", {
           file,
           job: jobName,
-          evidence: "reachable untrusted event content + AI usage + effective write permission",
+          evidence: untrustedViaInterpolation ? "reachable untrusted event content + AI usage + effective write permission" : "AI agent action reachable on an untrusted event reads that event's content through its own token + effective write permission",
           line: jobLine,
           events: unionEvents(
-            aiSteps.filter((step) => step.hasUntrustedSink).flatMap((step) => step.events)
+            aiSteps.filter((step) => step.hasUntrustedIngestion).flatMap((step) => step.events)
           ),
           callChain: context.callChain
         })
