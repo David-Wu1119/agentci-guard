@@ -32,9 +32,28 @@ export const AI_AGENT_CLI_PATTERNS = [
   /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|npx|uvx)\s+)*codex[ \t]+(?:exec|run)(?:[\s]|$)/im,
 ];
 
+// Hosted agents are also dispatched straight over HTTP, with no action and no
+// local binary: the workflow posts to an agent endpoint that runs a coding
+// session with repository access.
+//
+// Only agent-dispatch routes belong here. A plain inference call --
+// chat/completions, messages, generateContent -- is not an agent: injected
+// text can corrupt its output, but the call has no tools with which to touch
+// the repository, and the threat this project models requires that reach.
+// See the misleading-non-agent adversarial case.
+//
+// A scheme is required so prose, comments, and documentation naming these
+// hosts do not become observations.
+export const AI_AGENT_API_PATTERNS = [
+  /https?:\/\/api\.cursor\.com\/v\d+\/agents\b/i,
+  /https?:\/\/api\.devin\.ai\/v\d+\/sessions\b/i,
+  /https?:\/\/api\.githubcopilot\.com\/[^\s"']*agents?\b/i,
+];
+
 export const AI_AGENT_PATTERNS = [
   ...AI_AGENT_ACTION_PATTERNS,
   ...AI_AGENT_CLI_PATTERNS,
+  ...AI_AGENT_API_PATTERNS,
 ];
 
 const UNTRUSTED_CONTEXT_PATTERNS: Array<{
@@ -100,8 +119,16 @@ export function looksLikeAiAction(value: string): boolean {
   return AI_AGENT_ACTION_PATTERNS.some((pattern) => pattern.test(value));
 }
 
+/**
+ * A shell-driven agent invocation: a local CLI, or an HTTP call to a hosted
+ * agent endpoint. Both are grouped here rather than with actions because they
+ * receive only what the surrounding script hands them, so untrusted content
+ * still has to be interpolated for it to reach the agent.
+ */
 export function looksLikeAiCli(value: string): boolean {
-  return AI_AGENT_CLI_PATTERNS.some((pattern) => pattern.test(value));
+  return [...AI_AGENT_CLI_PATTERNS, ...AI_AGENT_API_PATTERNS].some((pattern) =>
+    pattern.test(value),
+  );
 }
 
 export function containsUntrustedGitHubContext(value: string): boolean {
