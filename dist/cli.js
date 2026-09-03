@@ -16829,9 +16829,15 @@ var AI_AGENT_CLI_PATTERNS = [
   /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|npx|uvx)\s+)*cursor-agent(?=[\s;&|)]|$)(?![ \t]+(?:--version|--help|-h)(?:[\s;&|)]|$))/im,
   /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|npx|uvx)\s+)*codex[ \t]+(?:exec|run)(?:[\s]|$)/im
 ];
+var AI_AGENT_API_PATTERNS = [
+  /https?:\/\/api\.cursor\.com\/v\d+\/agents\b/i,
+  /https?:\/\/api\.devin\.ai\/v\d+\/sessions\b/i,
+  /https?:\/\/api\.githubcopilot\.com\/[^\s"']*agents?\b/i
+];
 var AI_AGENT_PATTERNS = [
   ...AI_AGENT_ACTION_PATTERNS,
-  ...AI_AGENT_CLI_PATTERNS
+  ...AI_AGENT_CLI_PATTERNS,
+  ...AI_AGENT_API_PATTERNS
 ];
 var UNTRUSTED_CONTEXT_PATTERNS = [
   {
@@ -16886,7 +16892,9 @@ function looksLikeAiAction(value) {
   return AI_AGENT_ACTION_PATTERNS.some((pattern) => pattern.test(value));
 }
 function looksLikeAiCli(value) {
-  return AI_AGENT_CLI_PATTERNS.some((pattern) => pattern.test(value));
+  return [...AI_AGENT_CLI_PATTERNS, ...AI_AGENT_API_PATTERNS].some(
+    (pattern) => pattern.test(value)
+  );
 }
 function untrustedGitHubContextEvents(value) {
   const events = /* @__PURE__ */ new Set();

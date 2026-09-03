@@ -151,9 +151,16 @@ declare function matchesPath(glob: string, target: string): boolean;
 
 declare const AI_AGENT_ACTION_PATTERNS: RegExp[];
 declare const AI_AGENT_CLI_PATTERNS: RegExp[];
+declare const AI_AGENT_API_PATTERNS: RegExp[];
 declare const AI_AGENT_PATTERNS: RegExp[];
 declare function looksLikeAiUsage(value: string): boolean;
 declare function looksLikeAiAction(value: string): boolean;
+/**
+ * A shell-driven agent invocation: a local CLI, or an HTTP call to a hosted
+ * agent endpoint. Both are grouped here rather than with actions because they
+ * receive only what the surrounding script hands them, so untrusted content
+ * still has to be interpolated for it to reach the agent.
+ */
 declare function looksLikeAiCli(value: string): boolean;
 declare function containsUntrustedGitHubContext(value: string): boolean;
 declare function untrustedGitHubContextEvents(value: string): string[];
@@ -228,4 +235,4 @@ declare function narrowEvents(events: string[], rawCondition: unknown): Reachabi
  */
 declare function hasTrustedActorGate(rawCondition: unknown): boolean;
 
-export { AI_AGENT_ACTION_PATTERNS, AI_AGENT_CLI_PATTERNS, AI_AGENT_PATTERNS, type AgentUsage, type AgentciConfig, type Diagnostic, type EffectivePermissions, type FailOn, type Finding, type PermissionDefault, type PermissionLevel, RULES, type Reachability, type RuleDefinition, SENSITIVE_WRITE_SCOPES, SEVERITY_ORDER, type SarifLog, type ScanOptions, type ScanResult, type Severity, UNTRUSTED_EVENTS, type WorkflowFile, containsSecretReference, containsShellAccess, containsUntrustedGitHubContext, describePermissions, formatGithubOutputs, hasFindingAtOrAbove, hasSensitiveWrite, hasTrustedActorGate, hasUnknownSensitivePermission, isPinnedAction, loadConfig, loadWorkflowFiles, looksLikeAiAction, looksLikeAiCli, looksLikeAiUsage, matchesPath, mergeEnvironment, narrowEvents, normalizeTriggers, parseFailOn, parseInlineIgnores, permissionLevel, renderMarkdownReport, renderTextReport, resolvePermissions, scanRepository, scanWorkflow, toSarif, untrustedGitHubContextEvents };
+export { AI_AGENT_ACTION_PATTERNS, AI_AGENT_API_PATTERNS, AI_AGENT_CLI_PATTERNS, AI_AGENT_PATTERNS, type AgentUsage, type AgentciConfig, type Diagnostic, type EffectivePermissions, type FailOn, type Finding, type PermissionDefault, type PermissionLevel, RULES, type Reachability, type RuleDefinition, SENSITIVE_WRITE_SCOPES, SEVERITY_ORDER, type SarifLog, type ScanOptions, type ScanResult, type Severity, UNTRUSTED_EVENTS, type WorkflowFile, containsSecretReference, containsShellAccess, containsUntrustedGitHubContext, describePermissions, formatGithubOutputs, hasFindingAtOrAbove, hasSensitiveWrite, hasTrustedActorGate, hasUnknownSensitivePermission, isPinnedAction, loadConfig, loadWorkflowFiles, looksLikeAiAction, looksLikeAiCli, looksLikeAiUsage, matchesPath, mergeEnvironment, narrowEvents, normalizeTriggers, parseFailOn, parseInlineIgnores, permissionLevel, renderMarkdownReport, renderTextReport, resolvePermissions, scanRepository, scanWorkflow, toSarif, untrustedGitHubContextEvents };

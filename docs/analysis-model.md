@@ -32,6 +32,26 @@ Any nonconstant job or step condition outside this subset does not silently
 choose a reachability state. It retains the conservative event set and emits
 `agentci/analysis-event-condition`.
 
+## What counts as an agent
+
+Three invocation shapes are recognized: an **action** reference, a local
+**CLI** command, and an HTTP call to a hosted **agent-dispatch** endpoint. The
+third shape appears in workflows that drive a background coding agent with no
+action and no installed binary.
+
+Inference calls are deliberately excluded. A request to
+`chat/completions`, `/v1/messages`, or `:generateContent` returns text and
+holds no tools, so injected content can corrupt its output but cannot reach the
+repository. The threat this project models requires that reach, so a plain
+inference call is not an agent observation no matter how untrusted its input.
+The `misleading-non-agent` adversarial case pins this boundary.
+
+HTTP agent endpoints are grouped with CLIs rather than actions for ingestion
+purposes, because a shell request carries only what the surrounding script puts
+in it. Version and help invocations (`aider --version`) are likewise not
+executions, which is why a scheduled workflow that checks a published package
+version reports clean.
+
 ## Untrusted content reaching an agent
 
 Untrusted content reaches an agent by two different routes, and only one of

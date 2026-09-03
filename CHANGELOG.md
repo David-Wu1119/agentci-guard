@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Agent detection now recognizes hosted agent-dispatch HTTP endpoints, a shape
+  that uses no action and no local binary. Found by running the frozen
+  benchmark's 16 held-out agent-diversity workflows, where two cases invoked a
+  coding agent purely over HTTP and produced zero observations, leaving every
+  rule inert. Plain inference endpoints are deliberately excluded: a
+  `chat/completions` or `messages` call returns text and holds no tools, so it
+  cannot reach the repository the way the threat model requires. Eval corpus
+  effect: high 38 to 44 and medium 179 to 181, confined entirely to the two
+  recovered cases, with critical unchanged.
+
 ### Fixed
 
 - `agentci/untrusted-ai-write-token` now recognizes agent actions that read
