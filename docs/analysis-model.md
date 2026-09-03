@@ -32,6 +32,34 @@ Any nonconstant job or step condition outside this subset does not silently
 choose a reachability state. It retains the conservative event set and emits
 `agentci/analysis-event-condition`.
 
+## Untrusted content reaching an agent
+
+Untrusted content reaches an agent by two different routes, and only one of
+them is visible as an expression.
+
+The first is interpolation: `${{ github.event.issue.title }}` and its siblings
+expanded into a prompt, an input, or a `run:` block. This is what
+`agentci/untrusted-input-in-prompt` reports.
+
+The second is self-fetching, and it is the dominant shape in practice. Agent
+_actions_ such as `anthropics/claude-code-action` receive a token and read the
+triggering issue, comment, or pull request through the GitHub API at runtime.
+The attacker's text arrives in the agent's context without ever appearing in
+the workflow file. A reachability model that requires an expression therefore
+misses the ordinary case: a job triggered by `issue_comment`, holding
+`contents: write`, running an agent action, and gated on nothing but a trigger
+phrase that any stranger can type.
+
+So an agent action reachable on an event in `UNTRUSTED_EVENTS` is treated as
+ingesting that event's untrusted content, whether or not an expression is
+present. A `run:` invocation of an agent CLI is treated differently: it only
+receives what the shell hands it, so it still requires interpolation.
+
+The two routes stay distinguishable in output.
+`agentci/untrusted-input-in-prompt` remains specific to interpolation, and
+`agentci/untrusted-ai-write-token` reports either route, naming which one it
+found in the finding's evidence.
+
 ## Actor and provenance guards
 
 An untrusted trigger does not by itself mean an untrusted actor can reach a job.
