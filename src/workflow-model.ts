@@ -510,7 +510,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * at runtime is deliberately excluded, because such a check can run after
  * untrusted content has already been fetched or executed.
  */
+/** Contexts GitHub resolves to the triggering user's login before a job runs. */
+const ACTOR_LOGIN_CONTEXT =
+  "(?:github\\.actor|github\\.triggering_actor|github\\.event\\.(?:sender|comment\\.user|issue\\.user|pull_request\\.user|review\\.user)\\.login)";
+
+/** A quoted GitHub login, including the `name[bot]` form. */
+const LITERAL_LOGIN =
+  "(['\"])[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\\[bot\\])?\\1";
+
 const TRUSTED_ACTOR_ATOMS: RegExp[] = [
+  // Restricted to one literal login. GitHub resolves the actor before the job
+  // starts and a stranger cannot be that user, so this is exactly as sound as
+  // comparing against github.repository_owner. Anthropic's workflow template
+  // ships this shape with the maintainer's own login filled in.
+  new RegExp(`^${ACTOR_LOGIN_CONTEXT}\\s*(?:==|===)\\s*${LITERAL_LOGIN}$`, "i"),
+  new RegExp(`^${LITERAL_LOGIN}\\s*(?:==|===)\\s*${ACTOR_LOGIN_CONTEXT}$`, "i"),
   // Restricted to the repository owner.
   /^(?:github\.actor|github\.event\.sender\.login|github\.event\.comment\.user\.login|github\.event\.issue\.user\.login)\s*(?:==|===)\s*github\.repository_owner$/i,
   /^github\.repository_owner\s*(?:==|===)\s*(?:github\.actor|github\.event\.sender\.login)$/i,
@@ -526,6 +540,12 @@ const TRUSTED_ASSOCIATIONS = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
 
 const ASSOCIATION_EQUALITY =
   /^github\.event\.(?:comment|issue|pull_request|review)\.author_association\s*(?:==|===)\s*(['"])([A-Za-z_]+)\1$/i;
+
+/** `contains(fromJSON('["alice","bob"]'), github.actor)` — an allowlist of logins. */
+const LOGIN_MEMBERSHIP = new RegExp(
+  `^contains\\s*\\(\\s*fromJSON\\s*\\(\\s*(['"])(.*?)\\1\\s*\\)\\s*,\\s*${ACTOR_LOGIN_CONTEXT}\\s*\\)$`,
+  "i",
+);
 
 const ASSOCIATION_MEMBERSHIP =
   /^contains\s*\(\s*fromJSON\s*\(\s*(['"])(.*?)\1\s*\)\s*,\s*github\.event\.(?:comment|issue|pull_request|review)\.author_association\s*\)$/i;
@@ -566,6 +586,20 @@ function isTrustedActorAtom(atom: string): boolean {
 
   const equality = ASSOCIATION_EQUALITY.exec(normalized);
   if (equality) return TRUSTED_ASSOCIATIONS.has(equality[2].toUpperCase());
+
+  const logins = LOGIN_MEMBERSHIP.exec(normalized);
+  if (logins) {
+    try {
+      const decoded = JSON.parse(logins[2]) as unknown;
+      return (
+        Array.isArray(decoded) &&
+        decoded.length > 0 &&
+        decoded.every((value) => typeof value === "string" && value.length > 0)
+      );
+    } catch {
+      return false;
+    }
+  }
 
   const membership = ASSOCIATION_MEMBERSHIP.exec(normalized);
   if (membership) {
