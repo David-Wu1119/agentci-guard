@@ -126,7 +126,12 @@ found in the finding's evidence.
 
 An untrusted trigger does not by itself mean an untrusted actor can reach a job.
 A job or step condition is treated as _actor-gated_ when it restricts execution
-to the repository owner (`github.actor` or `github.event.sender.login` compared
+to one or more literal logins (`github.actor == 'maintainer'`, or
+`contains(fromJSON('["a","b"]'), github.actor)` — GitHub resolves the actor
+before the job starts and a stranger cannot be that user, so this is exactly as
+sound as an owner comparison, and it is the shape Anthropic's workflow template
+ships; inequality such as `!= 'dependabot[bot]'` excludes one account and
+admits everyone else, so it is not a gate), to the repository owner (`github.actor` or `github.event.sender.login` compared
 against `github.repository_owner`), to pull requests originating in the base
 repository (`github.event.pull_request.head.repo.full_name ==
 github.repository`, or a negated `head.repo.fork`), or to a trusted
