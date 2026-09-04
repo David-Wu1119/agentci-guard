@@ -4,6 +4,10 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { runAction, type ActionIo } from "../src/action-runner.js";
 import YAML from "yaml";
+import packageJson from "../package.json" with { type: "json" };
+
+const VERSION = packageJson.version;
+const escaped = VERSION.replaceAll(".", "\\.");
 
 async function temporaryOutput(): Promise<{
   output: string;
@@ -45,21 +49,27 @@ describe("JavaScript Action entrypoint", () => {
       ".github/workflows/published-tag-smoke.yml",
       "utf8",
     );
+    // Both published-artifact smokes must target the version in package.json,
+    // so a release cannot bump one without the other.
     expect(
-      publishedSmoke.match(/uses:\s*David-Wu1119\/agentci-guard@v0\.1\.1\s*$/gm)
-        ?.length,
+      publishedSmoke.match(
+        new RegExp(
+          `uses:\\s*David-Wu1119\\/agentci-guard@v${escaped}\\s*$`,
+          "gm",
+        ),
+      )?.length,
     ).toBe(3);
     expect(publishedSmoke).toMatch(
-      /github\.event\.release\.tag_name == 'v0\.1\.1'/,
+      new RegExp(`github\\.event\\.release\\.tag_name == 'v${escaped}'`),
     );
-    expect(publishedSmoke).toContain("github.ref == 'refs/tags/v0.1.1'");
+    expect(publishedSmoke).toContain(`github.ref == 'refs/tags/v${VERSION}'`);
 
     const npmSmoke = await fs.readFile(
       ".github/workflows/published-npm-smoke.yml",
       "utf8",
     );
-    expect(npmSmoke).toContain("agentci-guard@0.1.1");
-    expect(npmSmoke).toContain("github.ref == 'refs/tags/v0.1.1'");
+    expect(npmSmoke).toContain(`agentci-guard@${VERSION}`);
+    expect(npmSmoke).toContain(`github.ref == 'refs/tags/v${VERSION}'`);
     expect(npmSmoke).toContain('"$consumer_dir/node_modules/.bin/agentci"');
   });
 

@@ -87,7 +87,7 @@ jobs:
       - uses: actions/checkout@v4
       # Pin an immutable release tag. The floating `v0` is moved to each
       # release only after its published-Action smoke passes.
-      - uses: David-Wu1119/agentci-guard@v0.1.1
+      - uses: David-Wu1119/agentci-guard@v0.2.0
         with:
           path: .
           sarif: agentci-results.sarif
@@ -102,7 +102,7 @@ The Action sets `findings`, `critical`, `high`, `medium`, `low`, `sarif-path`,
 `diagnostics`, and `analysis-complete` as outputs:
 
 ```yaml
-- uses: David-Wu1119/agentci-guard@v0.1.1
+- uses: David-Wu1119/agentci-guard@v0.2.0
   id: agentci
   with:
     fail-on: none
@@ -147,7 +147,7 @@ docker run --rm -v "$PWD:/scan:ro" -v "$PWD/out:/out" agentci-guard \
 ```yaml
 repos:
   - repo: https://github.com/David-Wu1119/agentci-guard
-    rev: v0.1.1
+    rev: v0.2.0
     hooks:
       - id: agentci-guard
 ```
@@ -221,6 +221,14 @@ Concretely:
 - Remote reusable workflows are reported as unresolvable, not guessed at.
 - Agent detection is a maintained list of vendors, actions, CLIs, and dispatch
   endpoints. A new or renamed agent is invisible until a pattern is added.
+- `anthropics/claude-code-action` refuses users without write access by
+  default, and this is **not modeled**: a bare `@claude` workflow on an
+  untrusted trigger is reported critical even though the action itself blocks
+  strangers unless `allowed_non_write_users` or `allowed_bots` is set. On the
+  frozen benchmark 19 of 24 confirmed critical findings are this shape. Whether
+  to report them as high instead is an open severity decision; until it is
+  made, treat a critical on a bare `claude-code-action` as "one config line
+  from exploitable," not "exploitable now."
 
 For the runtime layer, see
 [StepSecurity Harden-Runner](https://github.com/step-security/harden-runner).
