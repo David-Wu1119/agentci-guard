@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import fs from "node:fs/promises";
 import path from "node:path";
-import { Command } from "commander";
+import { pathToFileURL } from "node:url";
+import { Command, CommanderError } from "commander";
 import pc from "picocolors";
 import {
   formatGithubOutputs,
@@ -12,7 +13,9 @@ import {
   hasFindingAtOrAbove,
 } from "./index.js";
 import { parseFailOn } from "./options.js";
+import { RULES } from "./rules.js";
 import type { Severity } from "./types.js";
+import packageJson from "../package.json" with { type: "json" };
 
 type ScanOptions = {
   json?: boolean;
@@ -22,11 +25,36 @@ type ScanOptions = {
   failOn: "none" | Severity;
 };
 
-async function main(): Promise<void> {
+export type CliIo = {
+  log(message: string): void;
+  error(message: string): void;
+};
+
+const DEFAULT_IO: CliIo = {
+  log: (message) => console.log(message),
+  error: (message) => console.error(pc.red(message)),
+};
+
+/**
+ * Run the CLI against a full argv (including the node and script entries) and
+ * return the process exit code instead of setting it, so the command surface
+ * can be exercised in-process by tests as well as from the bin wrapper.
+ */
+export async function run(
+  argv: string[],
+  io: CliIo = DEFAULT_IO,
+  environment: Record<string, string | undefined> = process.env,
+): Promise<number> {
+  let exitCode = 0;
   const program = new Command()
     .name("agentci")
     .description("Scan CI/CD workflows for unsafe AI coding-agent usage.")
-    .version("0.1.1");
+    .version(packageJson.version)
+    .exitOverride()
+    .configureOutput({
+      writeOut: (text) => io.log(text.trimEnd()),
+      writeErr: (text) => io.error(text.trimEnd()),
+    });
 
   program
     .command("scan")
@@ -73,25 +101,28 @@ async function main(): Promise<void> {
         );
       }
 
-      if (options.json) console.log(JSON.stringify(result, null, 2));
-      else console.log(renderTextReport(result));
+      io.log(
+        options.json
+          ? JSON.stringify(result, null, 2)
+          : renderTextReport(result),
+      );
 
-      if (process.env.GITHUB_OUTPUT)
+      if (environment.GITHUB_OUTPUT) {
         await fs.appendFile(
-          process.env.GITHUB_OUTPUT,
+          environment.GITHUB_OUTPUT,
           formatGithubOutputs(result, options.sarif),
           "utf8",
         );
+      }
 
       if (
         result.diagnostics.some((diagnostic) => diagnostic.severity === "error")
       ) {
-        process.exitCode = 1;
+        exitCode = 1;
         return;
       }
-
       if (failOn !== "none" && hasFindingAtOrAbove(result.findings, failOn)) {
-        process.exitCode = 2;
+        exitCode = 2;
       }
     });
 
@@ -102,23 +133,40 @@ async function main(): Promise<void> {
       "<rule-id>",
       "Rule ID, for example agentci/untrusted-ai-write-token.",
     )
-    .action(async (ruleId: string) => {
-      const { RULES } = await import("./rules.js");
+    .action((ruleId: string) => {
       const rule = RULES[ruleId];
       if (!rule) throw new Error(`Unknown rule: ${ruleId}`);
-      console.log(pc.bold(rule.title));
-      console.log(`Severity: ${rule.severity}`);
-      console.log("");
-      console.log(rule.why);
-      console.log("");
-      console.log("Fix:");
-      for (const fix of rule.fix) console.log(`- ${fix}`);
+      io.log(
+        [
+          pc.bold(rule.title),
+          `Severity: ${rule.severity}`,
+          "",
+          rule.why,
+          "",
+          "Fix:",
+          ...rule.fix.map((fix) => `- ${fix}`),
+        ].join("\n"),
+      );
     });
 
-  await program.parseAsync(process.argv);
+  try {
+    await program.parseAsync(argv);
+  } catch (error) {
+    // Commander routes --help, --version, and usage errors through here once
+    // exitOverride is set; its exit code is already the right one.
+    if (error instanceof CommanderError) return error.exitCode;
+    io.error(error instanceof Error ? error.message : String(error));
+    return 1;
+  }
+  return exitCode;
 }
 
-main().catch((error: unknown) => {
-  console.error(pc.red(error instanceof Error ? error.message : String(error)));
-  process.exitCode = 1;
-});
+const invokedAsScript =
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
+
+if (invokedAsScript) {
+  run(process.argv).then((code) => {
+    process.exitCode = code;
+  });
+}

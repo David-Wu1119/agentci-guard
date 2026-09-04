@@ -12,15 +12,8 @@ var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require
   if (typeof require !== "undefined") return require.apply(this, arguments);
   throw Error('Dynamic require of "' + x + '" is not supported');
 });
-var __esm = (fn, res) => function __init() {
-  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
-};
 var __commonJS = (cb, mod) => function __require2() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
-};
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
 };
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
@@ -3542,113 +3535,6 @@ var require_picocolors = __commonJS({
     };
     module.exports = createColors();
     module.exports.createColors = createColors;
-  }
-});
-
-// src/rules.ts
-var rules_exports = {};
-__export(rules_exports, {
-  RULES: () => RULES,
-  SEVERITY_ORDER: () => SEVERITY_ORDER
-});
-var RULES, SEVERITY_ORDER;
-var init_rules = __esm({
-  "src/rules.ts"() {
-    "use strict";
-    RULES = {
-      "agentci/untrusted-ai-write-token": {
-        id: "agentci/untrusted-ai-write-token",
-        title: "Untrusted event content can reach an AI agent with write permissions",
-        severity: "critical",
-        why: "An attacker can place prompt-injection text in a PR, issue, or comment. If that text reaches an AI agent with repository write permissions, the agent can be induced to modify code, comments, workflows, or releases.",
-        fix: [
-          "Do not run privileged AI agents on untrusted triggers.",
-          "Use read-only GITHUB_TOKEN permissions for untrusted events.",
-          "Require maintainer approval before running the agent.",
-          "Sanitize and summarize untrusted content before passing it to an agent."
-        ]
-      },
-      "agentci/pull-request-target-ai": {
-        id: "agentci/pull-request-target-ai",
-        title: "AI agent runs on pull_request_target",
-        severity: "critical",
-        why: "pull_request_target runs in the base repository security context and can expose write tokens or secrets to workflows influenced by an untrusted pull request.",
-        fix: [
-          "Use pull_request with read-only permissions for untrusted code.",
-          "Split analysis into a read-only job and a separate maintainer-approved write job.",
-          "Avoid checking out untrusted PR head code in pull_request_target."
-        ]
-      },
-      "agentci/ai-with-secrets": {
-        id: "agentci/ai-with-secrets",
-        title: "AI agent job has access to secrets",
-        severity: "medium",
-        why: "Secrets mounted into an AI-agent job can be exfiltrated if untrusted prompt content influences tool use, shell commands, or generated output. Most AI actions require a provider key, so this is a baseline exposure to review rather than a vulnerability on its own \u2014 it becomes high-risk when combined with untrusted input or write permissions (see agentci/untrusted-ai-write-token).",
-        fix: [
-          "Do not expose secrets to agent jobs that process untrusted content.",
-          "Use short-lived scoped tokens.",
-          "Move secret-bearing actions behind manual approval."
-        ]
-      },
-      "agentci/untrusted-input-in-prompt": {
-        id: "agentci/untrusted-input-in-prompt",
-        title: "Untrusted GitHub event content is passed into an AI prompt or command",
-        severity: "high",
-        why: "PR bodies, issue bodies, comments, branch names, and commit messages are attacker-controlled in common workflows and can contain prompt-injection instructions.",
-        fix: [
-          "Avoid inserting raw GitHub event text into prompts.",
-          "Use structured extraction and length limits.",
-          "Add prompt-injection filtering before AI execution.",
-          "Run the agent with read-only permissions."
-        ]
-      },
-      "agentci/ai-shell-access": {
-        id: "agentci/ai-shell-access",
-        title: "AI agent has shell or arbitrary command access",
-        severity: "high",
-        why: "Shell access allows a compromised agent prompt to inspect the workspace, call network endpoints, or alter build artifacts.",
-        fix: [
-          "Disable shell tools for untrusted events.",
-          "Run in a sandbox with no secrets.",
-          "Restrict network and filesystem access."
-        ]
-      },
-      "agentci/broad-write-permissions": {
-        id: "agentci/broad-write-permissions",
-        title: "Workflow grants broad write permissions near AI usage",
-        severity: "medium",
-        why: "Broad write scopes increase blast radius if an AI-agent step is influenced by untrusted input.",
-        fix: [
-          "Set default permissions to read-only.",
-          "Grant write scopes only in narrowly scoped jobs.",
-          "Prefer job-level permissions over workflow-level write permissions."
-        ]
-      },
-      "agentci/unpinned-ai-action": {
-        id: "agentci/unpinned-ai-action",
-        title: "AI-related action is not pinned to a commit SHA",
-        severity: "medium",
-        why: "Tag-pinned third-party actions can change over time. AI-agent actions often receive privileged context, so supply-chain drift matters.",
-        fix: [
-          "Pin third-party actions to full commit SHAs.",
-          "Review updates explicitly.",
-          "Prefer first-party or internally mirrored actions for privileged jobs."
-        ]
-      },
-      "agentci/unsafe-checkout": {
-        id: "agentci/unsafe-checkout",
-        title: "Workflow checks out untrusted pull request head in a privileged context",
-        severity: "high",
-        why: "An explicit bypass of GitHub's unsafe-PR checkout protection, or a known-unprotected checkout version, can place attacker-controlled code in a privileged workflow workspace.",
-        fix: [
-          "Do not opt out of checkout's unsafe-PR protection.",
-          "Use a current protected actions/checkout release.",
-          "Use read-only analysis jobs.",
-          "Disable install/build scripts before trust is established."
-        ]
-      }
-    };
-    SEVERITY_ORDER = ["low", "medium", "high", "critical"];
   }
 });
 
@@ -16712,6 +16598,7 @@ var require_dist = __commonJS({
 // src/cli.ts
 import fs3 from "fs/promises";
 import path3 from "path";
+import { pathToFileURL } from "url";
 
 // node_modules/.pnpm/commander@14.0.3/node_modules/commander/esm.mjs
 var import_index = __toESM(require_commander(), 1);
@@ -17047,11 +16934,103 @@ function label(severity) {
   return import_picocolors.default.cyan("[LOW]");
 }
 
-// src/index.ts
-init_rules();
+// src/rules.ts
+var RULES = {
+  "agentci/untrusted-ai-write-token": {
+    id: "agentci/untrusted-ai-write-token",
+    title: "Untrusted event content can reach an AI agent with write permissions",
+    severity: "critical",
+    why: "An attacker can place prompt-injection text in a PR, issue, or comment. If that text reaches an AI agent with repository write permissions, the agent can be induced to modify code, comments, workflows, or releases.",
+    fix: [
+      "Do not run privileged AI agents on untrusted triggers.",
+      "Use read-only GITHUB_TOKEN permissions for untrusted events.",
+      "Require maintainer approval before running the agent.",
+      "Sanitize and summarize untrusted content before passing it to an agent."
+    ]
+  },
+  "agentci/pull-request-target-ai": {
+    id: "agentci/pull-request-target-ai",
+    title: "AI agent runs on pull_request_target",
+    severity: "critical",
+    why: "pull_request_target runs in the base repository security context and can expose write tokens or secrets to workflows influenced by an untrusted pull request.",
+    fix: [
+      "Use pull_request with read-only permissions for untrusted code.",
+      "Split analysis into a read-only job and a separate maintainer-approved write job.",
+      "Avoid checking out untrusted PR head code in pull_request_target."
+    ]
+  },
+  "agentci/ai-with-secrets": {
+    id: "agentci/ai-with-secrets",
+    title: "AI agent job has access to secrets",
+    severity: "medium",
+    why: "Secrets mounted into an AI-agent job can be exfiltrated if untrusted prompt content influences tool use, shell commands, or generated output. Most AI actions require a provider key, so this is a baseline exposure to review rather than a vulnerability on its own \u2014 it becomes high-risk when combined with untrusted input or write permissions (see agentci/untrusted-ai-write-token).",
+    fix: [
+      "Do not expose secrets to agent jobs that process untrusted content.",
+      "Use short-lived scoped tokens.",
+      "Move secret-bearing actions behind manual approval."
+    ]
+  },
+  "agentci/untrusted-input-in-prompt": {
+    id: "agentci/untrusted-input-in-prompt",
+    title: "Untrusted GitHub event content is passed into an AI prompt or command",
+    severity: "high",
+    why: "PR bodies, issue bodies, comments, branch names, and commit messages are attacker-controlled in common workflows and can contain prompt-injection instructions.",
+    fix: [
+      "Avoid inserting raw GitHub event text into prompts.",
+      "Use structured extraction and length limits.",
+      "Add prompt-injection filtering before AI execution.",
+      "Run the agent with read-only permissions."
+    ]
+  },
+  "agentci/ai-shell-access": {
+    id: "agentci/ai-shell-access",
+    title: "AI agent has shell or arbitrary command access",
+    severity: "high",
+    why: "Shell access allows a compromised agent prompt to inspect the workspace, call network endpoints, or alter build artifacts.",
+    fix: [
+      "Disable shell tools for untrusted events.",
+      "Run in a sandbox with no secrets.",
+      "Restrict network and filesystem access."
+    ]
+  },
+  "agentci/broad-write-permissions": {
+    id: "agentci/broad-write-permissions",
+    title: "Workflow grants broad write permissions near AI usage",
+    severity: "medium",
+    why: "Broad write scopes increase blast radius if an AI-agent step is influenced by untrusted input.",
+    fix: [
+      "Set default permissions to read-only.",
+      "Grant write scopes only in narrowly scoped jobs.",
+      "Prefer job-level permissions over workflow-level write permissions."
+    ]
+  },
+  "agentci/unpinned-ai-action": {
+    id: "agentci/unpinned-ai-action",
+    title: "AI-related action is not pinned to a commit SHA",
+    severity: "medium",
+    why: "Tag-pinned third-party actions can change over time. AI-agent actions often receive privileged context, so supply-chain drift matters.",
+    fix: [
+      "Pin third-party actions to full commit SHAs.",
+      "Review updates explicitly.",
+      "Prefer first-party or internally mirrored actions for privileged jobs."
+    ]
+  },
+  "agentci/unsafe-checkout": {
+    id: "agentci/unsafe-checkout",
+    title: "Workflow checks out untrusted pull request head in a privileged context",
+    severity: "high",
+    why: "An explicit bypass of GitHub's unsafe-PR checkout protection, or a known-unprotected checkout version, can place attacker-controlled code in a privileged workflow workspace.",
+    fix: [
+      "Do not opt out of checkout's unsafe-PR protection.",
+      "Use a current protected actions/checkout release.",
+      "Use read-only analysis jobs.",
+      "Disable install/build scripts before trust is established."
+    ]
+  }
+};
+var SEVERITY_ORDER = ["low", "medium", "high", "critical"];
 
 // src/sarif.ts
-init_rules();
 function toSarif(findings) {
   const usedRules = Object.values(RULES).filter(
     (rule) => findings.some((finding) => finding.rule_id === rule.id)
@@ -17113,7 +17092,6 @@ var import_fast_glob = __toESM(require_out4(), 1);
 var import_yaml = __toESM(require_dist(), 1);
 import fs2 from "fs/promises";
 import path2 from "path";
-init_rules();
 
 // src/workflow-model.ts
 var STATUS_ONLY_CONDITION = /^[\s()!&|]*(?:(?:always|success|failure|cancelled)\(\s*\)[\s()!&|]*)+$/i;
@@ -18287,9 +18265,117 @@ function isRecord2(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
+// package.json
+var package_default = {
+  name: "agentci-guard",
+  version: "0.1.1",
+  description: "Experimental linter for risky AI coding-agent usage in GitHub Actions workflows.",
+  type: "module",
+  bin: {
+    agentci: "dist/cli.js",
+    "agentci-guard": "dist/cli.js"
+  },
+  exports: {
+    ".": {
+      types: "./dist/index.d.ts",
+      import: "./dist/index.js"
+    }
+  },
+  files: [
+    "dist",
+    "action.yml",
+    "README.md",
+    "BENCHMARK.md",
+    "ANNOTATION_GUIDE.md",
+    "DATA_CARD.md",
+    "REPRODUCIBILITY.md",
+    "ERROR_ANALYSIS.md",
+    "THREAT_MODEL.md",
+    "RULES.md",
+    "THIRD_PARTY_LICENSES.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "SECURITY.md",
+    "docs",
+    "examples"
+  ],
+  scripts: {
+    build: "tsup",
+    check: "npm run format:check && npm run typecheck && npm run test:coverage && npm run build && npm run licenses:check && npm run baseline:verify && npm run benchmark:verify",
+    "format:check": 'prettier "**/*.{md,json,yml,yaml,ts,mjs}" --check',
+    typecheck: "tsc --noEmit",
+    test: "vitest run",
+    "test:coverage": "vitest run --coverage",
+    prepare: "npm run build",
+    prepublishOnly: "npm run check && npm run package:smoke",
+    agentci: "tsx src/cli.ts",
+    "baseline:verify": "node scripts/verify-baseline.mjs",
+    "benchmark:verify": "node scripts/benchmark/verify-snapshot.mjs && node scripts/benchmark/generate-annotation-sheet.mjs --check && node scripts/benchmark/generate-review-sheet.mjs --check && node scripts/benchmark/generate-pilot-sheet.mjs --check && node scripts/benchmark/validate-labels.mjs",
+    "benchmark:smoke": "node scripts/benchmark/smoke-annotation-toolchain.mjs",
+    "licenses:check": "node scripts/generate-third-party-licenses.mjs --check",
+    "package:smoke": "node scripts/verify-standalone-package.mjs"
+  },
+  keywords: [
+    "github-actions",
+    "ai-agent",
+    "ci-security",
+    "prompt-injection",
+    "supply-chain-security",
+    "sarif",
+    "llm-security"
+  ],
+  homepage: "https://github.com/David-Wu1119/agentci-guard#readme",
+  repository: {
+    type: "git",
+    url: "git+https://github.com/David-Wu1119/agentci-guard.git"
+  },
+  bugs: {
+    url: "https://github.com/David-Wu1119/agentci-guard/issues"
+  },
+  license: "MIT",
+  engines: {
+    node: ">=20.18.0"
+  },
+  packageManager: "pnpm@10.11.0",
+  pnpm: {
+    overrides: {
+      "fast-uri": "^3.1.5",
+      postcss: "8.5.26",
+      vite: "8.1.5"
+    }
+  },
+  dependencies: {
+    commander: "^14.0.2",
+    "fast-glob": "^3.3.3",
+    picocolors: "^1.1.1",
+    yaml: "^2.8.2"
+  },
+  devDependencies: {
+    "@types/node": "^22.19.3",
+    "@vitest/coverage-v8": "^4.1.11",
+    ajv: "^8.20.0",
+    "ajv-draft-04": "1.0.0",
+    "ajv-formats": "^3.0.1",
+    prettier: "^3.8.3",
+    tsup: "^8.5.1",
+    tsx: "^4.21.0",
+    typescript: "^5.9.3",
+    vite: "8.1.5",
+    vitest: "^4.1.10"
+  }
+};
+
 // src/cli.ts
-async function main() {
-  const program2 = new Command().name("agentci").description("Scan CI/CD workflows for unsafe AI coding-agent usage.").version("0.1.1");
+var DEFAULT_IO = {
+  log: (message) => console.log(message),
+  error: (message) => console.error(import_picocolors2.default.red(message))
+};
+async function run(argv, io = DEFAULT_IO, environment = process.env) {
+  let exitCode = 0;
+  const program2 = new Command().name("agentci").description("Scan CI/CD workflows for unsafe AI coding-agent usage.").version(package_default.version).exitOverride().configureOutput({
+    writeOut: (text) => io.log(text.trimEnd()),
+    writeErr: (text) => io.error(text.trimEnd())
+  });
   program2.command("scan").description(
     "Scan a repository for unsafe AI-agent GitHub Actions patterns."
   ).argument("[path]", "Repository path.", ".").option("--json", "Print JSON output.", false).option("--markdown <path>", "Write a Markdown report.").option("--sarif <path>", "Write SARIF output.").option(
@@ -18325,43 +18411,60 @@ async function main() {
         "utf8"
       );
     }
-    if (options.json) console.log(JSON.stringify(result, null, 2));
-    else console.log(renderTextReport(result));
-    if (process.env.GITHUB_OUTPUT)
+    io.log(
+      options.json ? JSON.stringify(result, null, 2) : renderTextReport(result)
+    );
+    if (environment.GITHUB_OUTPUT) {
       await fs3.appendFile(
-        process.env.GITHUB_OUTPUT,
+        environment.GITHUB_OUTPUT,
         formatGithubOutputs(result, options.sarif),
         "utf8"
       );
+    }
     if (result.diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
-      process.exitCode = 1;
+      exitCode = 1;
       return;
     }
     if (failOn !== "none" && hasFindingAtOrAbove(result.findings, failOn)) {
-      process.exitCode = 2;
+      exitCode = 2;
     }
   });
   program2.command("explain").description("Explain a rule by ID.").argument(
     "<rule-id>",
     "Rule ID, for example agentci/untrusted-ai-write-token."
-  ).action(async (ruleId) => {
-    const { RULES: RULES2 } = await Promise.resolve().then(() => (init_rules(), rules_exports));
-    const rule = RULES2[ruleId];
+  ).action((ruleId) => {
+    const rule = RULES[ruleId];
     if (!rule) throw new Error(`Unknown rule: ${ruleId}`);
-    console.log(import_picocolors2.default.bold(rule.title));
-    console.log(`Severity: ${rule.severity}`);
-    console.log("");
-    console.log(rule.why);
-    console.log("");
-    console.log("Fix:");
-    for (const fix of rule.fix) console.log(`- ${fix}`);
+    io.log(
+      [
+        import_picocolors2.default.bold(rule.title),
+        `Severity: ${rule.severity}`,
+        "",
+        rule.why,
+        "",
+        "Fix:",
+        ...rule.fix.map((fix) => `- ${fix}`)
+      ].join("\n")
+    );
   });
-  await program2.parseAsync(process.argv);
+  try {
+    await program2.parseAsync(argv);
+  } catch (error) {
+    if (error instanceof CommanderError) return error.exitCode;
+    io.error(error instanceof Error ? error.message : String(error));
+    return 1;
+  }
+  return exitCode;
 }
-main().catch((error) => {
-  console.error(import_picocolors2.default.red(error instanceof Error ? error.message : String(error)));
-  process.exitCode = 1;
-});
+var invokedAsScript = process.argv[1] !== void 0 && import.meta.url === pathToFileURL(path3.resolve(process.argv[1])).href;
+if (invokedAsScript) {
+  run(process.argv).then((code) => {
+    process.exitCode = code;
+  });
+}
+export {
+  run
+};
 /*! Bundled license information:
 
 is-extglob/index.js:
