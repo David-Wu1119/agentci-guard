@@ -128,6 +128,24 @@ one finding at or above it; `1` scanner error — a parse failure or a bad input
 An incomplete analysis is never reported as a clean one: unsupported constructs
 become diagnostics and set `analysis_complete: false`.
 
+### Whole organization
+
+```bash
+export GITHUB_TOKEN=ghp_...            # unauthenticated calls are limited to 60/hour
+agentci org my-org                      # Markdown report to stdout, exit 2 at high or above
+agentci org my-org --markdown org-report.md --sarif org.sarif --fail-on none
+agentci org my-org --include-archived --include-forks --json
+```
+
+Lists every repository through the GitHub API, fetches each one's workflow files
+without cloning, runs the same analysis as `scan`, and produces one report:
+totals, a severity-sorted table of repositories, per-repository findings,
+skipped repositories with reasons, and which analyses were incomplete. Archived
+repositories and forks are skipped unless asked for. A repository that could not
+be fetched is listed as skipped and makes the command exit 1, because a report
+with holes must not read as clean. This is the deliverable for an audit of an
+organization's agent workflows.
+
 ### Container
 
 The committed bundle has no runtime dependencies, so the image is Node plus

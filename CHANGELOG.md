@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `agentci org <login>` scans every repository in a GitHub organization or user
+  account without cloning: repositories are listed through the API, each one's
+  workflow files are fetched through the contents API, and the same analysis
+  `scan` performs runs per repository. Output is one Markdown report — totals, a
+  severity-sorted repository table, per-repository findings, skipped
+  repositories with reasons, incomplete analyses — plus optional JSON and SARIF
+  with files prefixed by repository. Archived repositories and forks are skipped
+  unless `--include-archived` / `--include-forks`; a repository that cannot be
+  fetched is reported as skipped and exits 1 so a report with gaps never reads
+  as clean. Rate-limit exhaustion is reported with the reset time and a pointer
+  to `GITHUB_TOKEN`. Local reusable workflows resolve exactly as on disk through
+  a virtual repository root. The filesystem scanner and the organization scanner
+  now share one analysis entry point, `scanWorkflowFiles`, so a fetched workflow
+  is analyzed identically to a checked-out one; the frozen benchmark's per-case
+  results are unchanged.
+
 ## [0.2.0] - 2026-09-04
 
 ### Added

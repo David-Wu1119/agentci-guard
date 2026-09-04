@@ -172,6 +172,60 @@ type FailOn = "none" | Severity;
 declare function parseFailOn(value: string): FailOn;
 
 /**
+ * Scan every repository in a GitHub organization (or user account) without
+ * cloning anything: list repositories, fetch each one's workflow files through
+ * the contents API, and run the same analysis the CLI runs on a checkout.
+ *
+ * This is the unit an audit or posture engagement actually delivers -- one
+ * report across an organization -- rather than one scan per checkout.
+ */
+type OrgRepository = {
+    full_name: string;
+    html_url: string;
+    default_branch: string;
+    archived: boolean;
+    fork: boolean;
+    stargazers_count: number;
+};
+type OrgRepositoryResult = {
+    repository: string;
+    url: string;
+    stars: number;
+    archived: boolean;
+    fork: boolean;
+    /** Present when the repository was not analyzed, with the reason. */
+    skipped?: string;
+    result?: ScanResult;
+};
+type OrgScanResult = {
+    scanned_at: string;
+    org: string;
+    repository_count: number;
+    scanned_count: number;
+    skipped_count: number;
+    workflow_count: number;
+    repositories: OrgRepositoryResult[];
+    findings: Finding[];
+    summary: Record<Severity, number>;
+    analysis_complete: boolean;
+};
+type OrgScanOptions = {
+    /** GitHub token. Unauthenticated requests are limited to 60 per hour. */
+    token?: string;
+    includeArchived?: boolean;
+    includeForks?: boolean;
+    /** Injected for tests; defaults to the global fetch. */
+    fetch?: typeof fetch;
+    apiBase?: string;
+    /** Repositories fetched in parallel. */
+    concurrency?: number;
+    config?: AgentciConfig;
+};
+declare function scanOrganization(org: string, options?: OrgScanOptions): Promise<OrgScanResult>;
+/** The audit deliverable: one Markdown report across the organization. */
+declare function renderOrgMarkdownReport(result: OrgScanResult): string;
+
+/**
  * Render the GitHub Actions `$GITHUB_OUTPUT` lines for a scan, so downstream
  * steps can branch on the result (e.g. comment on a PR when critical > 0).
  */
@@ -192,7 +246,15 @@ declare const SEVERITY_ORDER: Severity[];
 declare function toSarif(findings: Finding[]): SarifLog;
 
 declare function scanRepository(root: string, options?: Partial<ScanOptions>): Promise<ScanResult>;
+/**
+ * Analyze an already-loaded set of workflow files as one repository. The
+ * filesystem scan and the organization scan both end here, so a fetched
+ * workflow is analyzed exactly as a checked-out one.
+ */
+declare function scanWorkflowFiles(workflows: WorkflowFile[], scanRoot: string, config: AgentciConfig): ScanResult;
 declare function loadWorkflowFiles(root: string): Promise<WorkflowFile[]>;
+/** Parse raw workflow YAML into a WorkflowFile, recording a parse error instead of throwing. */
+declare function parseWorkflowFile(file: string, raw: string): WorkflowFile;
 /**
  * Scan one already-parsed workflow. Reusable calls cannot be resolved through
  * this compatibility API; repository scans should use scanRepository.
@@ -235,4 +297,4 @@ declare function narrowEvents(events: string[], rawCondition: unknown): Reachabi
  */
 declare function hasTrustedActorGate(rawCondition: unknown): boolean;
 
-export { AI_AGENT_ACTION_PATTERNS, AI_AGENT_API_PATTERNS, AI_AGENT_CLI_PATTERNS, AI_AGENT_PATTERNS, type AgentUsage, type AgentciConfig, type Diagnostic, type EffectivePermissions, type FailOn, type Finding, type PermissionDefault, type PermissionLevel, RULES, type Reachability, type RuleDefinition, SENSITIVE_WRITE_SCOPES, SEVERITY_ORDER, type SarifLog, type ScanOptions, type ScanResult, type Severity, UNTRUSTED_EVENTS, type WorkflowFile, containsSecretReference, containsShellAccess, containsUntrustedGitHubContext, describePermissions, formatGithubOutputs, hasFindingAtOrAbove, hasSensitiveWrite, hasTrustedActorGate, hasUnknownSensitivePermission, isPinnedAction, loadConfig, loadWorkflowFiles, looksLikeAiAction, looksLikeAiCli, looksLikeAiUsage, matchesPath, mergeEnvironment, narrowEvents, normalizeTriggers, parseFailOn, parseInlineIgnores, permissionLevel, renderMarkdownReport, renderTextReport, resolvePermissions, scanRepository, scanWorkflow, toSarif, untrustedGitHubContextEvents };
+export { AI_AGENT_ACTION_PATTERNS, AI_AGENT_API_PATTERNS, AI_AGENT_CLI_PATTERNS, AI_AGENT_PATTERNS, type AgentUsage, type AgentciConfig, type Diagnostic, type EffectivePermissions, type FailOn, type Finding, type OrgRepository, type OrgRepositoryResult, type OrgScanOptions, type OrgScanResult, type PermissionDefault, type PermissionLevel, RULES, type Reachability, type RuleDefinition, SENSITIVE_WRITE_SCOPES, SEVERITY_ORDER, type SarifLog, type ScanOptions, type ScanResult, type Severity, UNTRUSTED_EVENTS, type WorkflowFile, containsSecretReference, containsShellAccess, containsUntrustedGitHubContext, describePermissions, formatGithubOutputs, hasFindingAtOrAbove, hasSensitiveWrite, hasTrustedActorGate, hasUnknownSensitivePermission, isPinnedAction, loadConfig, loadWorkflowFiles, looksLikeAiAction, looksLikeAiCli, looksLikeAiUsage, matchesPath, mergeEnvironment, narrowEvents, normalizeTriggers, parseFailOn, parseInlineIgnores, parseWorkflowFile, permissionLevel, renderMarkdownReport, renderOrgMarkdownReport, renderTextReport, resolvePermissions, scanOrganization, scanRepository, scanWorkflow, scanWorkflowFiles, toSarif, untrustedGitHubContextEvents };

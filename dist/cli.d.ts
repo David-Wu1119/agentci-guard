@@ -8,6 +8,10 @@ type CliIo = {
  * return the process exit code instead of setting it, so the command surface
  * can be exercised in-process by tests as well as from the bin wrapper.
  */
-declare function run(argv: string[], io?: CliIo, environment?: Record<string, string | undefined>): Promise<number>;
+type CliDeps = {
+    /** Injected for tests; defaults to the global fetch. */
+    fetch?: typeof fetch;
+};
+declare function run(argv: string[], io?: CliIo, environment?: Record<string, string | undefined>, deps?: CliDeps): Promise<number>;
 
-export { type CliIo, run };
+export { type CliDeps, type CliIo, run };

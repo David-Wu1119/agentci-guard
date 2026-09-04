@@ -41,6 +41,17 @@ What can truthfully be said today:
   whose TaintAWI analyzes the same class at far larger scale with confirmed
   exploitability. Cite it; do not compete with it.
 
+## Running an organization audit
+
+`agentci org <login> --markdown report.md --sarif report.sarif --fail-on none`
+with `GITHUB_TOKEN` set is the audit deliverable: one Markdown report across
+every repository in an organization or user account, fetched through the API
+without cloning. Read the "Skipped" and "Incomplete analysis" sections before
+sending anything to a client — a skipped repository is a gap in the report, and
+the command exits 1 when one exists. Every finding remains a review hypothesis;
+hand-read each critical before it goes in front of a maintainer or a buyer, and
+apply the claims policy above to the report's own language.
+
 ## Verifying the tree
 
 Every merge to `main` must pass the full gate. Run it locally before opening a

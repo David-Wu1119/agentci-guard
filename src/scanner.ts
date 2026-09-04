@@ -86,6 +86,19 @@ export async function scanRepository(
   }
   const config = await loadConfig(scanRoot, options.configPath);
   const workflows = await loadWorkflowFiles(scanRoot);
+  return scanWorkflowFiles(workflows, scanRoot, config);
+}
+
+/**
+ * Analyze an already-loaded set of workflow files as one repository. The
+ * filesystem scan and the organization scan both end here, so a fetched
+ * workflow is analyzed exactly as a checked-out one.
+ */
+export function scanWorkflowFiles(
+  workflows: WorkflowFile[],
+  scanRoot: string,
+  config: AgentciConfig,
+): ScanResult {
   const repository: RepositoryAnalysis = {
     root: scanRoot,
     config,
@@ -182,21 +195,25 @@ export async function loadWorkflowFiles(root: string): Promise<WorkflowFile[]> {
     const metadata = await fs.lstat(file);
     if (!metadata.isFile() || metadata.isSymbolicLink()) continue;
     const raw = await fs.readFile(file, "utf8");
-    const document = YAML.parseDocument(raw, { prettyErrors: true });
-    const error = document.errors[0];
-    if (error) {
-      const line = error.linePos?.[0]?.line;
-      workflows.push({
-        path: file,
-        raw,
-        document: undefined,
-        parse_error: { message: error.message, line },
-      });
-    } else {
-      workflows.push({ path: file, raw, document: document.toJS() });
-    }
+    workflows.push(parseWorkflowFile(file, raw));
   }
   return workflows;
+}
+
+/** Parse raw workflow YAML into a WorkflowFile, recording a parse error instead of throwing. */
+export function parseWorkflowFile(file: string, raw: string): WorkflowFile {
+  const document = YAML.parseDocument(raw, { prettyErrors: true });
+  const error = document.errors[0];
+  if (error) {
+    const line = error.linePos?.[0]?.line;
+    return {
+      path: file,
+      raw,
+      document: undefined,
+      parse_error: { message: error.message, line },
+    };
+  }
+  return { path: file, raw, document: document.toJS() };
 }
 
 /**

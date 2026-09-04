@@ -1,6 +1,7 @@
 export * from "./config.js";
 export * from "./detect.js";
 export * from "./options.js";
+export * from "./org.js";
 export * from "./report.js";
 export * from "./rules.js";
 export * from "./sarif.js";

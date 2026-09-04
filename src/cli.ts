@@ -13,6 +13,7 @@ import {
   hasFindingAtOrAbove,
 } from "./index.js";
 import { parseFailOn } from "./options.js";
+import { renderOrgMarkdownReport, scanOrganization } from "./org.js";
 import { RULES } from "./rules.js";
 import type { Severity } from "./types.js";
 import packageJson from "../package.json" with { type: "json" };
@@ -40,10 +41,26 @@ const DEFAULT_IO: CliIo = {
  * return the process exit code instead of setting it, so the command surface
  * can be exercised in-process by tests as well as from the bin wrapper.
  */
+export type CliDeps = {
+  /** Injected for tests; defaults to the global fetch. */
+  fetch?: typeof fetch;
+};
+
+type OrgOptions = {
+  json?: boolean;
+  markdown?: string;
+  sarif?: string;
+  token?: string;
+  includeArchived?: boolean;
+  includeForks?: boolean;
+  failOn: "none" | Severity;
+};
+
 export async function run(
   argv: string[],
   io: CliIo = DEFAULT_IO,
   environment: Record<string, string | undefined> = process.env,
+  deps: CliDeps = {},
 ): Promise<number> {
   let exitCode = 0;
   const program = new Command()
@@ -118,6 +135,80 @@ export async function run(
       if (
         result.diagnostics.some((diagnostic) => diagnostic.severity === "error")
       ) {
+        exitCode = 1;
+        return;
+      }
+      if (failOn !== "none" && hasFindingAtOrAbove(result.findings, failOn)) {
+        exitCode = 2;
+      }
+    });
+
+  program
+    .command("org")
+    .description(
+      "Scan every repository in a GitHub organization or user account without cloning; the audit deliverable.",
+    )
+    .argument("<org>", "GitHub organization or user login.")
+    .option("--json", "Print JSON output.", false)
+    .option("--markdown <path>", "Write the organization report as Markdown.")
+    .option(
+      "--sarif <path>",
+      "Write SARIF output (files prefixed by repository).",
+    )
+    .option(
+      "--token <token>",
+      "GitHub token; defaults to GITHUB_TOKEN. Unauthenticated calls are limited to 60/hour.",
+    )
+    .option("--include-archived", "Also scan archived repositories.", false)
+    .option("--include-forks", "Also scan forks.", false)
+    .option(
+      "--fail-on <severity>",
+      "Fail at or above severity: none, low, medium, high, critical.",
+      "high",
+    )
+    .action(async (org: string, options: OrgOptions) => {
+      const failOn = parseFailOn(options.failOn);
+      const result = await scanOrganization(org, {
+        token: options.token ?? environment.GITHUB_TOKEN,
+        includeArchived: options.includeArchived,
+        includeForks: options.includeForks,
+        fetch: deps.fetch,
+      });
+
+      if (options.sarif) {
+        await fs.mkdir(path.dirname(path.resolve(options.sarif)), {
+          recursive: true,
+        });
+        await fs.writeFile(
+          options.sarif,
+          `${JSON.stringify(toSarif(result.findings), null, 2)}\n`,
+          "utf8",
+        );
+      }
+      if (options.markdown) {
+        await fs.mkdir(path.dirname(path.resolve(options.markdown)), {
+          recursive: true,
+        });
+        await fs.writeFile(
+          options.markdown,
+          renderOrgMarkdownReport(result),
+          "utf8",
+        );
+      }
+
+      io.log(
+        options.json
+          ? JSON.stringify(result, null, 2)
+          : renderOrgMarkdownReport(result),
+      );
+
+      const fetchFailures = result.repositories.filter((entry) =>
+        entry.skipped?.startsWith("fetch failed"),
+      );
+      if (fetchFailures.length > 0) {
+        io.error(
+          `${fetchFailures.length} repositor${fetchFailures.length === 1 ? "y" : "ies"} could not be fetched; see the Skipped section.`,
+        );
         exitCode = 1;
         return;
       }
