@@ -16840,99 +16840,11 @@ function parseFailOn(value) {
   throw new Error("fail-on must be one of none, low, medium, high, critical.");
 }
 
-// src/report.ts
-var import_picocolors = __toESM(require_picocolors(), 1);
-function formatGithubOutputs(result, sarifPath) {
-  return [
-    `findings=${result.findings.length}`,
-    `critical=${result.summary.critical}`,
-    `high=${result.summary.high}`,
-    `medium=${result.summary.medium}`,
-    `low=${result.summary.low}`,
-    `sarif-path=${sarifPath ?? ""}`,
-    `diagnostics=${result.diagnostics.length}`,
-    `analysis-complete=${result.analysis_complete}`
-  ].join("\n") + "\n";
-}
-function renderTextReport(result) {
-  const lines = [
-    "AgentCI Guard scan",
-    `Workflows: ${result.workflow_count}`,
-    `Findings: ${result.findings.length}`,
-    `Summary: critical=${result.summary.critical} high=${result.summary.high} medium=${result.summary.medium} low=${result.summary.low}`,
-    `Analysis: ${result.analysis_complete ? "complete" : `partial (${result.diagnostics.length} diagnostic(s))`}`,
-    ""
-  ];
-  for (const finding of result.findings) {
-    lines.push(`${label(finding.severity)} ${finding.rule_id}`);
-    lines.push(
-      `File: ${finding.file}${finding.job ? ` / job: ${finding.job}` : ""}${finding.step ? ` / step: ${finding.step}` : ""}`
-    );
-    lines.push(`Evidence: ${finding.evidence}`);
-    lines.push(`Why: ${finding.why}`);
-    lines.push("Fix:");
-    for (const fix of finding.fix) lines.push(`- ${fix}`);
-    lines.push("");
-  }
-  if (result.diagnostics.length > 0) {
-    lines.push("Diagnostics:");
-    for (const diagnostic of result.diagnostics) {
-      lines.push(
-        `- [${diagnostic.kind.toUpperCase()}] ${diagnostic.code} ${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ""}: ${diagnostic.message}`
-      );
-    }
-  }
-  return lines.join("\n");
-}
-function renderMarkdownReport(result) {
-  return [
-    "# AgentCI Guard Scan",
-    "",
-    `- Workflows: ${result.workflow_count}`,
-    `- Findings: ${result.findings.length}`,
-    `- Critical: ${result.summary.critical}`,
-    `- High: ${result.summary.high}`,
-    `- Medium: ${result.summary.medium}`,
-    `- Low: ${result.summary.low}`,
-    `- Analysis complete: ${result.analysis_complete ? "yes" : "no"}`,
-    `- Diagnostics: ${result.diagnostics.length}`,
-    "",
-    ...result.findings.flatMap(renderFindingMarkdown),
-    ...result.diagnostics.length > 0 ? [
-      "## Diagnostics",
-      "",
-      ...result.diagnostics.map(
-        (diagnostic) => `- **${diagnostic.code}** \u2014 ${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ""}: ${diagnostic.message}`
-      ),
-      ""
-    ] : [],
-    ""
-  ].join("\n");
-}
-function renderFindingMarkdown(finding) {
-  return [
-    `## ${finding.severity.toUpperCase()} ${finding.rule_id}`,
-    "",
-    `**File:** ${finding.file}`,
-    finding.line ? `**Line:** ${finding.line}` : "",
-    finding.job ? `**Job:** ${finding.job}` : "",
-    finding.step ? `**Step:** ${finding.step}` : "",
-    `**Evidence:** \`${finding.evidence.replace(/`/g, "'")}\``,
-    "",
-    finding.why,
-    "",
-    "**Fix:**",
-    "",
-    ...finding.fix.map((fix) => `- ${fix}`),
-    ""
-  ].filter(Boolean);
-}
-function label(severity) {
-  if (severity === "critical") return import_picocolors.default.red("[CRITICAL]");
-  if (severity === "high") return import_picocolors.default.red("[HIGH]");
-  if (severity === "medium") return import_picocolors.default.yellow("[MEDIUM]");
-  return import_picocolors.default.cyan("[LOW]");
-}
+// src/scanner.ts
+var import_fast_glob = __toESM(require_out4(), 1);
+var import_yaml = __toESM(require_dist(), 1);
+import fs2 from "fs/promises";
+import path2 from "path";
 
 // src/rules.ts
 var RULES = {
@@ -17029,69 +16941,6 @@ var RULES = {
   }
 };
 var SEVERITY_ORDER = ["low", "medium", "high", "critical"];
-
-// src/sarif.ts
-function toSarif(findings) {
-  const usedRules = Object.values(RULES).filter(
-    (rule) => findings.some((finding) => finding.rule_id === rule.id)
-  );
-  return {
-    version: "2.1.0",
-    $schema: "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
-    runs: [
-      {
-        tool: {
-          driver: {
-            name: "AgentCI Guard",
-            informationUri: "https://github.com/David-Wu1119/agentci-guard",
-            rules: usedRules.map((rule) => ({
-              id: rule.id,
-              name: rule.title,
-              shortDescription: { text: rule.title },
-              fullDescription: { text: rule.why },
-              help: {
-                text: rule.fix.join(" "),
-                markdown: rule.fix.map((fix) => `- ${fix}`).join("\n")
-              },
-              defaultConfiguration: { level: sarifLevel(rule.severity) }
-            }))
-          }
-        },
-        results: findings.map((finding) => ({
-          ruleId: finding.rule_id,
-          level: sarifLevel(finding.severity),
-          message: { text: `${finding.title}: ${finding.evidence}` },
-          properties: {
-            "agentci/severity": finding.severity,
-            "agentci/reachableEvents": finding.reachable_events ?? [],
-            ...finding.job ? { "agentci/job": finding.job } : {},
-            ...finding.step ? { "agentci/step": finding.step } : {},
-            ...finding.step_index === void 0 ? {} : { "agentci/stepIndex": finding.step_index }
-          },
-          locations: [
-            {
-              physicalLocation: {
-                artifactLocation: { uri: finding.file },
-                region: { startLine: finding.line ?? 1 }
-              }
-            }
-          ]
-        }))
-      }
-    ]
-  };
-}
-function sarifLevel(severity) {
-  if (severity === "critical" || severity === "high") return "error";
-  if (severity === "medium") return "warning";
-  return "note";
-}
-
-// src/scanner.ts
-var import_fast_glob = __toESM(require_out4(), 1);
-var import_yaml = __toESM(require_dist(), 1);
-import fs2 from "fs/promises";
-import path2 from "path";
 
 // src/workflow-model.ts
 var STATUS_ONLY_CONDITION = /^[\s()!&|]*(?:(?:always|success|failure|cancelled)\(\s*\)[\s()!&|]*)+$/i;
@@ -17607,6 +17456,9 @@ async function scanRepository(root, options = {}) {
   }
   const config = await loadConfig(scanRoot, options.configPath);
   const workflows = await loadWorkflowFiles(scanRoot);
+  return scanWorkflowFiles(workflows, scanRoot, config);
+}
+function scanWorkflowFiles(workflows, scanRoot, config) {
   const repository = {
     root: scanRoot,
     config,
@@ -17682,21 +17534,23 @@ async function loadWorkflowFiles(root) {
     const metadata = await fs2.lstat(file);
     if (!metadata.isFile() || metadata.isSymbolicLink()) continue;
     const raw = await fs2.readFile(file, "utf8");
-    const document = import_yaml.default.parseDocument(raw, { prettyErrors: true });
-    const error = document.errors[0];
-    if (error) {
-      const line = error.linePos?.[0]?.line;
-      workflows.push({
-        path: file,
-        raw,
-        document: void 0,
-        parse_error: { message: error.message, line }
-      });
-    } else {
-      workflows.push({ path: file, raw, document: document.toJS() });
-    }
+    workflows.push(parseWorkflowFile(file, raw));
   }
   return workflows;
+}
+function parseWorkflowFile(file, raw) {
+  const document = import_yaml.default.parseDocument(raw, { prettyErrors: true });
+  const error = document.errors[0];
+  if (error) {
+    const line = error.linePos?.[0]?.line;
+    return {
+      path: file,
+      raw,
+      document: void 0,
+      parse_error: { message: error.message, line }
+    };
+  }
+  return { path: file, raw, document: document.toJS() };
 }
 function hasFindingAtOrAbove(findings, severity) {
   return findings.some(
@@ -18286,6 +18140,391 @@ function isRecord2(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
+// src/org.ts
+var EMPTY_CONFIG = { ignore: [], ignorePaths: [] };
+async function scanOrganization(org, options = {}) {
+  const fetcher = options.fetch ?? fetch;
+  const apiBase = (options.apiBase ?? "https://api.github.com").replace(
+    /\/$/,
+    ""
+  );
+  const headers = {
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    "User-Agent": "agentci-guard"
+  };
+  if (options.token) headers.Authorization = `Bearer ${options.token}`;
+  const api = async (url) => {
+    const response = await fetcher(url, { headers });
+    if (response.status === 403 && response.headers.get("x-ratelimit-remaining") === "0") {
+      const reset = response.headers.get("x-ratelimit-reset");
+      const when = reset ? new Date(Number(reset) * 1e3).toISOString() : "unknown";
+      throw new Error(
+        `GitHub API rate limit exhausted (resets ${when}). Provide a token via --token or GITHUB_TOKEN.`
+      );
+    }
+    return response;
+  };
+  const repositories = await listRepositories(org, api, apiBase);
+  const config = options.config ?? EMPTY_CONFIG;
+  const results = new Array(repositories.length);
+  let index = 0;
+  const workers = Array.from(
+    { length: Math.max(1, options.concurrency ?? 4) },
+    async () => {
+      while (index < repositories.length) {
+        const position = index++;
+        const repo = repositories[position];
+        results[position] = await scanOne(repo, api, apiBase, config, options);
+      }
+    }
+  );
+  await Promise.all(workers);
+  const scanned = results.filter((entry) => entry.result !== void 0);
+  const findings = scanned.flatMap(
+    (entry) => entry.result.findings.map((finding) => ({
+      ...finding,
+      file: `${entry.repository}/${finding.file}`
+    }))
+  );
+  const summary = {
+    critical: 0,
+    high: 0,
+    medium: 0,
+    low: 0
+  };
+  for (const finding of findings) summary[finding.severity]++;
+  return {
+    scanned_at: (/* @__PURE__ */ new Date()).toISOString(),
+    org,
+    repository_count: repositories.length,
+    scanned_count: scanned.length,
+    skipped_count: results.length - scanned.length,
+    workflow_count: scanned.reduce(
+      (total, entry) => total + entry.result.workflow_count,
+      0
+    ),
+    repositories: results,
+    findings,
+    summary,
+    analysis_complete: results.every(
+      (entry) => entry.skipped === void 0 || entry.skipped === "archived" || entry.skipped === "fork"
+    ) && scanned.every((entry) => entry.result.analysis_complete)
+  };
+}
+async function listRepositories(org, api, apiBase) {
+  for (const root of [`orgs/${org}`, `users/${org}`]) {
+    const collected = [];
+    let page = 1;
+    let notFound = false;
+    for (; ; ) {
+      const response = await api(
+        `${apiBase}/${root}/repos?per_page=100&type=all&sort=full_name&page=${page}`
+      );
+      if (response.status === 404) {
+        notFound = true;
+        break;
+      }
+      if (!response.ok) {
+        throw new Error(
+          `GitHub API ${response.status} listing repositories for ${org}`
+        );
+      }
+      const batch = await response.json();
+      collected.push(
+        ...batch.map((repo) => ({
+          full_name: repo.full_name,
+          html_url: repo.html_url,
+          default_branch: repo.default_branch,
+          archived: Boolean(repo.archived),
+          fork: Boolean(repo.fork),
+          stargazers_count: Number(repo.stargazers_count ?? 0)
+        }))
+      );
+      if (batch.length < 100) break;
+      page++;
+    }
+    if (!notFound) return collected;
+  }
+  throw new Error(`GitHub organization or user not found: ${org}`);
+}
+async function scanOne(repo, api, apiBase, config, options) {
+  const base = {
+    repository: repo.full_name,
+    url: repo.html_url,
+    stars: repo.stargazers_count,
+    archived: repo.archived,
+    fork: repo.fork
+  };
+  if (repo.archived && !options.includeArchived) {
+    return { ...base, skipped: "archived" };
+  }
+  if (repo.fork && !options.includeForks) {
+    return { ...base, skipped: "fork" };
+  }
+  try {
+    const files = await fetchWorkflowFiles(repo, api, apiBase);
+    const root = `/${repo.full_name}`;
+    const workflows = files.map(
+      (file) => parseWorkflowFile(`${root}/.github/workflows/${file.name}`, file.raw)
+    );
+    return { ...base, result: scanWorkflowFiles(workflows, root, config) };
+  } catch (error) {
+    return {
+      ...base,
+      skipped: `fetch failed: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+}
+async function fetchWorkflowFiles(repo, api, apiBase) {
+  const listing = await api(
+    `${apiBase}/repos/${repo.full_name}/contents/.github/workflows?ref=${encodeURIComponent(repo.default_branch)}`
+  );
+  if (listing.status === 404) return [];
+  if (!listing.ok) {
+    throw new Error(`GitHub API ${listing.status} listing workflows`);
+  }
+  const entries = await listing.json();
+  if (!Array.isArray(entries)) return [];
+  const files = [];
+  for (const entry of entries) {
+    if (entry.type !== "file" || !/\.ya?ml$/i.test(entry.name)) continue;
+    if (!entry.download_url) continue;
+    const response = await api(entry.download_url);
+    if (!response.ok) {
+      throw new Error(`GitHub API ${response.status} fetching ${entry.name}`);
+    }
+    files.push({ name: entry.name, raw: await response.text() });
+  }
+  return files.sort((a, b) => a.name.localeCompare(b.name));
+}
+function renderOrgMarkdownReport(result) {
+  const scanned = result.repositories.filter((r) => r.result !== void 0);
+  const flagged = scanned.filter((r) => r.result.findings.length > 0).sort(
+    (a, b) => b.result.summary.critical - a.result.summary.critical || b.result.summary.high - a.result.summary.high || b.stars - a.stars
+  );
+  const skipped = result.repositories.filter((r) => r.skipped !== void 0);
+  const incomplete = scanned.filter(
+    (r) => !r.result.analysis_complete
+  );
+  const lines = [
+    `# AgentCI Guard organization report: ${result.org}`,
+    "",
+    `Scanned ${result.scanned_count} of ${result.repository_count} repositories (${result.workflow_count} workflows) on ${result.scanned_at.slice(0, 10)}.`,
+    "",
+    "| | Count |",
+    "|---|---:|",
+    `| Critical | ${result.summary.critical} |`,
+    `| High | ${result.summary.high} |`,
+    `| Medium | ${result.summary.medium} |`,
+    `| Low | ${result.summary.low} |`,
+    `| Repositories with findings | ${flagged.length} |`,
+    `| Repositories clean | ${scanned.length - flagged.length} |`,
+    `| Repositories skipped | ${skipped.length} |`,
+    `| Repositories with incomplete analysis | ${incomplete.length} |`,
+    "",
+    "Findings are review hypotheses from static analysis of workflow YAML. An",
+    "incomplete analysis means the tool met a construct it could not interpret",
+    "and kept a conservative reading; it is never reported as clean. See",
+    '"What it cannot see" in the README before acting on any single line.',
+    ""
+  ];
+  if (flagged.length > 0) {
+    lines.push(
+      "## Repositories by severity",
+      "",
+      "| Repository | \u2605 | Critical | High | Medium | Complete |",
+      "|---|---:|---:|---:|---:|:---:|"
+    );
+    for (const entry of flagged) {
+      const r = entry.result;
+      lines.push(
+        `| [${entry.repository}](${entry.url}) | ${entry.stars} | ${r.summary.critical} | ${r.summary.high} | ${r.summary.medium} | ${r.analysis_complete ? "yes" : "no"} |`
+      );
+    }
+    lines.push("");
+    for (const entry of flagged) {
+      const r = entry.result;
+      lines.push(`## ${entry.repository}`, "");
+      for (const finding of r.findings) {
+        lines.push(
+          `- **${finding.severity.toUpperCase()}** \`${finding.rule_id}\` \u2014 ${finding.file}${finding.line ? `:${finding.line}` : ""}${finding.job ? ` (job \`${finding.job}\`)` : ""}`,
+          `  ${finding.evidence.replace(/\s+/g, " ")}`
+        );
+      }
+      lines.push("");
+    }
+  }
+  if (skipped.length > 0) {
+    lines.push("## Skipped", "");
+    for (const entry of skipped) {
+      lines.push(`- ${entry.repository}: ${entry.skipped}`);
+    }
+    lines.push("");
+  }
+  if (incomplete.length > 0) {
+    lines.push("## Incomplete analysis", "");
+    for (const entry of incomplete) {
+      const r = entry.result;
+      const codes = [...new Set(r.diagnostics.map((d) => d.code))].join(", ");
+      lines.push(`- ${entry.repository}: ${codes}`);
+    }
+    lines.push("");
+  }
+  return lines.join("\n");
+}
+
+// src/report.ts
+var import_picocolors = __toESM(require_picocolors(), 1);
+function formatGithubOutputs(result, sarifPath) {
+  return [
+    `findings=${result.findings.length}`,
+    `critical=${result.summary.critical}`,
+    `high=${result.summary.high}`,
+    `medium=${result.summary.medium}`,
+    `low=${result.summary.low}`,
+    `sarif-path=${sarifPath ?? ""}`,
+    `diagnostics=${result.diagnostics.length}`,
+    `analysis-complete=${result.analysis_complete}`
+  ].join("\n") + "\n";
+}
+function renderTextReport(result) {
+  const lines = [
+    "AgentCI Guard scan",
+    `Workflows: ${result.workflow_count}`,
+    `Findings: ${result.findings.length}`,
+    `Summary: critical=${result.summary.critical} high=${result.summary.high} medium=${result.summary.medium} low=${result.summary.low}`,
+    `Analysis: ${result.analysis_complete ? "complete" : `partial (${result.diagnostics.length} diagnostic(s))`}`,
+    ""
+  ];
+  for (const finding of result.findings) {
+    lines.push(`${label(finding.severity)} ${finding.rule_id}`);
+    lines.push(
+      `File: ${finding.file}${finding.job ? ` / job: ${finding.job}` : ""}${finding.step ? ` / step: ${finding.step}` : ""}`
+    );
+    lines.push(`Evidence: ${finding.evidence}`);
+    lines.push(`Why: ${finding.why}`);
+    lines.push("Fix:");
+    for (const fix of finding.fix) lines.push(`- ${fix}`);
+    lines.push("");
+  }
+  if (result.diagnostics.length > 0) {
+    lines.push("Diagnostics:");
+    for (const diagnostic of result.diagnostics) {
+      lines.push(
+        `- [${diagnostic.kind.toUpperCase()}] ${diagnostic.code} ${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ""}: ${diagnostic.message}`
+      );
+    }
+  }
+  return lines.join("\n");
+}
+function renderMarkdownReport(result) {
+  return [
+    "# AgentCI Guard Scan",
+    "",
+    `- Workflows: ${result.workflow_count}`,
+    `- Findings: ${result.findings.length}`,
+    `- Critical: ${result.summary.critical}`,
+    `- High: ${result.summary.high}`,
+    `- Medium: ${result.summary.medium}`,
+    `- Low: ${result.summary.low}`,
+    `- Analysis complete: ${result.analysis_complete ? "yes" : "no"}`,
+    `- Diagnostics: ${result.diagnostics.length}`,
+    "",
+    ...result.findings.flatMap(renderFindingMarkdown),
+    ...result.diagnostics.length > 0 ? [
+      "## Diagnostics",
+      "",
+      ...result.diagnostics.map(
+        (diagnostic) => `- **${diagnostic.code}** \u2014 ${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ""}: ${diagnostic.message}`
+      ),
+      ""
+    ] : [],
+    ""
+  ].join("\n");
+}
+function renderFindingMarkdown(finding) {
+  return [
+    `## ${finding.severity.toUpperCase()} ${finding.rule_id}`,
+    "",
+    `**File:** ${finding.file}`,
+    finding.line ? `**Line:** ${finding.line}` : "",
+    finding.job ? `**Job:** ${finding.job}` : "",
+    finding.step ? `**Step:** ${finding.step}` : "",
+    `**Evidence:** \`${finding.evidence.replace(/`/g, "'")}\``,
+    "",
+    finding.why,
+    "",
+    "**Fix:**",
+    "",
+    ...finding.fix.map((fix) => `- ${fix}`),
+    ""
+  ].filter(Boolean);
+}
+function label(severity) {
+  if (severity === "critical") return import_picocolors.default.red("[CRITICAL]");
+  if (severity === "high") return import_picocolors.default.red("[HIGH]");
+  if (severity === "medium") return import_picocolors.default.yellow("[MEDIUM]");
+  return import_picocolors.default.cyan("[LOW]");
+}
+
+// src/sarif.ts
+function toSarif(findings) {
+  const usedRules = Object.values(RULES).filter(
+    (rule) => findings.some((finding) => finding.rule_id === rule.id)
+  );
+  return {
+    version: "2.1.0",
+    $schema: "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
+    runs: [
+      {
+        tool: {
+          driver: {
+            name: "AgentCI Guard",
+            informationUri: "https://github.com/David-Wu1119/agentci-guard",
+            rules: usedRules.map((rule) => ({
+              id: rule.id,
+              name: rule.title,
+              shortDescription: { text: rule.title },
+              fullDescription: { text: rule.why },
+              help: {
+                text: rule.fix.join(" "),
+                markdown: rule.fix.map((fix) => `- ${fix}`).join("\n")
+              },
+              defaultConfiguration: { level: sarifLevel(rule.severity) }
+            }))
+          }
+        },
+        results: findings.map((finding) => ({
+          ruleId: finding.rule_id,
+          level: sarifLevel(finding.severity),
+          message: { text: `${finding.title}: ${finding.evidence}` },
+          properties: {
+            "agentci/severity": finding.severity,
+            "agentci/reachableEvents": finding.reachable_events ?? [],
+            ...finding.job ? { "agentci/job": finding.job } : {},
+            ...finding.step ? { "agentci/step": finding.step } : {},
+            ...finding.step_index === void 0 ? {} : { "agentci/stepIndex": finding.step_index }
+          },
+          locations: [
+            {
+              physicalLocation: {
+                artifactLocation: { uri: finding.file },
+                region: { startLine: finding.line ?? 1 }
+              }
+            }
+          ]
+        }))
+      }
+    ]
+  };
+}
+function sarifLevel(severity) {
+  if (severity === "critical" || severity === "high") return "error";
+  if (severity === "medium") return "warning";
+  return "note";
+}
+
 // package.json
 var package_default = {
   name: "agentci-guard",
@@ -18391,7 +18630,7 @@ var DEFAULT_IO = {
   log: (message) => console.log(message),
   error: (message) => console.error(import_picocolors2.default.red(message))
 };
-async function run(argv, io = DEFAULT_IO, environment = process.env) {
+async function run(argv, io = DEFAULT_IO, environment = process.env, deps = {}) {
   let exitCode = 0;
   const program2 = new Command().name("agentci").description("Scan CI/CD workflows for unsafe AI coding-agent usage.").version(package_default.version).exitOverride().configureOutput({
     writeOut: (text) => io.log(text.trimEnd()),
@@ -18443,6 +18682,64 @@ async function run(argv, io = DEFAULT_IO, environment = process.env) {
       );
     }
     if (result.diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
+      exitCode = 1;
+      return;
+    }
+    if (failOn !== "none" && hasFindingAtOrAbove(result.findings, failOn)) {
+      exitCode = 2;
+    }
+  });
+  program2.command("org").description(
+    "Scan every repository in a GitHub organization or user account without cloning; the audit deliverable."
+  ).argument("<org>", "GitHub organization or user login.").option("--json", "Print JSON output.", false).option("--markdown <path>", "Write the organization report as Markdown.").option(
+    "--sarif <path>",
+    "Write SARIF output (files prefixed by repository)."
+  ).option(
+    "--token <token>",
+    "GitHub token; defaults to GITHUB_TOKEN. Unauthenticated calls are limited to 60/hour."
+  ).option("--include-archived", "Also scan archived repositories.", false).option("--include-forks", "Also scan forks.", false).option(
+    "--fail-on <severity>",
+    "Fail at or above severity: none, low, medium, high, critical.",
+    "high"
+  ).action(async (org, options) => {
+    const failOn = parseFailOn(options.failOn);
+    const result = await scanOrganization(org, {
+      token: options.token ?? environment.GITHUB_TOKEN,
+      includeArchived: options.includeArchived,
+      includeForks: options.includeForks,
+      fetch: deps.fetch
+    });
+    if (options.sarif) {
+      await fs3.mkdir(path3.dirname(path3.resolve(options.sarif)), {
+        recursive: true
+      });
+      await fs3.writeFile(
+        options.sarif,
+        `${JSON.stringify(toSarif(result.findings), null, 2)}
+`,
+        "utf8"
+      );
+    }
+    if (options.markdown) {
+      await fs3.mkdir(path3.dirname(path3.resolve(options.markdown)), {
+        recursive: true
+      });
+      await fs3.writeFile(
+        options.markdown,
+        renderOrgMarkdownReport(result),
+        "utf8"
+      );
+    }
+    io.log(
+      options.json ? JSON.stringify(result, null, 2) : renderOrgMarkdownReport(result)
+    );
+    const fetchFailures = result.repositories.filter(
+      (entry) => entry.skipped?.startsWith("fetch failed")
+    );
+    if (fetchFailures.length > 0) {
+      io.error(
+        `${fetchFailures.length} repositor${fetchFailures.length === 1 ? "y" : "ies"} could not be fetched; see the Skipped section.`
+      );
       exitCode = 1;
       return;
     }

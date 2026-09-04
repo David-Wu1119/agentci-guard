@@ -32,79 +32,6 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// node_modules/.pnpm/picocolors@1.1.1/node_modules/picocolors/picocolors.js
-var require_picocolors = __commonJS({
-  "node_modules/.pnpm/picocolors@1.1.1/node_modules/picocolors/picocolors.js"(exports, module) {
-    "use strict";
-    var p = process || {};
-    var argv = p.argv || [];
-    var env = p.env || {};
-    var isColorSupported = !(!!env.NO_COLOR || argv.includes("--no-color")) && (!!env.FORCE_COLOR || argv.includes("--color") || p.platform === "win32" || (p.stdout || {}).isTTY && env.TERM !== "dumb" || !!env.CI);
-    var formatter = (open, close, replace = open) => (input2) => {
-      let string = "" + input2, index = string.indexOf(close, open.length);
-      return ~index ? open + replaceClose(string, close, replace, index) + close : open + string + close;
-    };
-    var replaceClose = (string, close, replace, index) => {
-      let result = "", cursor = 0;
-      do {
-        result += string.substring(cursor, index) + replace;
-        cursor = index + close.length;
-        index = string.indexOf(close, cursor);
-      } while (~index);
-      return result + string.substring(cursor);
-    };
-    var createColors = (enabled = isColorSupported) => {
-      let f = enabled ? formatter : () => String;
-      return {
-        isColorSupported: enabled,
-        reset: f("\x1B[0m", "\x1B[0m"),
-        bold: f("\x1B[1m", "\x1B[22m", "\x1B[22m\x1B[1m"),
-        dim: f("\x1B[2m", "\x1B[22m", "\x1B[22m\x1B[2m"),
-        italic: f("\x1B[3m", "\x1B[23m"),
-        underline: f("\x1B[4m", "\x1B[24m"),
-        inverse: f("\x1B[7m", "\x1B[27m"),
-        hidden: f("\x1B[8m", "\x1B[28m"),
-        strikethrough: f("\x1B[9m", "\x1B[29m"),
-        black: f("\x1B[30m", "\x1B[39m"),
-        red: f("\x1B[31m", "\x1B[39m"),
-        green: f("\x1B[32m", "\x1B[39m"),
-        yellow: f("\x1B[33m", "\x1B[39m"),
-        blue: f("\x1B[34m", "\x1B[39m"),
-        magenta: f("\x1B[35m", "\x1B[39m"),
-        cyan: f("\x1B[36m", "\x1B[39m"),
-        white: f("\x1B[37m", "\x1B[39m"),
-        gray: f("\x1B[90m", "\x1B[39m"),
-        bgBlack: f("\x1B[40m", "\x1B[49m"),
-        bgRed: f("\x1B[41m", "\x1B[49m"),
-        bgGreen: f("\x1B[42m", "\x1B[49m"),
-        bgYellow: f("\x1B[43m", "\x1B[49m"),
-        bgBlue: f("\x1B[44m", "\x1B[49m"),
-        bgMagenta: f("\x1B[45m", "\x1B[49m"),
-        bgCyan: f("\x1B[46m", "\x1B[49m"),
-        bgWhite: f("\x1B[47m", "\x1B[49m"),
-        blackBright: f("\x1B[90m", "\x1B[39m"),
-        redBright: f("\x1B[91m", "\x1B[39m"),
-        greenBright: f("\x1B[92m", "\x1B[39m"),
-        yellowBright: f("\x1B[93m", "\x1B[39m"),
-        blueBright: f("\x1B[94m", "\x1B[39m"),
-        magentaBright: f("\x1B[95m", "\x1B[39m"),
-        cyanBright: f("\x1B[96m", "\x1B[39m"),
-        whiteBright: f("\x1B[97m", "\x1B[39m"),
-        bgBlackBright: f("\x1B[100m", "\x1B[49m"),
-        bgRedBright: f("\x1B[101m", "\x1B[49m"),
-        bgGreenBright: f("\x1B[102m", "\x1B[49m"),
-        bgYellowBright: f("\x1B[103m", "\x1B[49m"),
-        bgBlueBright: f("\x1B[104m", "\x1B[49m"),
-        bgMagentaBright: f("\x1B[105m", "\x1B[49m"),
-        bgCyanBright: f("\x1B[106m", "\x1B[49m"),
-        bgWhiteBright: f("\x1B[107m", "\x1B[49m")
-      };
-    };
-    module.exports = createColors();
-    module.exports.createColors = createColors;
-  }
-});
-
 // node_modules/.pnpm/fast-glob@3.3.3/node_modules/fast-glob/out/utils/array.js
 var require_array = __commonJS({
   "node_modules/.pnpm/fast-glob@3.3.3/node_modules/fast-glob/out/utils/array.js"(exports) {
@@ -13162,6 +13089,79 @@ var require_dist = __commonJS({
   }
 });
 
+// node_modules/.pnpm/picocolors@1.1.1/node_modules/picocolors/picocolors.js
+var require_picocolors = __commonJS({
+  "node_modules/.pnpm/picocolors@1.1.1/node_modules/picocolors/picocolors.js"(exports, module) {
+    "use strict";
+    var p = process || {};
+    var argv = p.argv || [];
+    var env = p.env || {};
+    var isColorSupported = !(!!env.NO_COLOR || argv.includes("--no-color")) && (!!env.FORCE_COLOR || argv.includes("--color") || p.platform === "win32" || (p.stdout || {}).isTTY && env.TERM !== "dumb" || !!env.CI);
+    var formatter = (open, close, replace = open) => (input2) => {
+      let string = "" + input2, index = string.indexOf(close, open.length);
+      return ~index ? open + replaceClose(string, close, replace, index) + close : open + string + close;
+    };
+    var replaceClose = (string, close, replace, index) => {
+      let result = "", cursor = 0;
+      do {
+        result += string.substring(cursor, index) + replace;
+        cursor = index + close.length;
+        index = string.indexOf(close, cursor);
+      } while (~index);
+      return result + string.substring(cursor);
+    };
+    var createColors = (enabled = isColorSupported) => {
+      let f = enabled ? formatter : () => String;
+      return {
+        isColorSupported: enabled,
+        reset: f("\x1B[0m", "\x1B[0m"),
+        bold: f("\x1B[1m", "\x1B[22m", "\x1B[22m\x1B[1m"),
+        dim: f("\x1B[2m", "\x1B[22m", "\x1B[22m\x1B[2m"),
+        italic: f("\x1B[3m", "\x1B[23m"),
+        underline: f("\x1B[4m", "\x1B[24m"),
+        inverse: f("\x1B[7m", "\x1B[27m"),
+        hidden: f("\x1B[8m", "\x1B[28m"),
+        strikethrough: f("\x1B[9m", "\x1B[29m"),
+        black: f("\x1B[30m", "\x1B[39m"),
+        red: f("\x1B[31m", "\x1B[39m"),
+        green: f("\x1B[32m", "\x1B[39m"),
+        yellow: f("\x1B[33m", "\x1B[39m"),
+        blue: f("\x1B[34m", "\x1B[39m"),
+        magenta: f("\x1B[35m", "\x1B[39m"),
+        cyan: f("\x1B[36m", "\x1B[39m"),
+        white: f("\x1B[37m", "\x1B[39m"),
+        gray: f("\x1B[90m", "\x1B[39m"),
+        bgBlack: f("\x1B[40m", "\x1B[49m"),
+        bgRed: f("\x1B[41m", "\x1B[49m"),
+        bgGreen: f("\x1B[42m", "\x1B[49m"),
+        bgYellow: f("\x1B[43m", "\x1B[49m"),
+        bgBlue: f("\x1B[44m", "\x1B[49m"),
+        bgMagenta: f("\x1B[45m", "\x1B[49m"),
+        bgCyan: f("\x1B[46m", "\x1B[49m"),
+        bgWhite: f("\x1B[47m", "\x1B[49m"),
+        blackBright: f("\x1B[90m", "\x1B[39m"),
+        redBright: f("\x1B[91m", "\x1B[39m"),
+        greenBright: f("\x1B[92m", "\x1B[39m"),
+        yellowBright: f("\x1B[93m", "\x1B[39m"),
+        blueBright: f("\x1B[94m", "\x1B[39m"),
+        magentaBright: f("\x1B[95m", "\x1B[39m"),
+        cyanBright: f("\x1B[96m", "\x1B[39m"),
+        whiteBright: f("\x1B[97m", "\x1B[39m"),
+        bgBlackBright: f("\x1B[100m", "\x1B[49m"),
+        bgRedBright: f("\x1B[101m", "\x1B[49m"),
+        bgGreenBright: f("\x1B[102m", "\x1B[49m"),
+        bgYellowBright: f("\x1B[103m", "\x1B[49m"),
+        bgBlueBright: f("\x1B[104m", "\x1B[49m"),
+        bgMagentaBright: f("\x1B[105m", "\x1B[49m"),
+        bgCyanBright: f("\x1B[106m", "\x1B[49m"),
+        bgWhiteBright: f("\x1B[107m", "\x1B[49m")
+      };
+    };
+    module.exports = createColors();
+    module.exports.createColors = createColors;
+  }
+});
+
 // src/action-runner.ts
 import fs3 from "fs/promises";
 import path3 from "path";
@@ -13386,56 +13386,11 @@ function parseFailOn(value) {
   throw new Error("fail-on must be one of none, low, medium, high, critical.");
 }
 
-// src/report.ts
-var import_picocolors = __toESM(require_picocolors(), 1);
-function formatGithubOutputs(result, sarifPath) {
-  return [
-    `findings=${result.findings.length}`,
-    `critical=${result.summary.critical}`,
-    `high=${result.summary.high}`,
-    `medium=${result.summary.medium}`,
-    `low=${result.summary.low}`,
-    `sarif-path=${sarifPath ?? ""}`,
-    `diagnostics=${result.diagnostics.length}`,
-    `analysis-complete=${result.analysis_complete}`
-  ].join("\n") + "\n";
-}
-function renderTextReport(result) {
-  const lines = [
-    "AgentCI Guard scan",
-    `Workflows: ${result.workflow_count}`,
-    `Findings: ${result.findings.length}`,
-    `Summary: critical=${result.summary.critical} high=${result.summary.high} medium=${result.summary.medium} low=${result.summary.low}`,
-    `Analysis: ${result.analysis_complete ? "complete" : `partial (${result.diagnostics.length} diagnostic(s))`}`,
-    ""
-  ];
-  for (const finding of result.findings) {
-    lines.push(`${label(finding.severity)} ${finding.rule_id}`);
-    lines.push(
-      `File: ${finding.file}${finding.job ? ` / job: ${finding.job}` : ""}${finding.step ? ` / step: ${finding.step}` : ""}`
-    );
-    lines.push(`Evidence: ${finding.evidence}`);
-    lines.push(`Why: ${finding.why}`);
-    lines.push("Fix:");
-    for (const fix of finding.fix) lines.push(`- ${fix}`);
-    lines.push("");
-  }
-  if (result.diagnostics.length > 0) {
-    lines.push("Diagnostics:");
-    for (const diagnostic of result.diagnostics) {
-      lines.push(
-        `- [${diagnostic.kind.toUpperCase()}] ${diagnostic.code} ${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ""}: ${diagnostic.message}`
-      );
-    }
-  }
-  return lines.join("\n");
-}
-function label(severity) {
-  if (severity === "critical") return import_picocolors.default.red("[CRITICAL]");
-  if (severity === "high") return import_picocolors.default.red("[HIGH]");
-  if (severity === "medium") return import_picocolors.default.yellow("[MEDIUM]");
-  return import_picocolors.default.cyan("[LOW]");
-}
+// src/scanner.ts
+var import_fast_glob = __toESM(require_out4(), 1);
+var import_yaml = __toESM(require_dist(), 1);
+import fs2 from "fs/promises";
+import path2 from "path";
 
 // src/rules.ts
 var RULES = {
@@ -13532,69 +13487,6 @@ var RULES = {
   }
 };
 var SEVERITY_ORDER = ["low", "medium", "high", "critical"];
-
-// src/sarif.ts
-function toSarif(findings) {
-  const usedRules = Object.values(RULES).filter(
-    (rule) => findings.some((finding) => finding.rule_id === rule.id)
-  );
-  return {
-    version: "2.1.0",
-    $schema: "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
-    runs: [
-      {
-        tool: {
-          driver: {
-            name: "AgentCI Guard",
-            informationUri: "https://github.com/David-Wu1119/agentci-guard",
-            rules: usedRules.map((rule) => ({
-              id: rule.id,
-              name: rule.title,
-              shortDescription: { text: rule.title },
-              fullDescription: { text: rule.why },
-              help: {
-                text: rule.fix.join(" "),
-                markdown: rule.fix.map((fix) => `- ${fix}`).join("\n")
-              },
-              defaultConfiguration: { level: sarifLevel(rule.severity) }
-            }))
-          }
-        },
-        results: findings.map((finding) => ({
-          ruleId: finding.rule_id,
-          level: sarifLevel(finding.severity),
-          message: { text: `${finding.title}: ${finding.evidence}` },
-          properties: {
-            "agentci/severity": finding.severity,
-            "agentci/reachableEvents": finding.reachable_events ?? [],
-            ...finding.job ? { "agentci/job": finding.job } : {},
-            ...finding.step ? { "agentci/step": finding.step } : {},
-            ...finding.step_index === void 0 ? {} : { "agentci/stepIndex": finding.step_index }
-          },
-          locations: [
-            {
-              physicalLocation: {
-                artifactLocation: { uri: finding.file },
-                region: { startLine: finding.line ?? 1 }
-              }
-            }
-          ]
-        }))
-      }
-    ]
-  };
-}
-function sarifLevel(severity) {
-  if (severity === "critical" || severity === "high") return "error";
-  if (severity === "medium") return "warning";
-  return "note";
-}
-
-// src/scanner.ts
-var import_fast_glob = __toESM(require_out4(), 1);
-var import_yaml = __toESM(require_dist(), 1);
-import fs2 from "fs/promises";
-import path2 from "path";
 
 // src/workflow-model.ts
 var STATUS_ONLY_CONDITION = /^[\s()!&|]*(?:(?:always|success|failure|cancelled)\(\s*\)[\s()!&|]*)+$/i;
@@ -14110,6 +14002,9 @@ async function scanRepository(root, options = {}) {
   }
   const config = await loadConfig(scanRoot, options.configPath);
   const workflows = await loadWorkflowFiles(scanRoot);
+  return scanWorkflowFiles(workflows, scanRoot, config);
+}
+function scanWorkflowFiles(workflows, scanRoot, config) {
   const repository = {
     root: scanRoot,
     config,
@@ -14185,21 +14080,23 @@ async function loadWorkflowFiles(root) {
     const metadata = await fs2.lstat(file);
     if (!metadata.isFile() || metadata.isSymbolicLink()) continue;
     const raw = await fs2.readFile(file, "utf8");
-    const document = import_yaml.default.parseDocument(raw, { prettyErrors: true });
-    const error = document.errors[0];
-    if (error) {
-      const line = error.linePos?.[0]?.line;
-      workflows.push({
-        path: file,
-        raw,
-        document: void 0,
-        parse_error: { message: error.message, line }
-      });
-    } else {
-      workflows.push({ path: file, raw, document: document.toJS() });
-    }
+    workflows.push(parseWorkflowFile(file, raw));
   }
   return workflows;
+}
+function parseWorkflowFile(file, raw) {
+  const document = import_yaml.default.parseDocument(raw, { prettyErrors: true });
+  const error = document.errors[0];
+  if (error) {
+    const line = error.linePos?.[0]?.line;
+    return {
+      path: file,
+      raw,
+      document: void 0,
+      parse_error: { message: error.message, line }
+    };
+  }
+  return { path: file, raw, document: document.toJS() };
 }
 function hasFindingAtOrAbove(findings, severity) {
   return findings.some(
@@ -14787,6 +14684,114 @@ function summarize(findings) {
 }
 function isRecord2(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+// src/report.ts
+var import_picocolors = __toESM(require_picocolors(), 1);
+function formatGithubOutputs(result, sarifPath) {
+  return [
+    `findings=${result.findings.length}`,
+    `critical=${result.summary.critical}`,
+    `high=${result.summary.high}`,
+    `medium=${result.summary.medium}`,
+    `low=${result.summary.low}`,
+    `sarif-path=${sarifPath ?? ""}`,
+    `diagnostics=${result.diagnostics.length}`,
+    `analysis-complete=${result.analysis_complete}`
+  ].join("\n") + "\n";
+}
+function renderTextReport(result) {
+  const lines = [
+    "AgentCI Guard scan",
+    `Workflows: ${result.workflow_count}`,
+    `Findings: ${result.findings.length}`,
+    `Summary: critical=${result.summary.critical} high=${result.summary.high} medium=${result.summary.medium} low=${result.summary.low}`,
+    `Analysis: ${result.analysis_complete ? "complete" : `partial (${result.diagnostics.length} diagnostic(s))`}`,
+    ""
+  ];
+  for (const finding of result.findings) {
+    lines.push(`${label(finding.severity)} ${finding.rule_id}`);
+    lines.push(
+      `File: ${finding.file}${finding.job ? ` / job: ${finding.job}` : ""}${finding.step ? ` / step: ${finding.step}` : ""}`
+    );
+    lines.push(`Evidence: ${finding.evidence}`);
+    lines.push(`Why: ${finding.why}`);
+    lines.push("Fix:");
+    for (const fix of finding.fix) lines.push(`- ${fix}`);
+    lines.push("");
+  }
+  if (result.diagnostics.length > 0) {
+    lines.push("Diagnostics:");
+    for (const diagnostic of result.diagnostics) {
+      lines.push(
+        `- [${diagnostic.kind.toUpperCase()}] ${diagnostic.code} ${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ""}: ${diagnostic.message}`
+      );
+    }
+  }
+  return lines.join("\n");
+}
+function label(severity) {
+  if (severity === "critical") return import_picocolors.default.red("[CRITICAL]");
+  if (severity === "high") return import_picocolors.default.red("[HIGH]");
+  if (severity === "medium") return import_picocolors.default.yellow("[MEDIUM]");
+  return import_picocolors.default.cyan("[LOW]");
+}
+
+// src/sarif.ts
+function toSarif(findings) {
+  const usedRules = Object.values(RULES).filter(
+    (rule) => findings.some((finding) => finding.rule_id === rule.id)
+  );
+  return {
+    version: "2.1.0",
+    $schema: "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
+    runs: [
+      {
+        tool: {
+          driver: {
+            name: "AgentCI Guard",
+            informationUri: "https://github.com/David-Wu1119/agentci-guard",
+            rules: usedRules.map((rule) => ({
+              id: rule.id,
+              name: rule.title,
+              shortDescription: { text: rule.title },
+              fullDescription: { text: rule.why },
+              help: {
+                text: rule.fix.join(" "),
+                markdown: rule.fix.map((fix) => `- ${fix}`).join("\n")
+              },
+              defaultConfiguration: { level: sarifLevel(rule.severity) }
+            }))
+          }
+        },
+        results: findings.map((finding) => ({
+          ruleId: finding.rule_id,
+          level: sarifLevel(finding.severity),
+          message: { text: `${finding.title}: ${finding.evidence}` },
+          properties: {
+            "agentci/severity": finding.severity,
+            "agentci/reachableEvents": finding.reachable_events ?? [],
+            ...finding.job ? { "agentci/job": finding.job } : {},
+            ...finding.step ? { "agentci/step": finding.step } : {},
+            ...finding.step_index === void 0 ? {} : { "agentci/stepIndex": finding.step_index }
+          },
+          locations: [
+            {
+              physicalLocation: {
+                artifactLocation: { uri: finding.file },
+                region: { startLine: finding.line ?? 1 }
+              }
+            }
+          ]
+        }))
+      }
+    ]
+  };
+}
+function sarifLevel(severity) {
+  if (severity === "critical" || severity === "high") return "error";
+  if (severity === "medium") return "warning";
+  return "note";
 }
 
 // src/action-runner.ts
