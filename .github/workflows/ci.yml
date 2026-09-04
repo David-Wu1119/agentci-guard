@@ -35,7 +35,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Audit dependencies
-        run: pnpm audit --audit-level high
+        # Fails on advisories at or above high. Retries only when the advisory
+        # endpoint itself is unreachable, and still fails after the window.
+        run: node scripts/audit-dependencies.mjs --level high
 
       - name: Format
         run: pnpm format:check
@@ -44,7 +46,8 @@ jobs:
         run: pnpm typecheck
 
       - name: Test
-        run: pnpm test
+        # Enforces the coverage floor declared in vitest.config.ts.
+        run: pnpm test:coverage
 
       - name: Build
         run: pnpm build
