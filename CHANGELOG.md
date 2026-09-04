@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-04
+
+### Added
+
+- A `Dockerfile` that packages the committed bundle on `node:24-alpine`, runs
+  as the unprivileged `node` user, and needs no install step or network access
+  at build time. Verified against both example repositories with the CLI's
+  exit-code contract intact.
+- A `.pre-commit-hooks.yaml` so the scanner runs on changes under
+  `.github/workflows/` and fails the commit at `high` or above.
+- `docs/OPERATIONS.md`, a handbook for running, releasing, and extending the
+  tool without the original author: what may truthfully be claimed, the full
+  verification gate, how to measure a change against the frozen benchmark, the
+  release and `v0`-tag sequence, and how to add a rule or an agent pattern.
+- The README was rewritten around the current state: the honest status
+  paragraph now records the four defects found and fixed by hand-reading the
+  benchmark, the zizmor comparison on identical inputs, and the TaintAWI prior
+  art; a rule table replaces the feature list; container and pre-commit
+  quickstarts were added; and a "what it cannot see" section names the
+  coverage floor and the chosen false positives.
+- Agent detection now anchors the OpenHands organization and leaves the
+  repository open, covering the rename from All-Hands-AI and agents published
+  under `extensions` and `software-agent-sdk`. The previous pattern required
+  both a legacy org and a repository named `openhands`, so
+  `OpenHands/extensions/plugins/pr-review@main` matched nothing: corpus case
+  openhands-003 (cloudera/cybersec) produced zero observations on a
+  `pull_request`-triggered review agent holding `pull-requests: write` and
+  `issues: write`. Eval corpus effect: critical 32 to 33, medium 181 to 184,
+  confined to that one case.
+- Agent detection now recognizes hosted agent-dispatch HTTP endpoints, a shape
+  that uses no action and no local binary. Found by running the frozen
+  benchmark's 16 held-out agent-diversity workflows, where two cases invoked a
+  coding agent purely over HTTP and produced zero observations, leaving every
+  rule inert. Plain inference endpoints are deliberately excluded: a
+  `chat/completions` or `messages` call returns text and holds no tools, so it
+  cannot reach the repository the way the threat model requires. Eval corpus
+  effect: high 38 to 44 and medium 179 to 181, confined entirely to the two
+  recovered cases, with critical unchanged.
+
+### Changed
+
+- The CLI now exposes an in-process `run(argv, io, env)` entry that returns the
+  exit code instead of setting it, so the command surface is exercised and
+  measured by the unit suite rather than only through a spawned `dist/cli.js`.
+  Behavior is unchanged: exit 0 clean, 2 at or above threshold, 1 on parse
+  errors, bad inputs, or unknown rules. The version string now comes from
+  `package.json` instead of a hard-coded literal.
+- `pnpm check` now enforces a coverage floor (90% lines, statements, and
+  functions; 80% branches) as a ratchet. Tests were added for every product
+  surface that had none: the Markdown report, config validation and discovery,
+  the reusable-workflow permission ceiling, Action input aliasing and
+  validation, and the actor-guard expression parser's quoting and
+  parenthesization. 112 tests became 150.
+
 ### Fixed
 
 - Actor-gate recognition now accepts a literal login — `github.actor ==
@@ -31,63 +85,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the event set. Mixed conditions stay conservative. No finding changes on the
   frozen benchmark; the effect is confined to diagnostics and the
   `analysis_complete` flag.
-
-### Changed
-
-- The CLI now exposes an in-process `run(argv, io, env)` entry that returns the
-  exit code instead of setting it, so the command surface is exercised and
-  measured by the unit suite rather than only through a spawned `dist/cli.js`.
-  Behavior is unchanged: exit 0 clean, 2 at or above threshold, 1 on parse
-  errors, bad inputs, or unknown rules. The version string now comes from
-  `package.json` instead of a hard-coded literal.
-- `pnpm check` now enforces a coverage floor (90% lines, statements, and
-  functions; 80% branches) as a ratchet. Tests were added for every product
-  surface that had none: the Markdown report, config validation and discovery,
-  the reusable-workflow permission ceiling, Action input aliasing and
-  validation, and the actor-guard expression parser's quoting and
-  parenthesization. 112 tests became 150.
-
-### Added
-
-- A `Dockerfile` that packages the committed bundle on `node:24-alpine`, runs
-  as the unprivileged `node` user, and needs no install step or network access
-  at build time. Verified against both example repositories with the CLI's
-  exit-code contract intact.
-- A `.pre-commit-hooks.yaml` so the scanner runs on changes under
-  `.github/workflows/` and fails the commit at `high` or above.
-- `docs/OPERATIONS.md`, a handbook for running, releasing, and extending the
-  tool without the original author: what may truthfully be claimed, the full
-  verification gate, how to measure a change against the frozen benchmark, the
-  release and `v0`-tag sequence, and how to add a rule or an agent pattern.
-- The README was rewritten around the current state: the honest status
-  paragraph now records the four defects found and fixed by hand-reading the
-  benchmark, the zizmor comparison on identical inputs, and the TaintAWI prior
-  art; a rule table replaces the feature list; container and pre-commit
-  quickstarts were added; and a "what it cannot see" section names the
-  coverage floor and the chosen false positives.
-
-- Agent detection now anchors the OpenHands organization and leaves the
-  repository open, covering the rename from All-Hands-AI and agents published
-  under `extensions` and `software-agent-sdk`. The previous pattern required
-  both a legacy org and a repository named `openhands`, so
-  `OpenHands/extensions/plugins/pr-review@main` matched nothing: corpus case
-  openhands-003 (cloudera/cybersec) produced zero observations on a
-  `pull_request`-triggered review agent holding `pull-requests: write` and
-  `issues: write`. Eval corpus effect: critical 32 to 33, medium 181 to 184,
-  confined to that one case.
-
-- Agent detection now recognizes hosted agent-dispatch HTTP endpoints, a shape
-  that uses no action and no local binary. Found by running the frozen
-  benchmark's 16 held-out agent-diversity workflows, where two cases invoked a
-  coding agent purely over HTTP and produced zero observations, leaving every
-  rule inert. Plain inference endpoints are deliberately excluded: a
-  `chat/completions` or `messages` call returns text and holds no tools, so it
-  cannot reach the repository the way the threat model requires. Eval corpus
-  effect: high 38 to 44 and medium 179 to 181, confined entirely to the two
-  recovered cases, with critical unchanged.
-
-### Fixed
-
 - `agentci/untrusted-ai-write-token` now recognizes agent actions that read
   event content through their own token instead of through a `${{ }}`
   expansion. The rule previously required interpolation, which missed the
@@ -99,7 +96,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   than new noise introduced. Three of the recovered cases were hand-verified
   against the upstream workflows. Agent CLI invocations still require
   interpolation, since a `run:` step receives only what the shell passes it.
-
 - Event reachability now recognizes actor and provenance guards, so a job
   restricted to the repository owner, to same-repository pull requests, or to a
   trusted `author_association` no longer raises untrusted-reachability

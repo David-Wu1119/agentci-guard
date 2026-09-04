@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { readFileSync } from "node:fs";
 import fs from "node:fs";
 
 const reportPath = process.argv[2];
@@ -40,7 +41,10 @@ const errors = [];
 if (entry?.name !== "agentci-guard") {
   errors.push(`unexpected package name ${String(entry?.name)}`);
 }
-if (entry?.version !== "0.1.1") {
+const declaredVersion = JSON.parse(
+  readFileSync("package.json", "utf8"),
+).version;
+if (entry?.version !== declaredVersion) {
   errors.push(`unexpected package version ${String(entry?.version)}`);
 }
 if (missing.length > 0) {
