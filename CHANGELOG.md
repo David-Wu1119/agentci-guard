@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Actor-gate recognition now accepts a literal login — `github.actor ==
+'maintainer'`, the same on `sender.login` and `comment.user.login`, and a
+  `contains(fromJSON([...]), github.actor)` allowlist. GitHub resolves the actor
+  before the job starts and a stranger cannot be that user, so this is exactly
+  as sound as comparing against `github.repository_owner`. Anthropic's workflow
+  template ships this shape with the maintainer's own login filled in, and three
+  benchmark repositories using it were reported critical, including
+  marktext/marktext (~61k stars). Inequality (`!= 'dependabot[bot]'`) and empty
+  allowlists are not accepted. Eval corpus effect: critical 33 to 30, confined
+  to those three cases. All 31 critical findings on the benchmark were read by
+  hand for this change: 24 are confirmed, these 3 were this class, and 4 are the
+  documented runtime-gate limit — 77% precision on the critical rule before
+  this fix, 86% after, as measured by a single non-blind reader, not by the
+  benchmark's labeling protocol.
 - Event reachability now treats a condition made only of `always()`,
   `success()`, `failure()`, and `cancelled()` as complete and non-narrowing.
   These depend on prior step status, never on the trigger, so they cannot
