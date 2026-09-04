@@ -20,6 +20,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A `Dockerfile` that packages the committed bundle on `node:24-alpine`, runs
+  as the unprivileged `node` user, and needs no install step or network access
+  at build time. Verified against both example repositories with the CLI's
+  exit-code contract intact.
+- A `.pre-commit-hooks.yaml` so the scanner runs on changes under
+  `.github/workflows/` and fails the commit at `high` or above.
+- `docs/OPERATIONS.md`, a handbook for running, releasing, and extending the
+  tool without the original author: what may truthfully be claimed, the full
+  verification gate, how to measure a change against the frozen benchmark, the
+  release and `v0`-tag sequence, and how to add a rule or an agent pattern.
+- The README was rewritten around the current state: the honest status
+  paragraph now records the four defects found and fixed by hand-reading the
+  benchmark, the zizmor comparison on identical inputs, and the TaintAWI prior
+  art; a rule table replaces the feature list; container and pre-commit
+  quickstarts were added; and a "what it cannot see" section names the
+  coverage floor and the chosen false positives.
+
 - Agent detection now anchors the OpenHands organization and leaves the
   repository open, covering the rename from All-Hands-AI and agents published
   under `extensions` and `software-agent-sdk`. The previous pattern required
