@@ -1,13 +1,13 @@
 [
   {
-    "id": "agentci-guard@0.2.0",
+    "id": "agentci-guard@0.3.0",
     "name": "agentci-guard",
-    "version": "0.2.0",
-    "size": 1873713,
-    "unpackedSize": 5752825,
-    "shasum": "ce268d2c87d31982318befdfd858b7dfacb076b9",
-    "integrity": "sha512-ePrUkzNWFg6nhKloV+BghMoCe4WGR+ak8Vt4elUCgX6EjNkL67szRKPqSj/xW+vWQGDR1n+O8nWVeUM+UJ909w==",
-    "filename": "agentci-guard-0.2.0.tgz",
+    "version": "0.3.0",
+    "size": 1891157,
+    "unpackedSize": 5822710,
+    "shasum": "69b1b8953cc0681c7efe6dea486b366048290323",
+    "integrity": "sha512-466GAo2vNKMCihTSDBPnlUNAy35yG7hWms62S97CdC6UxbOJA/QzwecQocFu2mpOBjAMbnPnHdlbGOPeAtIUlA==",
+    "filename": "agentci-guard-0.3.0.tgz",
     "files": [
       {
         "path": "ANNOTATION_GUIDE.md",
@@ -21,7 +21,7 @@
       },
       {
         "path": "CHANGELOG.md",
-        "size": 15117,
+        "size": 16291,
         "mode": 420
       },
       {
@@ -41,7 +41,7 @@
       },
       {
         "path": "README.md",
-        "size": 11991,
+        "size": 12927,
         "mode": 420
       },
       {
@@ -81,42 +81,42 @@
       },
       {
         "path": "dist/action.js",
-        "size": 532849,
+        "size": 533001,
         "mode": 493
       },
       {
         "path": "dist/action.js.map",
-        "size": 915980,
+        "size": 916663,
         "mode": 420
       },
       {
         "path": "dist/cli.d.ts",
-        "size": 488,
+        "size": 625,
         "mode": 420
       },
       {
         "path": "dist/cli.js",
-        "size": 663233,
+        "size": 673966,
         "mode": 493
       },
       {
         "path": "dist/cli.js.map",
-        "size": 1112937,
+        "size": 1135897,
         "mode": 420
       },
       {
         "path": "dist/index.d.ts",
-        "size": 9578,
+        "size": 12015,
         "mode": 420
       },
       {
         "path": "dist/index.js",
-        "size": 532805,
+        "size": 541416,
         "mode": 420
       },
       {
         "path": "dist/index.js.map",
-        "size": 911702,
+        "size": 930381,
         "mode": 420
       },
       {
@@ -141,7 +141,7 @@
       },
       {
         "path": "docs/OPERATIONS.md",
-        "size": 11085,
+        "size": 11733,
         "mode": 420
       },
       {
@@ -157,6 +157,11 @@
       {
         "path": "docs/release-v0.2.0.md",
         "size": 5173,
+        "mode": 420
+      },
+      {
+        "path": "docs/release-v0.3.0.md",
+        "size": 2735,
         "mode": 420
       },
       {
@@ -185,7 +190,7 @@
         "mode": 420
       }
     ],
-    "entryCount": 35,
+    "entryCount": 36,
     "bundled": []
   }
 ]

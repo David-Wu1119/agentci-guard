@@ -87,7 +87,7 @@ jobs:
       - uses: actions/checkout@v4
       # Pin an immutable release tag. The floating `v0` is moved to each
       # release only after its published-Action smoke passes.
-      - uses: David-Wu1119/agentci-guard@v0.2.0
+      - uses: David-Wu1119/agentci-guard@v0.3.0
         with:
           path: .
           sarif: agentci-results.sarif
@@ -102,7 +102,7 @@ The Action sets `findings`, `critical`, `high`, `medium`, `low`, `sarif-path`,
 `diagnostics`, and `analysis-complete` as outputs:
 
 ```yaml
-- uses: David-Wu1119/agentci-guard@v0.2.0
+- uses: David-Wu1119/agentci-guard@v0.3.0
   id: agentci
   with:
     fail-on: none
@@ -165,7 +165,7 @@ docker run --rm -v "$PWD:/scan:ro" -v "$PWD/out:/out" agentci-guard \
 ```yaml
 repos:
   - repo: https://github.com/David-Wu1119/agentci-guard
-    rev: v0.2.0
+    rev: v0.3.0
     hooks:
       - id: agentci-guard
 ```
