@@ -65,13 +65,14 @@ errs toward reporting more, never less. Actor-gate recognition is separate and
 also fails closed: an unrecognized guard leaves the job ungated. So this class
 costs precision and reporting noise, and does not hide findings.
 
-One tempting cleanup is worth naming as a trap. The status functions
-`always()`, `success()`, `failure()`, and `cancelled()` are event-independent
-and account for a visible share of the diagnostics, so substituting `true` for
-them looks free. It is not: `!cancelled()` would then evaluate to false, empty
-the event set, and silently skip the job. Event-independence has to be modeled
-as non-narrowing, not as truth, and until that distinction is built these
-conditions stay unknown.
+The status functions `always()`, `success()`, `failure()`, and `cancelled()`
+are event-independent: they depend on prior step status, never on the trigger,
+so none of them can exclude an event. A condition built only from them and
+boolean operators therefore leaves the event set untouched and is reported as
+complete. They are deliberately not substituted with `true` — that would turn
+`!cancelled()` into `false`, empty the event set, and silently skip the job. A
+condition that mixes a status function with an unresolvable runtime value stays
+conservative and keeps its diagnostic.
 
 ## What counts as an agent
 

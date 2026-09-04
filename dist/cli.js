@@ -17116,6 +17116,7 @@ import path2 from "path";
 init_rules();
 
 // src/workflow-model.ts
+var STATUS_ONLY_CONDITION = /^[\s()!&|]*(?:(?:always|success|failure|cancelled)\(\s*\)[\s()!&|]*)+$/i;
 var UNTRUSTED_EVENTS = /* @__PURE__ */ new Set([
   "pull_request",
   "pull_request_target",
@@ -17211,6 +17212,9 @@ function narrowEvents(events, rawCondition) {
   }
   if (condition === "false") {
     return { events: [], complete: true };
+  }
+  if (STATUS_ONLY_CONDITION.test(condition)) {
+    return { events: [...events], complete: true };
   }
   let complete = true;
   const reachable = [];
