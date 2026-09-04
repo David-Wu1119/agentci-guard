@@ -1,0 +1,5 @@
+# Only package.json and the committed bundle are copied into the image.
+*
+!package.json
+!dist/
+dist/*.map

@@ -1,0 +1,19 @@
+# pre-commit hook definition. Consumers reference this repository:
+#
+#   repos:
+#     - repo: https://github.com/David-Wu1119/agentci-guard
+#       rev: v0.2.0
+#       hooks:
+#         - id: agentci-guard
+#
+# pre-commit installs the repository as a Node package, which exposes the
+# `agentci` bin. The scanner takes a repository root rather than file names, so
+# filenames are not passed; `files` only decides when the hook runs.
+- id: agentci-guard
+  name: AgentCI Guard
+  description: Scan GitHub Actions workflows for risky AI coding-agent usage.
+  entry: agentci scan . --fail-on high
+  language: node
+  pass_filenames: false
+  files: ^\.github/workflows/.*\.ya?ml$
+  minimum_pre_commit_version: "3.0.0"
