@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import YAML from "yaml";
 import { scanWorkflow, type WorkflowFile } from "../src/index.js";
+import { hasTrustedActorGate } from "../src/workflow-model.js";
 
 function workflow(raw: string): WorkflowFile {
   return { path: ".github/workflows/test.yml", document: YAML.parse(raw), raw };
@@ -120,5 +121,81 @@ jobs:
     steps:${COMMENT_STEP}
 `);
     expect(rules).toContain("agentci/untrusted-ai-write-token");
+  });
+});
+
+describe("actor-guard expression parsing edge cases", () => {
+  it("ignores boolean operators and parentheses inside quoted strings", () => {
+    expect(
+      hasTrustedActorGate(
+        "github.event.comment.body == 'run && deploy || (skip)' && github.event.sender.login == github.repository_owner",
+      ),
+    ).toBe(true);
+    expect(
+      hasTrustedActorGate(
+        'github.event.comment.body == "x) || (y" || github.actor == github.repository_owner',
+      ),
+    ).toBe(false);
+  });
+
+  it("strips redundant outer parentheses but not partial ones", () => {
+    expect(
+      hasTrustedActorGate("((github.actor == github.repository_owner))"),
+    ).toBe(true);
+    expect(
+      hasTrustedActorGate(
+        "(github.actor == github.repository_owner) || (github.event.action == 'x')",
+      ),
+    ).toBe(false);
+    expect(
+      hasTrustedActorGate(
+        "(github.actor == github.repository_owner) && (github.event.action == 'x')",
+      ),
+    ).toBe(true);
+  });
+
+  it("handles the ${{ }} wrapper, odd whitespace, and non-string conditions", () => {
+    expect(
+      hasTrustedActorGate(
+        "${{   github.event.pull_request.head.repo.full_name   ==   github.repository   }}",
+      ),
+    ).toBe(true);
+    expect(hasTrustedActorGate(true)).toBe(false);
+    expect(hasTrustedActorGate(undefined)).toBe(false);
+    expect(hasTrustedActorGate("")).toBe(false);
+    expect(hasTrustedActorGate("   ")).toBe(false);
+  });
+
+  it("rejects a negated guard and an author_association outside the trusted set", () => {
+    expect(
+      hasTrustedActorGate("!(github.actor == github.repository_owner)"),
+    ).toBe(false);
+    expect(
+      hasTrustedActorGate(
+        "github.event.comment.author_association == 'CONTRIBUTOR'",
+      ),
+    ).toBe(false);
+    expect(
+      hasTrustedActorGate(
+        'contains(fromJSON(\'["OWNER","CONTRIBUTOR"]\'), github.event.comment.author_association)',
+      ),
+    ).toBe(false);
+    expect(
+      hasTrustedActorGate(
+        "contains(fromJSON('not json'), github.event.comment.author_association)",
+      ),
+    ).toBe(false);
+  });
+
+  it("accepts the reversed comparison and the negated fork flag", () => {
+    expect(hasTrustedActorGate("github.repository_owner == github.actor")).toBe(
+      true,
+    );
+    expect(
+      hasTrustedActorGate("!github.event.pull_request.head.repo.fork"),
+    ).toBe(true);
+    expect(
+      hasTrustedActorGate("github.event.pull_request.head.repo.fork == false"),
+    ).toBe(true);
   });
 });

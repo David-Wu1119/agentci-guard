@@ -18,6 +18,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   frozen benchmark; the effect is confined to diagnostics and the
   `analysis_complete` flag.
 
+### Changed
+
+- The CLI now exposes an in-process `run(argv, io, env)` entry that returns the
+  exit code instead of setting it, so the command surface is exercised and
+  measured by the unit suite rather than only through a spawned `dist/cli.js`.
+  Behavior is unchanged: exit 0 clean, 2 at or above threshold, 1 on parse
+  errors, bad inputs, or unknown rules. The version string now comes from
+  `package.json` instead of a hard-coded literal.
+- `pnpm check` now enforces a coverage floor (90% lines, statements, and
+  functions; 80% branches) as a ratchet. Tests were added for every product
+  surface that had none: the Markdown report, config validation and discovery,
+  the reusable-workflow permission ceiling, Action input aliasing and
+  validation, and the actor-guard expression parser's quoting and
+  parenthesization. 112 tests became 150.
+
 ### Added
 
 - A `Dockerfile` that packages the committed bundle on `node:24-alpine`, runs
