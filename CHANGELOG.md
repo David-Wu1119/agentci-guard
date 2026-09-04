@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Event reachability now treats a condition made only of `always()`,
+  `success()`, `failure()`, and `cancelled()` as complete and non-narrowing.
+  These depend on prior step status, never on the trigger, so they cannot
+  exclude an event; the analyzer previously reported them as uninterpretable.
+  They are not substituted with `true`, which would make `!cancelled()` empty
+  the event set. Mixed conditions stay conservative. No finding changes on the
+  frozen benchmark; the effect is confined to diagnostics and the
+  `analysis_complete` flag.
+
 ### Added
 
 - Agent detection now anchors the OpenHands organization and leaves the

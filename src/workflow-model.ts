@@ -29,6 +29,10 @@ type ExpressionToken = {
   value: string;
 };
 
+/** A condition made solely of status functions and boolean operators. */
+const STATUS_ONLY_CONDITION =
+  /^[\s()!&|]*(?:(?:always|success|failure|cancelled)\(\s*\)[\s()!&|]*)+$/i;
+
 export const UNTRUSTED_EVENTS = new Set([
   "pull_request",
   "pull_request_target",
@@ -155,6 +159,15 @@ export function narrowEvents(
   }
   if (condition === "false") {
     return { events: [], complete: true };
+  }
+  // Status functions are event-independent: none of them can exclude an
+  // event, so a condition built only from them and boolean operators leaves
+  // the event set untouched and needs no diagnostic. They are deliberately
+  // not substituted with `true` — that would turn `!cancelled()` into `false`
+  // and silently empty the event set. Mixed conditions fall through and stay
+  // conservative.
+  if (STATUS_ONLY_CONDITION.test(condition)) {
+    return { events: [...events], complete: true };
   }
   let complete = true;
   const reachable: string[] = [];
