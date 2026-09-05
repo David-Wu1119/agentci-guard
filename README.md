@@ -55,7 +55,7 @@ production-grade detector, start there.
 
 ## What it detects
 
-Eight rules, one threat model — the full contract is in [`RULES.md`](RULES.md)
+Nine rules, one threat model — the full contract is in [`RULES.md`](RULES.md)
 and the reasoning in [`THREAT_MODEL.md`](THREAT_MODEL.md).
 
 | Rule                        | Severity | Fires when                                                                                                                                                                                |
@@ -98,7 +98,7 @@ jobs:
       - uses: actions/checkout@v4
       # Pin an immutable release tag. The floating `v0` is moved to each
       # release only after its published-Action smoke passes.
-      - uses: David-Wu1119/agentci-guard@v0.4.0
+      - uses: David-Wu1119/agentci-guard@v0.5.0
         with:
           path: .
           sarif: agentci-results.sarif
@@ -116,7 +116,7 @@ codes and appends the same note to the step summary, so a step with zero
 findings cannot look clean when the analyzer did not finish:
 
 ```yaml
-- uses: David-Wu1119/agentci-guard@v0.4.0
+- uses: David-Wu1119/agentci-guard@v0.5.0
   id: agentci
   with:
     fail-on: none
@@ -126,9 +126,16 @@ findings cannot look clean when the analyzer did not finish:
 
 ### CLI
 
+The npm registry may lag the Action release (publication is a separate,
+human-authorized step; see [`docs/OPERATIONS.md`](docs/OPERATIONS.md)). To
+evaluate exactly the tested candidate, install the tarball attached to the
+release — its SHA-256 is in the release notes and in
+`evidence/sprint-2026-09-05/day4/`:
+
 ```bash
-npx agentci-guard scan .            # npm may lag the Action release; see below
-npm install -g agentci-guard && agentci scan .
+npm install -g https://github.com/David-Wu1119/agentci-guard/releases/download/v0.5.0/agentci-guard-0.5.0.tgz
+agentci --version                   # 0.5.0
+agentci scan . --fail-on none       # report-only for a first trial; diagnostics stay visible
 
 agentci scan . --json
 agentci scan . --sarif agentci-results.sarif
@@ -182,7 +189,7 @@ docker run --rm -v "$PWD:/scan:ro" -v "$PWD/out:/out" agentci-guard \
 ```yaml
 repos:
   - repo: https://github.com/David-Wu1119/agentci-guard
-    rev: v0.4.0
+    rev: v0.5.0
     hooks:
       - id: agentci-guard
 ```
