@@ -203,13 +203,31 @@ export async function run(
           : renderOrgMarkdownReport(result),
       );
 
+      // Same contract as `scan` and the Action: an error diagnostic (a workflow
+      // that failed to parse, a repository that could not be fetched) exits 1
+      // regardless of --fail-on, because a report with holes must not read as
+      // clean. Error outranks the finding threshold.
       const fetchFailures = result.repositories.filter((entry) =>
         entry.skipped?.startsWith("fetch failed"),
       );
-      if (fetchFailures.length > 0) {
-        io.error(
-          `${fetchFailures.length} repositor${fetchFailures.length === 1 ? "y" : "ies"} could not be fetched; see the Skipped section.`,
-        );
+      const scanErrors = result.diagnostics.filter(
+        (diagnostic) =>
+          diagnostic.severity === "error" &&
+          diagnostic.code !== "agentci/org-fetch-failed",
+      );
+      if (fetchFailures.length > 0 || scanErrors.length > 0) {
+        const reasons: string[] = [];
+        if (fetchFailures.length > 0) {
+          reasons.push(
+            `${fetchFailures.length} repositor${fetchFailures.length === 1 ? "y" : "ies"} could not be fetched; see the Skipped section`,
+          );
+        }
+        if (scanErrors.length > 0) {
+          reasons.push(
+            `${scanErrors.length} workflow(s) failed to parse or analyze; see the Incomplete analysis section`,
+          );
+        }
+        io.error(`${reasons.join(". ")}.`);
         exitCode = 1;
         return;
       }

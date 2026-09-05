@@ -26,7 +26,7 @@ precision or recall figure in any public material.
 What can truthfully be said today:
 
 - Eight rules, one threat model, documented in [`RULES.md`](../RULES.md).
-- Deterministic regression against a 38-case adversarial corpus and a frozen
+- Deterministic regression against a 40-case adversarial corpus and a frozen
   152-workflow real-world benchmark, both reproducible from the repository.
   The benchmark is **development and regression evidence**: its v3 evaluation
   split was opened during detector correction on 2–5 September 2026 and may
@@ -203,7 +203,14 @@ in. Preserve that distinction when adding a pattern.
 A quick audit for stale patterns: run the 16 held-out diversity cases
 (`benchmark/snapshots/holdout-*`) and confirm each reports at least one agent
 usage or an explicit unresolvable-workflow diagnostic. A confident clean scan
-on a workflow that visibly names an agent is the failure to look for.
+on a workflow that visibly names an agent is the failure to look for. Two of
+the sixteen are expected negatives and stay that way: `holdout-aider-003` only
+installs `aider-chat` and runs `aider --version` (an installation check, not
+an execution — the `--version` exclusion is deliberate), and
+`holdout-openhands-002` names OpenHands only in a YAML comment while the
+invocation lives in a runner-side script the analyzer cannot see (a documented
+limit, and that scan is already marked incomplete). Any other clean result is
+a defect. Recorded 2026-09-05 in `evidence/sprint-2026-09-05/day7/`.
 
 ## Known limits that are not bugs
 

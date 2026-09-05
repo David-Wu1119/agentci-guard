@@ -13253,7 +13253,16 @@ var AI_AGENT_ACTION_PATTERNS = [
   /\bcontinuedev\//i,
   /\bblock\/goose\b|\bgoose-ai\//i,
   /\bgithub\/copilot[\w-]*agent/i,
-  /\bopenai\/codex[\w-]*/i
+  /\bopenai\/codex[\w-]*/i,
+  // Google's Gemini CLI action and its archived predecessor. Exact repository
+  // names, because the google-github-actions organization also publishes
+  // auth, setup-gcloud, and deploy actions that are not agents. Its action.yml
+  // (upstream main, read 2026-09-05) defaults `github_issue_number` and
+  // `github_pr_number` to the triggering event's payload and takes a
+  // `settings` JSON that configures MCP servers, so it operates on the event
+  // like the other agent actions; it documents no write-access gate.
+  /\bgoogle-github-actions\/run-gemini-cli(?=@|\s|$)/i,
+  /\bgoogle-gemini\/gemini-cli-action(?=@|\s|$)/i
 ];
 var AI_AGENT_CLI_PATTERNS = [
   /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|npx|uvx)\s+)*claude(?=[\s;&|)]|$)(?![ \t]+(?:--version|--help|-h)(?:[\s;&|)]|$))/im,
@@ -14804,12 +14813,26 @@ async function scanOrganization(org, options = {}) {
     low: 0
   };
   for (const finding of findings) summary[finding.severity]++;
-  const diagnostics = scanned.flatMap(
-    (entry) => entry.result.diagnostics.map((diagnostic) => ({
-      ...diagnostic,
-      file: `${entry.repository}/${diagnostic.file}`
-    }))
-  );
+  const diagnostics = [
+    ...scanned.flatMap(
+      (entry) => entry.result.diagnostics.map((diagnostic) => ({
+        ...diagnostic,
+        file: `${entry.repository}/${diagnostic.file}`
+      }))
+    ),
+    // A repository that could not be fetched is a hole in the report. It is
+    // recorded as an error diagnostic so SARIF and JSON consumers see which
+    // repository and why; archived and fork skips are exclusions, not errors.
+    ...results.filter((entry) => entry.skipped?.startsWith("fetch failed")).map(
+      (entry) => ({
+        code: "agentci/org-fetch-failed",
+        kind: "analysis",
+        severity: "error",
+        file: `${entry.repository}/.github/workflows`,
+        message: `Repository ${entry.repository} could not be fetched and was not analyzed: ${entry.skipped.replace(/^fetch failed: /, "")}`
+      })
+    )
+  ];
   return {
     scanned_at: (/* @__PURE__ */ new Date()).toISOString(),
     org,

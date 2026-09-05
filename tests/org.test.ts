@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { run, type CliIo } from "../src/cli.js";
 import { renderOrgMarkdownReport, scanOrganization } from "../src/org.js";
+import { toSarif } from "../src/sarif.js";
 
 // A fake GitHub API: enough of /orgs, /users, and /contents to exercise
 // pagination, the user-account fallback, archived/fork skipping, a repository
@@ -422,8 +423,10 @@ describe("scanOrganization completeness categories", () => {
       result.scanned_count,
     );
     expect(result.analysis_complete).toBe(false);
-    // Diagnostics travel with the result, prefixed like findings are.
+    // Diagnostics travel with the result, prefixed like findings are; since
+    // review finding 2 (v0.6.0) a fetch failure is one of them.
     expect(result.diagnostics.map((d) => d.file).sort()).toEqual([
+      "acme/broken-fetch/.github/workflows",
       "acme/clean-incomplete/.github/workflows/ci.yml",
       "acme/findings-incomplete/.github/workflows/d.yml",
     ]);
@@ -444,5 +447,123 @@ describe("scanOrganization completeness categories", () => {
     expect(md).toMatch(
       /acme\/clean-incomplete: agentci\/analysis-remote-reusable-workflow/,
     );
+  });
+});
+
+// Review findings 1 and 2 (2026-09-05).
+describe("agentci org: error diagnostics and fetch failures are not swallowed", () => {
+  function captureIo(): CliIo & { logs: string[]; errors: string[] } {
+    const logs: string[] = [];
+    const errors: string[] = [];
+    return {
+      logs,
+      errors,
+      log: (m) => logs.push(m),
+      error: (m) => errors.push(m),
+    };
+  }
+  const BROKEN = "on: [push\njobs: {}\n";
+  const parseFailure: Repo[] = [
+    { full_name: "acme/hardened", workflows: { "ci.yml": HARDENED } },
+    { full_name: "acme/broken-yaml", workflows: { "broken.yml": BROKEN } },
+  ];
+
+  it("exits 1 on a parse error even at --fail-on none, and still writes the report (finding 1)", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "agentci-org-err-"));
+    const md = path.join(dir, "org.md");
+    const sarif = path.join(dir, "org.sarif");
+    const io = captureIo();
+    const code = await run(
+      [
+        "node",
+        "agentci",
+        "org",
+        "acme",
+        "--fail-on",
+        "none",
+        "--markdown",
+        md,
+        "--sarif",
+        sarif,
+        "--json",
+      ],
+      io,
+      {},
+      { fetch: fakeGitHub("acme", parseFailure).fetcher },
+    );
+    expect(code).toBe(1);
+    expect(io.errors.join("\n")).toMatch(/1 workflow\(s\) failed to parse/);
+    const printed = JSON.parse(io.logs.join("\n")) as {
+      analysis_complete: boolean;
+    };
+    expect(printed.analysis_complete).toBe(false);
+    expect(await fs.readFile(md, "utf8")).toContain(
+      "organization report: acme",
+    );
+    const exported = JSON.parse(await fs.readFile(sarif, "utf8")) as {
+      runs: Array<{
+        invocations: Array<{
+          executionSuccessful: boolean;
+          toolExecutionNotifications: Array<{
+            descriptor: { id: string };
+            level: string;
+          }>;
+        }>;
+      }>;
+    };
+    expect(exported.runs[0].invocations[0].executionSuccessful).toBe(false);
+    expect(
+      exported.runs[0].invocations[0].toolExecutionNotifications.map(
+        (n) => `${n.descriptor.id}/${n.level}`,
+      ),
+    ).toEqual(["agentci/parse-error/error"]);
+  });
+
+  it("exits 1 on a parse error at the default threshold too: error outranks findings (finding 1)", async () => {
+    const io = captureIo();
+    const code = await run(
+      ["node", "agentci", "org", "acme"],
+      io,
+      {},
+      { fetch: fakeGitHub("acme", parseFailure).fetcher },
+    );
+    expect(code).toBe(1);
+  });
+
+  it("records a fetch failure as an error diagnostic that reaches SARIF; deliberate skips do not (finding 2)", async () => {
+    const result = await scanOrganization("acme", {
+      fetch: fakeGitHub("acme", REPOS).fetcher,
+    });
+    const fetchDiagnostics = result.diagnostics.filter(
+      (d) => d.code === "agentci/org-fetch-failed",
+    );
+    expect(fetchDiagnostics).toHaveLength(1);
+    expect(fetchDiagnostics[0]).toMatchObject({
+      severity: "error",
+      kind: "analysis",
+      file: "acme/broken-fetch/.github/workflows",
+    });
+    expect(fetchDiagnostics[0].message).toMatch(
+      /GitHub API 500 listing workflows/,
+    );
+    // Archived and fork skips are exclusions, not failures.
+    expect(
+      result.diagnostics.some(
+        (d) =>
+          d.file.startsWith("acme/archived") || d.file.startsWith("acme/fork"),
+      ),
+    ).toBe(false);
+
+    const sarif = toSarif(result).runs[0];
+    expect(sarif.invocations?.[0]?.executionSuccessful).toBe(false);
+    const notification =
+      sarif.invocations?.[0]?.toolExecutionNotifications.find(
+        (n) => n.descriptor.id === "agentci/org-fetch-failed",
+      );
+    expect(notification?.level).toBe("error");
+    expect(
+      notification?.locations?.[0]?.physicalLocation.artifactLocation.uri,
+    ).toBe("acme/broken-fetch/.github/workflows");
+    expect(notification?.message.text).toMatch(/acme\/broken-fetch/);
   });
 });

@@ -1,0 +1,159 @@
+
+ RUN  v4.1.10 /Users/davidwu/Documents/Codex/agentci-guard
+
+ ❯ tests/agent-gemini.test.ts (7 tests | 6 failed) 13ms
+     × recognizes the exact action and its archived predecessor, not the vendor's other actions 4ms
+     × flags untrusted comment text reaching Gemini in a write-token job (review finding 3 fixture) 5ms
+     × still flags the write-token job without interpolation: the action operates on the event's issue itself 1ms
+     × does not raise the three privileged-agent rules on schedule/dispatch triggers (the u-06 shape) 1ms
+     × does not raise untrusted-ai-write-token when the job is read-only 1ms
+     × raises pull-request-target-ai when reachable on pull_request_target without a gate 1ms
+ ❯ tests/org.test.ts (16 tests | 3 failed) 57ms
+     × exits 1 on a parse error even at --fail-on none, and still writes the report (finding 1) 4ms
+     × exits 1 on a parse error at the default threshold too: error outranks findings (finding 1) 1ms
+     × records a fetch failure as an error diagnostic that reaches SARIF; deliberate skips do not (finding 2) 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 9 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/agent-gemini.test.ts > google-github-actions/run-gemini-cli is an agent action > recognizes the exact action and its archived predecessor, not the vendor's other actions
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ tests/agent-gemini.test.ts:47:74
+     45| describe("google-github-actions/run-gemini-cli is an agent action", ()…
+     46|   it("recognizes the exact action and its archived predecessor, not th…
+     47|     expect(looksLikeAiAction("google-github-actions/run-gemini-cli@v0"…
+       |                                                                          ^
+     48|       true,
+     49|     );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/9]⎯
+
+ FAIL  tests/agent-gemini.test.ts > google-github-actions/run-gemini-cli is an agent action > flags untrusted comment text reaching Gemini in a write-token job (review finding 3 fixture)
+AssertionError: expected [] to include 'agentci/untrusted-ai-write-token'
+ ❯ tests/agent-gemini.test.ts:69:19
+     67|   it("flags untrusted comment text reaching Gemini in a write-token jo…
+     68|     const found = rules(RISKY);
+     69|     expect(found).toContain(UAWT);
+       |                   ^
+     70|     expect(found).toContain(PROMPT);
+     71|     expect(found).not.toContain(GATED); // no documented write-access …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/9]⎯
+
+ FAIL  tests/agent-gemini.test.ts > google-github-actions/run-gemini-cli is an agent action > still flags the write-token job without interpolation: the action operates on the event's issue itself
+AssertionError: expected [] to include 'agentci/untrusted-ai-write-token'
+ ❯ tests/agent-gemini.test.ts:78:19
+     76|       RISKY.replace("          prompt: ${{ github.event.comment.body }…
+     77|     );
+     78|     expect(found).toContain(UAWT);
+       |                   ^
+     79|     expect(found).not.toContain(PROMPT);
+     80|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/9]⎯
+
+ FAIL  tests/agent-gemini.test.ts > google-github-actions/run-gemini-cli is an agent action > does not raise the three privileged-agent rules on schedule/dispatch triggers (the u-06 shape)
+AssertionError: expected [] to include 'agentci/broad-write-permissions'
+ ❯ tests/agent-gemini.test.ts:95:19
+     93|     expect(found).not.toContain(PRT);
+     94|     // It is still an agent: hygiene rules that only need an agent ste…
+     95|     expect(found).toContain("agentci/broad-write-permissions");
+       |                   ^
+     96|   });
+     97|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/9]⎯
+
+ FAIL  tests/agent-gemini.test.ts > google-github-actions/run-gemini-cli is an agent action > does not raise untrusted-ai-write-token when the job is read-only
+AssertionError: expected [] to include 'agentci/untrusted-input-in-prompt'
+ ❯ tests/agent-gemini.test.ts:101:19
+     99|     const found = rules(RISKY.replace("contents: write", "contents: re…
+    100|     expect(found).not.toContain(UAWT);
+    101|     expect(found).toContain(PROMPT);
+       |                   ^
+    102|   });
+    103|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/9]⎯
+
+ FAIL  tests/agent-gemini.test.ts > google-github-actions/run-gemini-cli is an agent action > raises pull-request-target-ai when reachable on pull_request_target without a gate
+AssertionError: expected [] to include 'agentci/pull-request-target-ai'
+ ❯ tests/agent-gemini.test.ts:107:7
+    105|     expect(
+    106|       rules(RISKY.replace("on: issue_comment", "on: pull_request_targe…
+    107|     ).toContain(PRT);
+       |       ^
+    108|   });
+    109|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/9]⎯
+
+ FAIL  tests/org.test.ts > agentci org: error diagnostics and fetch failures are not swallowed > exits 1 on a parse error even at --fail-on none, and still writes the report (finding 1)
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ tests/org.test.ts:492:18
+    490|       { fetch: fakeGitHub("acme", parseFailure).fetcher },
+    491|     );
+    492|     expect(code).toBe(1);
+       |                  ^
+    493|     expect(io.errors.join("\n")).toMatch(/1 workflow\(s\) failed to pa…
+    494|     const printed = JSON.parse(io.logs.join("\n")) as {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/9]⎯
+
+ FAIL  tests/org.test.ts > agentci org: error diagnostics and fetch failures are not swallowed > exits 1 on a parse error at the default threshold too: error outranks findings (finding 1)
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ tests/org.test.ts:528:18
+    526|       { fetch: fakeGitHub("acme", parseFailure).fetcher },
+    527|     );
+    528|     expect(code).toBe(1);
+       |                  ^
+    529|   });
+    530|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/9]⎯
+
+ FAIL  tests/org.test.ts > agentci org: error diagnostics and fetch failures are not swallowed > records a fetch failure as an error diagnostic that reaches SARIF; deliberate skips do not (finding 2)
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ tests/org.test.ts:538:30
+    536|       (d) => d.code === "agentci/org-fetch-failed",
+    537|     );
+    538|     expect(fetchDiagnostics).toHaveLength(1);
+       |                              ^
+    539|     expect(fetchDiagnostics[0]).toMatchObject({
+    540|       severity: "error",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/9]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  9 failed | 14 passed (23)
+   Start at  15:04:00
+   Duration  274ms (transform 99ms, setup 0ms, import 242ms, tests 71ms, environment 0ms)
+

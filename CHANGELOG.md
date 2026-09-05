@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-05
+
+Corrective release for the three findings of the 2026-09-05 external review.
+The detector changes (Gemini), so this is a new candidate identity; the Day 5
+spot-check case u-06 is development material from this version on.
+
+### Added
+
+- `google-github-actions/run-gemini-cli` and its archived predecessor
+  `google-gemini/gemini-cli-action` are recognized as agent actions (review
+  finding 3). Before, a workflow handing `github.event.comment.body` to Gemini
+  in a job with `contents: write` scanned as no agent, no findings, analysis
+  complete. Exact repository names only: the vendor's `auth`, `setup-gcloud`,
+  and `deploy-*` actions stay silent (pinned by the new `gemini-lookalike`
+  corpus case). Semantics were read from the action's `action.yml`: its
+  `github_issue_number`/`github_pr_number` inputs default to the triggering
+  event's payload and `settings` configures MCP servers, so it is treated like
+  the other agent actions — presumed to operate on the event, no documented
+  write-access gate. `tests/agent-gemini.test.ts` covers the risky shape with
+  and without interpolation, the schedule/dispatch shape (no privileged-agent
+  finding), read-only, `pull_request_target`, and five lookalikes. Corpus grows
+  to 40 cases (`gemini-write`, `gemini-lookalike`); no existing expectation
+  changed. Frozen benchmark: no snapshot references either action, so 0 of 152
+  cases changed.
+- Organization scans record a repository that could not be fetched as an
+  error diagnostic `agentci/org-fetch-failed` naming the repository and the
+  reason, so exported SARIF carries it as a notification instead of an
+  unexplained `executionSuccessful: false` (review finding 2). Archived and
+  fork exclusions remain skips, not diagnostics.
+
+### Fixed
+
+- `agentci org` exits 1 when any fetched workflow fails to parse, at every
+  `--fail-on` value, matching `scan` and the Action (review finding 1). It
+  previously checked only fetch failures and finding thresholds, so a malformed
+  workflow yielded exit 0 with `analysis_complete: false`. Error outranks the
+  finding threshold; the Markdown and SARIF reports are still written.
+
 ## [0.5.1] - 2026-09-05
 
 ### Fixed
@@ -16,8 +54,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Node resolves through symlinks, with `process.argv[1]`, which it does not;
   on mismatch the module loaded, did nothing, and exited 0. Every `npm
 install -g` bin entry is a symlink, so `agentci --version` and `agentci scan`
-  from a global install printed nothing and exited 0 at v0.5.0 (and earlier
-  versions with the same guard). Found on 2026-09-05 when the Day 5 spot check
+  from a global install printed nothing and exited 0 at v0.2.0 through v0.5.0
+  (the guard was introduced on 2026-09-03 in `bb76b6b`; v0.1.0 and v0.1.1 call
+  `main()` unconditionally and are not affected — range corrected 2026-09-05
+  after review). Found on 2026-09-05 when the Day 5 spot check
   ran the release tarball from macOS `/tmp`, itself a symlink. The comparison
   now resolves the argv path with `realpathSync` first (`isInvokedAsScript`,
   unit-tested with a symlinked file and against the committed bundle through a

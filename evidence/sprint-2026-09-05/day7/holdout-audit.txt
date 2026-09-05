@@ -1,0 +1,16 @@
+holdout-aider-001 agents 0 OK
+holdout-aider-002 agents 0 OK
+holdout-aider-003 agents 0 FAIL: confident clean scan
+holdout-aider-004 agents 0 OK
+holdout-codex-001 agents 1 OK
+holdout-codex-002 agents 4 OK
+holdout-codex-003 agents 1 OK
+holdout-codex-004 agents 1 OK
+holdout-cursor-001 agents 1 OK
+holdout-cursor-002 agents 1 OK
+holdout-cursor-003 agents 3 OK
+holdout-cursor-004 agents 1 OK
+holdout-openhands-001 agents 0 OK
+holdout-openhands-002 agents 0 FAIL: confident clean scan
+holdout-openhands-003 agents 0 OK
+holdout-openhands-004 agents 0 OK

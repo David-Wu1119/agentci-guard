@@ -1201,6 +1201,84 @@
       },
       "rationale": "Identical to gated-write except allowed_non_write_users: '*', which the action's docs call a significant security risk: the default gate is disabled for every account, so the finding is critical. Pins the boundary from the other side.",
       "assumption_sources": ["event-security", "project-rule-contract"]
+    },
+    {
+      "id": "gemini-write",
+      "path": "cases/gemini-write",
+      "targets": [
+        "agent detection: google-github-actions/run-gemini-cli",
+        "project-rule-contract"
+      ],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["issue_comment"],
+        "findings": [
+          {
+            "rule_id": "agentci/untrusted-ai-write-token",
+            "severity": "critical",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/untrusted-input-in-prompt",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2,
+              "step": "step 1"
+            }
+          },
+          {
+            "rule_id": "agentci/ai-with-secrets",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/broad-write-permissions",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "Review finding 3 (2026-09-05): the Gemini CLI action was absent from the detector, so untrusted comment text reaching Gemini in a write-token job scanned as no agent, no findings, complete. The action operates on the triggering event's issue or PR (its github_issue_number and github_pr_number inputs default to the payload) and documents no write-access gate, so it is treated like the other agent actions.",
+      "assumption_sources": ["event-security", "project-rule-contract"]
+    },
+    {
+      "id": "gemini-lookalike",
+      "path": "cases/gemini-lookalike",
+      "targets": [
+        "agent detection precision: same vendor organization, non-agent actions"
+      ],
+      "subject": {
+        "file": ".github/workflows/deploy.yml",
+        "job": "deploy"
+      },
+      "expected": {
+        "reachable_events": ["issue_comment"],
+        "findings": [],
+        "agent_usages": [],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "google-github-actions publishes auth, setup-gcloud, and deploy actions that are not agents. Matching the organization instead of the exact repository would flag ordinary deployment workflows; this case pins that they stay silent even on an untrusted event with a write token.",
+      "assumption_sources": ["project-rule-contract"]
     }
   ]
 }

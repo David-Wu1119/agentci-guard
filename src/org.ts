@@ -140,12 +140,28 @@ export async function scanOrganization(
     low: 0,
   };
   for (const finding of findings) summary[finding.severity]++;
-  const diagnostics = scanned.flatMap((entry) =>
-    (entry.result as ScanResult).diagnostics.map((diagnostic) => ({
-      ...diagnostic,
-      file: `${entry.repository}/${diagnostic.file}`,
-    })),
-  );
+  const diagnostics: Diagnostic[] = [
+    ...scanned.flatMap((entry) =>
+      (entry.result as ScanResult).diagnostics.map((diagnostic) => ({
+        ...diagnostic,
+        file: `${entry.repository}/${diagnostic.file}`,
+      })),
+    ),
+    // A repository that could not be fetched is a hole in the report. It is
+    // recorded as an error diagnostic so SARIF and JSON consumers see which
+    // repository and why; archived and fork skips are exclusions, not errors.
+    ...results
+      .filter((entry) => entry.skipped?.startsWith("fetch failed"))
+      .map(
+        (entry): Diagnostic => ({
+          code: "agentci/org-fetch-failed",
+          kind: "analysis",
+          severity: "error",
+          file: `${entry.repository}/.github/workflows`,
+          message: `Repository ${entry.repository} could not be fetched and was not analyzed: ${(entry.skipped as string).replace(/^fetch failed: /, "")}`,
+        }),
+      ),
+  ];
 
   return {
     scanned_at: new Date().toISOString(),

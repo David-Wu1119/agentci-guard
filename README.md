@@ -32,7 +32,7 @@ silently disabled by a vendor rename, a status-function trap, and literal-login
 gates the model did not recognize — and every critical finding was then
 hand-read against the agent vendor's documented defaults, which is what
 produced the `gated-ai-write-token` severity. Each is recorded with its measured
-effect in [`CHANGELOG.md`](CHANGELOG.md). A 38-case adversarial corpus is
+effect in [`CHANGELOG.md`](CHANGELOG.md). A 40-case adversarial corpus is
 frozen and has overruled two proposed changes; both times it was right.
 
 The benchmark's evaluation split is **no longer held out**: it was opened
@@ -98,7 +98,7 @@ jobs:
       - uses: actions/checkout@v4
       # Pin an immutable release tag. The floating `v0` is moved to each
       # release only after its published-Action smoke passes.
-      - uses: David-Wu1119/agentci-guard@v0.5.1
+      - uses: David-Wu1119/agentci-guard@v0.6.0
         with:
           path: .
           sarif: agentci-results.sarif
@@ -116,7 +116,7 @@ codes and appends the same note to the step summary, so a step with zero
 findings cannot look clean when the analyzer did not finish:
 
 ```yaml
-- uses: David-Wu1119/agentci-guard@v0.5.1
+- uses: David-Wu1119/agentci-guard@v0.6.0
   id: agentci
   with:
     fail-on: none
@@ -133,8 +133,8 @@ release — its SHA-256 is in the release notes and in
 `evidence/sprint-2026-09-05/day4/`:
 
 ```bash
-npm install -g https://github.com/David-Wu1119/agentci-guard/releases/download/v0.5.1/agentci-guard-0.5.1.tgz
-agentci --version                   # 0.5.1
+npm install -g https://github.com/David-Wu1119/agentci-guard/releases/download/v0.6.0/agentci-guard-0.6.0.tgz
+agentci --version                   # 0.6.0
 agentci scan . --fail-on none       # report-only for a first trial; diagnostics stay visible
 
 agentci scan . --json
@@ -189,7 +189,7 @@ docker run --rm -v "$PWD:/scan:ro" -v "$PWD/out:/out" agentci-guard \
 ```yaml
 repos:
   - repo: https://github.com/David-Wu1119/agentci-guard
-    rev: v0.5.1
+    rev: v0.6.0
     hooks:
       - id: agentci-guard
 ```
