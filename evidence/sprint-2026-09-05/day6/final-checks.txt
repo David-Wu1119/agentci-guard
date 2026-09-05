@@ -1,0 +1,37 @@
+# Final checks — 2026-09-05T18:31:17Z
+commit: 88f68390118dc276ebfbf9d4f7c65d4c081a76ab (code identical to origin/main 69613119330324346ed215148db7d672b4e2fd69 = v0.5.1 release commit; this branch adds only evidence/ and .gitignore)
+node v24.16.0, pnpm 10.11.0
+
+$ pnpm check
+Verified deterministic review plan with 5676/7056 units.
+Verified 6-case, 168-unit development-only annotation pilot without consulting scanner predictions or evaluation content.
+Validated schemas and blank annotation registries (7056 primary units; 5676 planned for independent review). Human labels are still absent.
+exit=0
+
+$ node scripts/audit-dependencies.mjs --level high
+audit clean at level high (attempt 1): low=1
+exit=0
+
+$ pnpm benchmark:smoke
+> agentci-guard@0.5.1 benchmark:smoke /Users/davidwu/Documents/Codex/agentci-guard
+> node scripts/benchmark/smoke-annotation-toolchain.mjs
+
+Annotation and scoring toolchain smoke passed with synthetic temporary labels; no benchmark labels or metrics were created.
+exit=0
+
+$ pnpm package:smoke
+
+npm warn Unknown env config "verify-deps-before-run". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "_jsr-registry". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+Verified packed Action and CLI run from the extracted tarball without node_modules (agentci-guard-0.5.1.tgz, sha256 498ad03b588c…, 10 checks).
+exit=0
+
+$ node scripts/verify-action-manifest.mjs
+Verified action.yml uses the self-contained committed Node 24 Action bundle with the documented inputs and outputs.
+exit=0
+
+$ git status --short
+?? evidence/sprint-2026-09-05/day6/
+exit=0 (1 lines; the only untracked path is this file's directory)
+$ git diff --stat origin/main -- . ':!evidence' ':!.gitignore'
+(empty = code identical to main)
