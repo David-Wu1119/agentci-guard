@@ -13,7 +13,10 @@ function ruleIds(raw: string): Set<string> {
 
 // The dominant real-world shape: the agent action fetches issue, comment, and
 // pull-request content itself through its own token, so the workflow contains
-// no interpolation of untrusted context for a static reader to find.
+// no interpolation of untrusted context for a static reader to find. With
+// anthropics/claude-code-action's default write-access gate intact, the
+// write-token finding is agentci/gated-ai-write-token (high); the point of
+// these tests is that ingestion is recognized at all.
 describe("agent actions that fetch untrusted content themselves", () => {
   it("flags an agent action reachable on an untrusted event with write permissions", () => {
     const rules = ruleIds(`
@@ -32,7 +35,7 @@ jobs:
         with:
           claude_code_oauth_token: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 `);
-    expect(rules).toContain("agentci/untrusted-ai-write-token");
+    expect(rules).toContain("agentci/gated-ai-write-token");
   });
 
   it("does not mislabel self-fetched content as prompt interpolation", () => {
@@ -50,7 +53,7 @@ jobs:
         with:
           claude_code_oauth_token: \${{ secrets.TOKEN }}
 `);
-    expect(rules).toContain("agentci/untrusted-ai-write-token");
+    expect(rules).toContain("agentci/gated-ai-write-token");
     expect(rules).not.toContain("agentci/untrusted-input-in-prompt");
   });
 
@@ -70,7 +73,7 @@ jobs:
           prompt: "Fix \${{ github.event.issue.title }}"
 `);
     expect(rules).toContain("agentci/untrusted-input-in-prompt");
-    expect(rules).toContain("agentci/untrusted-ai-write-token");
+    expect(rules).toContain("agentci/gated-ai-write-token");
   });
 
   it("respects an actor gate on a self-fetching agent action", () => {

@@ -153,6 +153,27 @@ declare const AI_AGENT_ACTION_PATTERNS: RegExp[];
 declare const AI_AGENT_CLI_PATTERNS: RegExp[];
 declare const AI_AGENT_API_PATTERNS: RegExp[];
 declare const AI_AGENT_PATTERNS: RegExp[];
+/**
+ * anthropics/claude-code-action refuses to run for users without repository
+ * write access by default (docs/security.md: "The action can only be
+ * triggered by users with write access to the repository. This is checked for
+ * issue, pull request, comment, and review events"). The lower-level
+ * claude-code-base-action performs no such check and is deliberately excluded.
+ */
+declare function isSelfGatingAgentAction(uses: string): boolean;
+/**
+ * The default gate is removed by allowlisting non-write users or bots. The
+ * docs mark `allowed_non_write_users` "a significant security risk" and note
+ * that `allowed_bots` entries are not permission-checked at all, so any
+ * non-empty value for either counts as a bypass.
+ */
+declare function hasAgentGateBypass(withBlock: unknown): boolean;
+/**
+ * Events on which the action's docs state the write-access check applies.
+ * `discussion`, `discussion_comment`, and `pull_request_target` are not listed;
+ * a job reachable on any of those keeps its full severity.
+ */
+declare const SELF_GATED_EVENTS: Set<string>;
 declare function looksLikeAiUsage(value: string): boolean;
 declare function looksLikeAiAction(value: string): boolean;
 /**
@@ -297,4 +318,4 @@ declare function narrowEvents(events: string[], rawCondition: unknown): Reachabi
  */
 declare function hasTrustedActorGate(rawCondition: unknown): boolean;
 
-export { AI_AGENT_ACTION_PATTERNS, AI_AGENT_API_PATTERNS, AI_AGENT_CLI_PATTERNS, AI_AGENT_PATTERNS, type AgentUsage, type AgentciConfig, type Diagnostic, type EffectivePermissions, type FailOn, type Finding, type OrgRepository, type OrgRepositoryResult, type OrgScanOptions, type OrgScanResult, type PermissionDefault, type PermissionLevel, RULES, type Reachability, type RuleDefinition, SENSITIVE_WRITE_SCOPES, SEVERITY_ORDER, type SarifLog, type ScanOptions, type ScanResult, type Severity, UNTRUSTED_EVENTS, type WorkflowFile, containsSecretReference, containsShellAccess, containsUntrustedGitHubContext, describePermissions, formatGithubOutputs, hasFindingAtOrAbove, hasSensitiveWrite, hasTrustedActorGate, hasUnknownSensitivePermission, isPinnedAction, loadConfig, loadWorkflowFiles, looksLikeAiAction, looksLikeAiCli, looksLikeAiUsage, matchesPath, mergeEnvironment, narrowEvents, normalizeTriggers, parseFailOn, parseInlineIgnores, parseWorkflowFile, permissionLevel, renderMarkdownReport, renderOrgMarkdownReport, renderTextReport, resolvePermissions, scanOrganization, scanRepository, scanWorkflow, scanWorkflowFiles, toSarif, untrustedGitHubContextEvents };
+export { AI_AGENT_ACTION_PATTERNS, AI_AGENT_API_PATTERNS, AI_AGENT_CLI_PATTERNS, AI_AGENT_PATTERNS, type AgentUsage, type AgentciConfig, type Diagnostic, type EffectivePermissions, type FailOn, type Finding, type OrgRepository, type OrgRepositoryResult, type OrgScanOptions, type OrgScanResult, type PermissionDefault, type PermissionLevel, RULES, type Reachability, type RuleDefinition, SELF_GATED_EVENTS, SENSITIVE_WRITE_SCOPES, SEVERITY_ORDER, type SarifLog, type ScanOptions, type ScanResult, type Severity, UNTRUSTED_EVENTS, type WorkflowFile, containsSecretReference, containsShellAccess, containsUntrustedGitHubContext, describePermissions, formatGithubOutputs, hasAgentGateBypass, hasFindingAtOrAbove, hasSensitiveWrite, hasTrustedActorGate, hasUnknownSensitivePermission, isPinnedAction, isSelfGatingAgentAction, loadConfig, loadWorkflowFiles, looksLikeAiAction, looksLikeAiCli, looksLikeAiUsage, matchesPath, mergeEnvironment, narrowEvents, normalizeTriggers, parseFailOn, parseInlineIgnores, parseWorkflowFile, permissionLevel, renderMarkdownReport, renderOrgMarkdownReport, renderTextReport, resolvePermissions, scanOrganization, scanRepository, scanWorkflow, scanWorkflowFiles, toSarif, untrustedGitHubContextEvents };

@@ -7,6 +7,17 @@ function workflow(raw: string): WorkflowFile {
   return { path: ".github/workflows/test.yml", document: YAML.parse(raw), raw };
 }
 
+// A write-token finding of either severity proves the job was treated as
+// reachable by an untrusted actor; which one fires depends on the agent's own
+// gate, which is not what these tests exercise.
+const WRITE_TOKEN_RULES = [
+  "agentci/untrusted-ai-write-token",
+  "agentci/gated-ai-write-token",
+];
+function hasWriteTokenFinding(rules: Set<string>): boolean {
+  return WRITE_TOKEN_RULES.some((rule) => rules.has(rule));
+}
+
 function ruleIds(raw: string): Set<string> {
   return new Set(scanWorkflow(workflow(raw), ".").map((f) => f.rule_id));
 }
@@ -38,7 +49,7 @@ jobs:
     if: github.event.sender.login == github.repository_owner
     steps:${ISSUE_STEP}
 `);
-    expect(rules).not.toContain("agentci/untrusted-ai-write-token");
+    expect(hasWriteTokenFinding(rules)).toBe(false);
     expect(rules).not.toContain("agentci/untrusted-input-in-prompt");
     // Permission and pinning hygiene is independent of who can trigger.
     expect(rules).toContain("agentci/broad-write-permissions");
@@ -56,7 +67,7 @@ jobs:
     if: github.event.pull_request.head.repo.full_name == github.repository
     steps:${PR_STEP}
 `);
-    expect(rules).not.toContain("agentci/untrusted-ai-write-token");
+    expect(hasWriteTokenFinding(rules)).toBe(false);
     expect(rules).not.toContain("agentci/untrusted-input-in-prompt");
   });
 
@@ -73,7 +84,7 @@ jobs:
     if: contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
     steps:${COMMENT_STEP}
 `);
-    expect(rules).not.toContain("agentci/untrusted-ai-write-token");
+    expect(hasWriteTokenFinding(rules)).toBe(false);
   });
 
   it("still reports an ungated untrusted job", () => {
@@ -89,7 +100,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:${ISSUE_STEP}
 `);
-    expect(rules).toContain("agentci/untrusted-ai-write-token");
+    expect(hasWriteTokenFinding(rules)).toBe(true);
     expect(rules).toContain("agentci/untrusted-input-in-prompt");
   });
 
@@ -104,7 +115,7 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:${PR_STEP}
 `);
-    expect(rules).toContain("agentci/untrusted-ai-write-token");
+    expect(hasWriteTokenFinding(rules)).toBe(true);
   });
 
   it("does not trust an actor guard that only widens reachability via ||", () => {
@@ -120,7 +131,7 @@ jobs:
     if: github.event.comment.author_association == 'OWNER' || github.event.comment.body == '/fix'
     steps:${COMMENT_STEP}
 `);
-    expect(rules).toContain("agentci/untrusted-ai-write-token");
+    expect(hasWriteTokenFinding(rules)).toBe(true);
   });
 });
 

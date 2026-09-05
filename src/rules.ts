@@ -22,6 +22,19 @@ export const RULES: Record<string, RuleDefinition> = {
       "Sanitize and summarize untrusted content before passing it to an agent.",
     ],
   },
+  "agentci/gated-ai-write-token": {
+    id: "agentci/gated-ai-write-token",
+    title:
+      "Untrusted event content reaches a write-capable agent that gates on repository write access",
+    severity: "high",
+    why: "The untrusted-trigger, AI-agent, write-token pattern is present, but the agent is anthropics/claude-code-action, which by default refuses to run for users without repository write access, so a stranger's issue or comment does not reach the agent as configured. Two residual risks remain: a user with write access can act on attacker-authored content (a maintainer @-mentioning the agent on a malicious issue), and the check lives inside the action at runtime, where a bypass was disclosed in January 2026. One configuration change makes this critical.",
+    fix: [
+      "Keep the default gate: never set allowed_non_write_users, and avoid allowed_bots.",
+      "Pin the action to a commit SHA so a fixed authorization check cannot silently regress.",
+      "Prefer read-only permissions on untrusted triggers and move writes to a separate, maintainer-approved job.",
+      "Treat maintainer @-mentions on untrusted issues as a review step, not an automation trigger.",
+    ],
+  },
   "agentci/pull-request-target-ai": {
     id: "agentci/pull-request-target-ai",
     title: "AI agent runs on pull_request_target",

@@ -192,7 +192,8 @@ describe("scanOrganization", () => {
     const reusableRules = new Set(
       byName["acme/reusable"].result?.findings.map((f) => f.rule_id),
     );
-    expect(reusableRules).toContain("agentci/untrusted-ai-write-token");
+    // Bare claude-code-action on issues with the default gate intact: high, not critical.
+    expect(reusableRules).toContain("agentci/gated-ai-write-token");
 
     // Aggregated findings are prefixed with the repository.
     expect(
@@ -200,7 +201,7 @@ describe("scanOrganization", () => {
         /^acme\/[^/]+\/\.github\/workflows\//.test(f.file),
       ),
     ).toBe(true);
-    expect(result.summary.critical).toBeGreaterThanOrEqual(3);
+    expect(result.summary.critical).toBeGreaterThanOrEqual(2);
     // A fetch failure means the organization analysis is not complete.
     expect(result.analysis_complete).toBe(false);
 

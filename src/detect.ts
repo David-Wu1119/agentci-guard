@@ -116,6 +116,47 @@ const SHELL_TOOL_PATTERN = /(?:^|[\s,[("'`])(?:Bash|Shell)(?=$|[\s,(\])}"'`])/i;
 const SHELL_ARGUMENT_PATTERN =
   /(?:--allowedTools?\s+[^\n]*(?:Bash|Shell)|--dangerously-skip-permissions)\b/i;
 
+/**
+ * anthropics/claude-code-action refuses to run for users without repository
+ * write access by default (docs/security.md: "The action can only be
+ * triggered by users with write access to the repository. This is checked for
+ * issue, pull request, comment, and review events"). The lower-level
+ * claude-code-base-action performs no such check and is deliberately excluded.
+ */
+export function isSelfGatingAgentAction(uses: string): boolean {
+  return /^anthropics\/claude-code-action(?:@|$)/i.test(uses.trim());
+}
+
+/**
+ * The default gate is removed by allowlisting non-write users or bots. The
+ * docs mark `allowed_non_write_users` "a significant security risk" and note
+ * that `allowed_bots` entries are not permission-checked at all, so any
+ * non-empty value for either counts as a bypass.
+ */
+export function hasAgentGateBypass(withBlock: unknown): boolean {
+  if (!withBlock || typeof withBlock !== "object") return false;
+  for (const key of ["allowed_non_write_users", "allowed_bots"]) {
+    const value = (withBlock as Record<string, unknown>)[key];
+    if (value === undefined || value === null) continue;
+    if (typeof value === "string" && value.trim() === "") continue;
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Events on which the action's docs state the write-access check applies.
+ * `discussion`, `discussion_comment`, and `pull_request_target` are not listed;
+ * a job reachable on any of those keeps its full severity.
+ */
+export const SELF_GATED_EVENTS = new Set([
+  "issues",
+  "issue_comment",
+  "pull_request",
+  "pull_request_review",
+  "pull_request_review_comment",
+]);
+
 export function looksLikeAiUsage(value: string): boolean {
   return AI_AGENT_PATTERNS.some((pattern) => pattern.test(value));
 }

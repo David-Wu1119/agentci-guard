@@ -102,6 +102,9 @@ jobs:
     steps:
       - uses: anthropics/claude-code-action@v1
 `);
-    expect(rules).toContain("agentci/untrusted-ai-write-token");
+    // A trigger phrase is not an actor gate, so the job stays reachable and a
+    // write-token finding fires; with the action's own default gate intact it
+    // is the high variant.
+    expect(rules).toContain("agentci/gated-ai-write-token");
   });
 });

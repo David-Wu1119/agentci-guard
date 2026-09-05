@@ -69,7 +69,9 @@ describe("reusable-workflow permission ceiling", () => {
       "permissions:\n  contents: write\n  issues: write",
       "    permissions:\n      contents: write\n      issues: write",
     );
-    expect(await ruleIds(root)).toContain("agentci/untrusted-ai-write-token");
+    // Write survives the ceiling; the callee is bare claude-code-action so the
+    // write-token finding is the gated (high) variant.
+    expect(await ruleIds(root)).toContain("agentci/gated-ai-write-token");
   });
 
   it("treats a caller grant of none as none regardless of the callee", async () => {

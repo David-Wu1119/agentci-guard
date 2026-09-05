@@ -13326,6 +13326,26 @@ var SECRET_PATTERNS = [
 ];
 var SHELL_TOOL_PATTERN = /(?:^|[\s,[("'`])(?:Bash|Shell)(?=$|[\s,(\])}"'`])/i;
 var SHELL_ARGUMENT_PATTERN = /(?:--allowedTools?\s+[^\n]*(?:Bash|Shell)|--dangerously-skip-permissions)\b/i;
+function isSelfGatingAgentAction(uses) {
+  return /^anthropics\/claude-code-action(?:@|$)/i.test(uses.trim());
+}
+function hasAgentGateBypass(withBlock) {
+  if (!withBlock || typeof withBlock !== "object") return false;
+  for (const key of ["allowed_non_write_users", "allowed_bots"]) {
+    const value = withBlock[key];
+    if (value === void 0 || value === null) continue;
+    if (typeof value === "string" && value.trim() === "") continue;
+    return true;
+  }
+  return false;
+}
+var SELF_GATED_EVENTS = /* @__PURE__ */ new Set([
+  "issues",
+  "issue_comment",
+  "pull_request",
+  "pull_request_review",
+  "pull_request_review_comment"
+]);
 function looksLikeAiAction(value) {
   return AI_AGENT_ACTION_PATTERNS.some((pattern) => pattern.test(value));
 }
@@ -13404,6 +13424,18 @@ var RULES = {
       "Use read-only GITHUB_TOKEN permissions for untrusted events.",
       "Require maintainer approval before running the agent.",
       "Sanitize and summarize untrusted content before passing it to an agent."
+    ]
+  },
+  "agentci/gated-ai-write-token": {
+    id: "agentci/gated-ai-write-token",
+    title: "Untrusted event content reaches a write-capable agent that gates on repository write access",
+    severity: "high",
+    why: "The untrusted-trigger, AI-agent, write-token pattern is present, but the agent is anthropics/claude-code-action, which by default refuses to run for users without repository write access, so a stranger's issue or comment does not reach the agent as configured. Two residual risks remain: a user with write access can act on attacker-authored content (a maintainer @-mentioning the agent on a malicious issue), and the check lives inside the action at runtime, where a bypass was disclosed in January 2026. One configuration change makes this critical.",
+    fix: [
+      "Keep the default gate: never set allowed_non_write_users, and avoid allowed_bots.",
+      "Pin the action to a commit SHA so a fixed authorization check cannot silently regress.",
+      "Prefer read-only permissions on untrusted triggers and move writes to a separate, maintainer-approved job.",
+      "Treat maintainer @-mentions on untrusted issues as a review step, not an automation trigger."
     ]
   },
   "agentci/pull-request-target-ai": {
@@ -14179,6 +14211,7 @@ function analyzeWorkflow(workflow, repository, context) {
     const steps = Array.isArray(rawJob.steps) ? rawJob.steps : [];
     const jobEnvironment = mergeEnvironment(workflowEnvironment, rawJob.env);
     const aiSteps = [];
+    let untrustedInRun = false;
     for (const [index, rawStep] of steps.entries()) {
       if (!isRecord2(rawStep)) continue;
       const stepName = typeof rawStep.name === "string" ? rawStep.name : `step ${index + 1}`;
@@ -14231,6 +14264,14 @@ function analyzeWorkflow(workflow, repository, context) {
       );
       const stepActorGate = jobActorGate || hasTrustedActorGate(rawStep.if);
       const hasUntrustedSink = !stepActorGate && contextCanReach(stepReachability.events, untrustedEvents);
+      if (stepRun.trim().length > 0 && contextCanReach(
+        stepReachability.events,
+        untrustedGitHubContextEvents(
+          materializeInputs(stepRun, context.inputValues)
+        )
+      )) {
+        untrustedInRun = true;
+      }
       const hasUntrustedIngestion = hasUntrustedSink || stepUsesAiAction && !stepActorGate && stepReachability.events.some((event) => UNTRUSTED_EVENTS.has(event));
       const hasSecret = context.inheritedSecrets || containsSecretReference(JSON.stringify(effectiveEnvironment)) || containsSecretReference(
         materializeInputs(
@@ -14259,6 +14300,9 @@ function analyzeWorkflow(workflow, repository, context) {
           hasSecret,
           hasUntrustedSink,
           hasUntrustedIngestion,
+          selfGated: isSelfGatingAgentAction(
+            materializeInputs(stepUses, context.inputValues)
+          ) && !hasAgentGateBypass(rawStep.with),
           events: stepReachability.events
         });
         if (hasUntrustedSink) {
@@ -14354,17 +14398,23 @@ function analyzeWorkflow(workflow, repository, context) {
       );
     }
     if (jobHasWrite && untrustedAiSink) {
+      const ingesting = aiSteps.filter((step) => step.hasUntrustedIngestion);
+      const reachableUntrusted = unionEvents(
+        ingesting.flatMap((step) => step.events)
+      ).filter((event) => UNTRUSTED_EVENTS.has(event));
+      const gated = ingesting.every((step) => step.selfGated) && reachableUntrusted.every((event) => SELF_GATED_EVENTS.has(event)) && !untrustedInRun;
       output.findings.push(
-        makeFinding("agentci/untrusted-ai-write-token", {
-          file,
-          job: jobName,
-          evidence: untrustedViaInterpolation ? "reachable untrusted event content + AI usage + effective write permission" : "AI agent action reachable on an untrusted event reads that event's content through its own token + effective write permission",
-          line: jobLine,
-          events: unionEvents(
-            aiSteps.filter((step) => step.hasUntrustedIngestion).flatMap((step) => step.events)
-          ),
-          callChain: context.callChain
-        })
+        makeFinding(
+          gated ? "agentci/gated-ai-write-token" : "agentci/untrusted-ai-write-token",
+          {
+            file,
+            job: jobName,
+            evidence: gated ? "untrusted trigger + AI usage + effective write permission, but anthropics/claude-code-action refuses users without repository write access by default; no allowed_non_write_users / allowed_bots bypass, no pull_request_target or discussion trigger, no untrusted text in a run: step. Residual: a write-access user acting on attacker content, and any bypass in the action's own check." : untrustedViaInterpolation ? "reachable untrusted event content + AI usage + effective write permission" : "AI agent action reachable on an untrusted event reads that event's content through its own token + effective write permission",
+            line: jobLine,
+            events: unionEvents(ingesting.flatMap((step) => step.events)),
+            callChain: context.callChain
+          }
+        )
       );
     }
     if (aiSteps.some((step) => step.hasSecret)) {

@@ -25,11 +25,14 @@ recall, or F1 figure to quote, and findings should be treated as review
 hypotheses rather than a production merge gate.
 
 What has been measured: every critical finding on that benchmark was read by
-hand during development, and four detection defects were found and fixed that
+hand during development, and six detection defects were found and fixed that
 way — over-firing on correctly hardened workflows, a flagship rule that caught
-roughly 3% of what it should, blindness to agents dispatched over HTTP, and a
-rule silently disabled by a vendor rename. Each is recorded with its measured
-effect in [`CHANGELOG.md`](CHANGELOG.md). A 36-case adversarial corpus is
+roughly 3% of what it should, blindness to agents dispatched over HTTP, a rule
+silently disabled by a vendor rename, a status-function trap, and literal-login
+gates the model did not recognize — and every critical finding was then
+hand-read against the agent vendor's documented defaults, which is what
+produced the `gated-ai-write-token` severity. Each is recorded with its measured
+effect in [`CHANGELOG.md`](CHANGELOG.md). A 38-case adversarial corpus is
 frozen and has overruled two proposed changes; both times it was right.
 
 On the same 152 workflows, [zizmor](https://github.com/zizmorcore/zizmor)
@@ -48,16 +51,17 @@ production-grade detector, start there.
 Eight rules, one threat model — the full contract is in [`RULES.md`](RULES.md)
 and the reasoning in [`THREAT_MODEL.md`](THREAT_MODEL.md).
 
-| Rule                        | Severity | Fires when                                                                                    |
-| --------------------------- | -------- | --------------------------------------------------------------------------------------------- |
-| `untrusted-ai-write-token`  | critical | Untrusted event content reaches an agent in a job holding a sensitive write scope             |
-| `pull-request-target-ai`    | critical | An agent is reachable on `pull_request_target`, which runs in base-repo context with secrets  |
-| `untrusted-input-in-prompt` | high     | Attacker-controlled context is interpolated into an agent's prompt or inputs                  |
-| `ai-shell-access`           | high     | The agent step can execute shell commands                                                     |
-| `unsafe-checkout`           | high     | Untrusted PR head code is checked out without GitHub's built-in protection                    |
-| `ai-with-secrets`           | medium   | An agent job's environment references a secret — baseline exposure, not a vulnerability alone |
-| `broad-write-permissions`   | medium   | The job holds write scopes wider than its purpose needs                                       |
-| `unpinned-ai-action`        | medium   | The agent action is referenced by tag rather than commit SHA                                  |
+| Rule                        | Severity | Fires when                                                                                                                                                                                |
+| --------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `untrusted-ai-write-token`  | critical | Untrusted event content reaches an agent in a job holding a sensitive write scope                                                                                                         |
+| `gated-ai-write-token`      | high     | The same pattern, but the agent is `anthropics/claude-code-action` with its default write-access gate intact, on an event its docs say it checks, with no untrusted text in a `run:` step |
+| `pull-request-target-ai`    | critical | An agent is reachable on `pull_request_target`, which runs in base-repo context with secrets                                                                                              |
+| `untrusted-input-in-prompt` | high     | Attacker-controlled context is interpolated into an agent's prompt or inputs                                                                                                              |
+| `ai-shell-access`           | high     | The agent step can execute shell commands                                                                                                                                                 |
+| `unsafe-checkout`           | high     | Untrusted PR head code is checked out without GitHub's built-in protection                                                                                                                |
+| `ai-with-secrets`           | medium   | An agent job's environment references a secret — baseline exposure, not a vulnerability alone                                                                                             |
+| `broad-write-permissions`   | medium   | The job holds write scopes wider than its purpose needs                                                                                                                                   |
+| `unpinned-ai-action`        | medium   | The agent action is referenced by tag rather than commit SHA                                                                                                                              |
 
 Two things the reachability model understands that a trigger-only check would
 not: a job gated to the repository owner, to same-repository pull requests, or
@@ -240,16 +244,16 @@ Concretely:
 - Agent detection is a maintained list of vendors, actions, CLIs, and dispatch
   endpoints. A new or renamed agent is invisible until a pattern is added.
 - `anthropics/claude-code-action` refuses users without write access by
-  default, and this is **not modeled**: a bare `@claude` workflow on an
-  untrusted trigger is reported critical even though the action itself blocks
-  strangers unless `allowed_non_write_users` or `allowed_bots` is set. On the
-  frozen benchmark 19 of 24 confirmed critical findings are this shape. Whether
-  to report them as high instead is an open severity decision; until it is
-  made, treat a critical on a bare `claude-code-action` as "one config line
-  from exploitable," not "exploitable now."
-
-For the runtime layer, see
-[StepSecurity Harden-Runner](https://github.com/step-security/harden-runner).
+  default. That is modeled: a bare `@claude` workflow on an untrusted trigger
+  reports `gated-ai-write-token` at **high**, and stays **critical** only when
+  `allowed_non_write_users` or `allowed_bots` is set, the trigger is
+  `pull_request_target` or a discussion event, untrusted text is expanded into a
+  `run:` step, or the agent is one whose default has not been verified. The
+  gate lives inside the action at runtime — a bypass was disclosed in January
+  2026 — and a maintainer can still hand the agent attacker-authored content,
+  which is why it is high rather than gone.
+  For the runtime layer, see
+  [StepSecurity Harden-Runner](https://github.com/step-security/harden-runner).
 
 ## Development and operations
 

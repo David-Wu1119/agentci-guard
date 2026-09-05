@@ -56,7 +56,12 @@ jobs:
         with:
           prompt: \${{ github.event.comment.body }}
 `);
-    expect(rules.has("agentci/untrusted-ai-write-token")).toBe(true);
+    // contents:write is a sensitive scope, so a write-token finding fires; the
+    // bare claude-code-action fixture yields the gated (high) variant.
+    expect(
+      rules.has("agentci/untrusted-ai-write-token") ||
+        rules.has("agentci/gated-ai-write-token"),
+    ).toBe(true);
     expect(rules.has("agentci/untrusted-input-in-prompt")).toBe(true);
     expect(rules.has("agentci/broad-write-permissions")).toBe(true);
   });
