@@ -1,0 +1,10 @@
+# v0.6.0 published-tag consumer smoke and v0 move — 2026-09-05T19:14:11Z
+$ gh run view 33986381416 --json conclusion,status,event,headSha,url,createdAt
+success completed event=release head=8af758a https://github.com/David-Wu1119/agentci-guard/actions/runs/33986381416 created=2026-09-05T19:12:00Z
+(triggered by the release event for tag v0.6.0; runs the published Action David-Wu1119/agentci-guard@v0.6.0 against the vulnerable, hardened, and threshold fixtures)
+
+$ git tag -fa v0 8af758a9779a46e04b3da8e557f067cb6e9d9b3b && git push --force origin v0
+$ git ls-remote --tags origin | grep -E 'v0(\^\{\})?$|v0\.6\.0\^'
+4dca0d4ea16fd6bdd474943f18639d9db196a534	refs/tags/v0
+8af758a9779a46e04b3da8e557f067cb6e9d9b3b	refs/tags/v0^{}
+8af758a9779a46e04b3da8e557f067cb6e9d9b3b	refs/tags/v0.6.0^{}
