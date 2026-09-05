@@ -1,0 +1,61 @@
+{
+  "verified_at": "2026-09-05T18:17:17.910Z",
+  "tarball": "agentci-guard-0.5.0.tgz",
+  "sha256": "f2d0495666318ece50c9512eea1343630447f554ba2edc53d9e0bd70b7220f36",
+  "bytes": 1911628,
+  "packed_version": "0.5.0",
+  "source_commit": "38aae8895538a1a511256853c09e208f38a27d3a",
+  "working_tree_changes": 0,
+  "node": "v24.16.0",
+  "checks": [
+    {
+      "name": "packed CLI reports the packed package.json version",
+      "ok": true,
+      "detail": {
+        "packed": "0.5.0",
+        "reported": "0.5.0"
+      }
+    },
+    {
+      "name": "packed Action: examples/vulnerable emits the 9-finding SARIF baseline, analysis complete",
+      "ok": true
+    },
+    {
+      "name": "packed CLI: examples/hardened has 0 findings, analysis complete",
+      "ok": true
+    },
+    {
+      "name": "packed CLI: step-level actor gate suppresses pull-request-target-ai",
+      "ok": true,
+      "detail": [
+        "agentci/unpinned-ai-action",
+        "agentci/broad-write-permissions"
+      ]
+    },
+    {
+      "name": "packed CLI: the same workflow without the gate is critical",
+      "ok": true,
+      "detail": [
+        "agentci/unpinned-ai-action",
+        "agentci/pull-request-target-ai",
+        "agentci/untrusted-ai-write-token",
+        "agentci/broad-write-permissions"
+      ]
+    },
+    {
+      "name": "packed CLI: text report says the analysis is incomplete",
+      "ok": true
+    },
+    {
+      "name": "packed CLI: SARIF invocation reports executionSuccessful=false with one notification",
+      "ok": true
+    },
+    {
+      "name": "packed Action: incomplete analysis exits 0 at fail-on none, sets analysis-complete=false, prints ::warning::, writes step summary",
+      "ok": true,
+      "detail": {
+        "exit": 0
+      }
+    }
+  ]
+}
