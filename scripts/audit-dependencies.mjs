@@ -16,12 +16,23 @@
 // Usage: node scripts/audit-dependencies.mjs [--level high] [--attempts 8] [--wait 45]
 
 import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 // Only run when executed directly, so decide() can be imported and tested.
 const invokedAsScript =
   process.argv[1] !== undefined &&
-  import.meta.url === pathToFileURL(process.argv[1]).href;
+  import.meta.url === pathToFileURL(realpathSafe(process.argv[1])).href;
+
+function realpathSafe(file) {
+  const resolved = path.resolve(file);
+  try {
+    return fs.realpathSync(resolved);
+  } catch {
+    return resolved;
+  }
+}
 
 const args = new Map();
 for (let index = 2; index < process.argv.length; index += 2) {

@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-09-05
+
+### Fixed
+
+- The CLI ran as a no-op when invoked through a symlink. `dist/cli.js`
+  decided whether it was the main script by comparing `import.meta.url`, which
+  Node resolves through symlinks, with `process.argv[1]`, which it does not;
+  on mismatch the module loaded, did nothing, and exited 0. Every `npm
+install -g` bin entry is a symlink, so `agentci --version` and `agentci scan`
+  from a global install printed nothing and exited 0 at v0.5.0 (and earlier
+  versions with the same guard). Found on 2026-09-05 when the Day 5 spot check
+  ran the release tarball from macOS `/tmp`, itself a symlink. The comparison
+  now resolves the argv path with `realpathSync` first (`isInvokedAsScript`,
+  unit-tested with a symlinked file and against the committed bundle through a
+  symlink), and `pnpm package:smoke` installs the tarball with `npm install -g`
+  into a temporary prefix and runs the bin shim. `scripts/audit-dependencies.mjs`
+  had the same guard and gets the same fix. Detection code is unchanged; the
+  detector remains the one frozen at v0.5.0 for the spot check.
+
 ## [0.5.0] - 2026-09-05
 
 ### Added

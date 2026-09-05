@@ -253,6 +253,47 @@ jobs:
     { exit: incompleteAction.status },
   );
 
+  // The documented CLI route: a global install whose bin entry is a symlink.
+  // At v0.5.0 the entry guard compared a symlink-resolved import.meta.url with
+  // an unresolved argv[1], so this shim loaded, did nothing, and exited 0.
+  const prefix = path.join(temporary, "prefix");
+  execFileSync(
+    "npm",
+    ["install", "-g", "--prefix", prefix, "--ignore-scripts", tarballPath],
+    { stdio: "pipe" },
+  );
+  const shim = path.join(prefix, "bin", "agentci");
+  const shimVersion = spawnSync(shim, ["--version"], { encoding: "utf8" });
+  check(
+    "npm -g bin shim (a symlink) runs the CLI and reports the version",
+    shimVersion.status === 0 && shimVersion.stdout.trim() === packedVersion,
+    { status: shimVersion.status, stdout: shimVersion.stdout.trim() },
+  );
+  const shimScan = spawnSync(
+    shim,
+    [
+      "scan",
+      path.join(packageRoot, "examples", "hardened"),
+      "--json",
+      "--fail-on",
+      "none",
+    ],
+    { encoding: "utf8" },
+  );
+  let shimResult;
+  try {
+    shimResult = JSON.parse(shimScan.stdout);
+  } catch {
+    shimResult = undefined;
+  }
+  check(
+    "npm -g bin shim scans and prints JSON",
+    shimScan.status === 0 &&
+      shimResult?.workflow_count === 1 &&
+      shimResult?.findings?.length === 0,
+    { status: shimScan.status, bytes: shimScan.stdout.length },
+  );
+
   if (recordPath) {
     const git = (args) =>
       execFileSync("git", args, {
