@@ -1,0 +1,7 @@
+
+> agentci-guard@0.4.0 package:smoke /Users/davidwu/Documents/Codex/agentci-guard
+> node scripts/verify-standalone-package.mjs
+
+npm warn Unknown env config "verify-deps-before-run". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "_jsr-registry". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+Verified packed Action and CLI run from the extracted tarball without node_modules.

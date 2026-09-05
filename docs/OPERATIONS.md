@@ -28,6 +28,9 @@ What can truthfully be said today:
 - Eight rules, one threat model, documented in [`RULES.md`](../RULES.md).
 - Deterministic regression against a 38-case adversarial corpus and a frozen
   152-workflow real-world benchmark, both reproducible from the repository.
+  The benchmark is **development and regression evidence**: its v3 evaluation
+  split was opened during detector correction on 2–5 September 2026 and may
+  not be cited as held out (see `BENCHMARK.md`, "Status change, 2026-09-05").
 - Every critical finding on the benchmark was hand-read during development,
   and four detection defects were found and fixed by that process; the
   defects and their measured effects are recorded in
@@ -86,7 +89,20 @@ The committed `dist/` must match a fresh build. CI checks this; locally, run
 ## Measuring a change against the benchmark
 
 Any change to detection or reachability must report its effect on the frozen
-benchmark before it merges, as every entry in the changelog does. The pattern:
+benchmark before it merges, as every entry in the changelog does. The tool for
+this is the behavioral report:
+
+```bash
+pnpm benchmark:behavior                       # writes evidence/behavior/{cases.json,summary.md}
+node scripts/benchmark/report-behavior.mjs --compare before/cases.json after/cases.json
+```
+
+It scans exactly the manifest's cases, records findings, diagnostics, and
+completeness per case with stable ordering, splits cases four ways
+(complete/incomplete × findings/none), and lists every case that moved between
+two runs. A failure to load a case is an explicit failed row, never a dropped
+one. It is a behavioral report, not an accuracy measurement. The manual
+pattern it replaces:
 
 ```bash
 # before the change

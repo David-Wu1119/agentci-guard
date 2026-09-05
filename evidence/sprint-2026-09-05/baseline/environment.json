@@ -1,0 +1,13 @@
+{
+  "captured_at": "2026-09-05T17:47:56.055966+00:00",
+  "repository": "/Users/davidwu/Documents/Codex/agentci-guard",
+  "commit": "5b99fb5c571f4601a40a69af97a68eb7f5abae4a",
+  "describe": "v0",
+  "working_tree_changes": 0,
+  "node": "v24.16.0",
+  "pnpm": "10.11.0",
+  "os": "Darwin 25.5.0 arm64",
+  "benchmark_manifest_sha256": "e66632f3926ac9a02c9107907e91d4ff12820fd3c9057f012d272cb8bd00830a",
+  "corpus_manifest_sha256": "7c60f234c313b68f82c04e757e6e1ec326ba3948b1ca51f97c7584ca4e54b28a",
+  "package_version": "0.4.0"
+}

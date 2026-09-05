@@ -1,0 +1,1 @@
+Verified action.yml uses the self-contained committed Node 24 Action bundle with the documented inputs and outputs.

@@ -23,6 +23,31 @@ Current immutable data:
 The synthetic cases under `corpus/adversarial/` are development fixtures and
 are never counted as accuracy data.
 
+### Status change, 2026-09-05: the v3 evaluation split is development data
+
+Between 2 and 5 September 2026 (releases v0.2.0–v0.4.0), every detector change
+was measured by scanning all 152 cases, both splits, and all 31 critical
+findings at the pre-#22 state — **21 of them in the v3 evaluation split** —
+were read by hand. Rules were then changed after those errors were seen (#14,
+#15, #22, #26). Under the leakage rule in this document ("if rules change after
+evaluation errors are seen, the affected evaluation data becomes development
+data"), the entire v3 evaluation split is reclassified as development data.
+
+Nothing is retracted: no v3 evaluation labels or predictions were ever sealed
+or published. But no accuracy claim may cite the v3 evaluation split as held
+out, and the per-case results in `evidence/` are behavioral regression
+records, not accuracy evidence. A formal evaluation requires a v4
+repository-disjoint sample that is not opened for rule tuning. A checksum
+freeze proves the snapshots are immutable; it does not make them unseen.
+
+**Formal-evaluation blocker — rule registry mismatch.** The manifest's
+annotation registry (`annotation_schema_version` 2) names eight rules. The
+scanner at v0.4.0 has nine: `agentci/gated-ai-write-token` was added on
+2026-09-05. The 7,056 v3 annotation units therefore cannot label the ninth
+rule, and the existing registry must not be used to claim evaluation of all
+current rules. Rebuilding the annotation system is out of scope for the current
+sprint and is recorded here as a blocker.
+
 ## Why v3 supersedes v2
 
 During pre-label detector correction, the 16 targeted diversity snapshots in
