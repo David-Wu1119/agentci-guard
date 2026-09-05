@@ -1,0 +1,507 @@
+{
+  "fetched_at": "2026-09-05T18:16:22.826Z",
+  "endpoint": "search/code?q=%22All-Hands-AI%2Fopenhands%22%20path%3A.github%2Fworkflows&sort=indexed&order=desc&per_page=100",
+  "total_count": 131,
+  "items": [
+    {
+      "repository": "OpenHands/software-agent-sdk",
+      "path": ".github/workflows/oh-update-documentation.yml.back",
+      "html_url": "https://github.com/OpenHands/software-agent-sdk/blob/fd92955659cf848cdbddf1893a36baa5221f2c53/.github/workflows/oh-update-documentation.yml.back"
+    },
+    {
+      "repository": "TheAgentCompany/TheAgentCompany",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/TheAgentCompany/TheAgentCompany/blob/98b68ef82a47690c316f42fddb05baafaab56851/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "chand1012/git2gpt",
+      "path": ".github/workflows/openhands.yml",
+      "html_url": "https://github.com/chand1012/git2gpt/blob/b31b0b8b5ba319412480ef980e05cd13bccf3080/.github/workflows/openhands.yml"
+    },
+    {
+      "repository": "ulab-uiuc/live-trade-bench",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/ulab-uiuc/live-trade-bench/blob/05fbfec8df76c2c309201e6b4b7c26aff7e6d0f9/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "dojoengine/dojo.js",
+      "path": ".github/workflows/openhands.yaml",
+      "html_url": "https://github.com/dojoengine/dojo.js/blob/2a9d32e9d96d59e6829d90b67688c15188ec7550/.github/workflows/openhands.yaml"
+    },
+    {
+      "repository": "ml-dev-bench/ml-dev-bench",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/ml-dev-bench/ml-dev-bench/blob/c2bd0c239f960368b11b2fd83d76f2ccfb69b7c4/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "Hookflo/tern",
+      "path": ".github/workflows/ai-agent-fix.yml",
+      "html_url": "https://github.com/Hookflo/tern/blob/33855f2b5d0083d764713dcbc55f4b3452e857fc/.github/workflows/ai-agent-fix.yml"
+    },
+    {
+      "repository": "malusamayo/software-agent-sdk",
+      "path": ".github/workflows/README-RELEASE.md",
+      "html_url": "https://github.com/malusamayo/software-agent-sdk/blob/89c21968922afc746bca8a653712038d5a38d6aa/.github/workflows/README-RELEASE.md"
+    },
+    {
+      "repository": "dtdannen/dvmdash",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/dtdannen/dvmdash/blob/38c68bd64576f47ff5dbef09ff9bae5ded6fe9d8/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "kevinboss/port",
+      "path": ".github/workflows/openhands-resolver.yaml",
+      "html_url": "https://github.com/kevinboss/port/blob/ef6a34dd34137f788283f9fb2f029d618b36aea9/.github/workflows/openhands-resolver.yaml"
+    },
+    {
+      "repository": "nergal-perm/java-decita",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/nergal-perm/java-decita/blob/b771a032f194318aaa6e9b2a7b6cbd8d40315acd/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "voteagora/abifsm",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/voteagora/abifsm/blob/cab5a706cbb71689a12b8a3097f5d3b10eafbf56/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "MYST000/Openhands-software-agent-sdk",
+      "path": ".github/workflows/README-RELEASE.md",
+      "html_url": "https://github.com/MYST000/Openhands-software-agent-sdk/blob/a6db5dcba26a3acfaeac58c8ba5195433a0e223d/.github/workflows/README-RELEASE.md"
+    },
+    {
+      "repository": "upamune/roomode",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/upamune/roomode/blob/5c251ab474583e98bdcc2756aecca9738e2ce9b2/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "BubTec/DPVControl",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/BubTec/DPVControl/blob/b116ef1f40a99f010727cd6671fdbbd4780a9d1f/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "adityasoni9998/OpenHands-Versa",
+      "path": ".github/workflows/ghcr-build.yml",
+      "html_url": "https://github.com/adityasoni9998/OpenHands-Versa/blob/aeb46646b89ada31a35b24d38320ff5a15b9f3a0/.github/workflows/ghcr-build.yml"
+    },
+    {
+      "repository": "adityasoni9998/OpenHands-Versa",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/adityasoni9998/OpenHands-Versa/blob/aeb46646b89ada31a35b24d38320ff5a15b9f3a0/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "ovenzeze/nimship-agent",
+      "path": ".github/workflows/resolve.yml",
+      "html_url": "https://github.com/ovenzeze/nimship-agent/blob/bd857f03603397dba3175d3265bdca435c17492a/.github/workflows/resolve.yml"
+    },
+    {
+      "repository": "neubig/pr-viewer",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/neubig/pr-viewer/blob/3b7c875af2bba762043d7589f41f09abbbfb5575/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "BubTec/HeatControl",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/BubTec/HeatControl/blob/7aa70985f031997e80fddf655564f10640200307/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "Sunwood-ai-labs/oha-demo-001",
+      "path": ".github/workflows/oha.yml",
+      "html_url": "https://github.com/Sunwood-ai-labs/oha-demo-001/blob/aa600711565c94d9d07d2b54d699ce959eaa6266/.github/workflows/oha.yml"
+    },
+    {
+      "repository": "lawwu/yt-transcript",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/lawwu/yt-transcript/blob/818bf11c85c847de19d081536e2e0553f0048b25/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "sani903/InteractiveSWEAgents",
+      "path": ".github/workflows/ghcr-build.yml",
+      "html_url": "https://github.com/sani903/InteractiveSWEAgents/blob/ed58236332ad039b54f968145d7bed9ba988f262/.github/workflows/ghcr-build.yml"
+    },
+    {
+      "repository": "jamesdube/init-c",
+      "path": ".github/workflows/ai-agent.yaml",
+      "html_url": "https://github.com/jamesdube/init-c/blob/185480da6a2374308688e89c1af53d6a8da6b869/.github/workflows/ai-agent.yaml"
+    },
+    {
+      "repository": "Robsieg/ragas-og",
+      "path": ".github/workflows/openhands.yml",
+      "html_url": "https://github.com/Robsieg/ragas-og/blob/76c3accc7e33d1503b5997720a79346846a8206d/.github/workflows/openhands.yml"
+    },
+    {
+      "repository": "Avvv19/signal-forge-ai",
+      "path": ".github/workflows/openhands.yml",
+      "html_url": "https://github.com/Avvv19/signal-forge-ai/blob/c5c0d306c9baefbe7eee58b5c3d55671f5a57a28/.github/workflows/openhands.yml"
+    },
+    {
+      "repository": "vklonin/ragas",
+      "path": ".github/workflows/openhands.yml",
+      "html_url": "https://github.com/vklonin/ragas/blob/b28433709cbedbb531db79dadcfbdbd3aa6adcb0/.github/workflows/openhands.yml"
+    },
+    {
+      "repository": "sani903/InteractiveSWEAgents",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/sani903/InteractiveSWEAgents/blob/ed58236332ad039b54f968145d7bed9ba988f262/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "multi-swe-bench/MopenHands",
+      "path": ".github/workflows/ghcr-build.yml",
+      "html_url": "https://github.com/multi-swe-bench/MopenHands/blob/50625e9ca449fce3990aae44a4046430adeb9de2/.github/workflows/ghcr-build.yml"
+    },
+    {
+      "repository": "MHFeng907/Code-Wizard-2024",
+      "path": ".github/workflows/deploy-docs.yml",
+      "html_url": "https://github.com/MHFeng907/Code-Wizard-2024/blob/3e1d4afb89924883326f1672a9f48f2d4245097f/.github/workflows/deploy-docs.yml"
+    },
+    {
+      "repository": "jayhusemi/OpenHands",
+      "path": ".github/workflows/deploy-docs.yml",
+      "html_url": "https://github.com/jayhusemi/OpenHands/blob/de81020a8dc9ce1dfdcfddf7cf85fe0615b25c73/.github/workflows/deploy-docs.yml"
+    },
+    {
+      "repository": "CK-Daniel/CoreKit",
+      "path": ".github/workflows/deploy-docs.yml",
+      "html_url": "https://github.com/CK-Daniel/CoreKit/blob/9850b0c4ad19f3906956db39f1548f07fbd1f072/.github/workflows/deploy-docs.yml"
+    },
+    {
+      "repository": "fvegiard/OpenHands",
+      "path": ".github/workflows/sync-upstream.yml",
+      "html_url": "https://github.com/fvegiard/OpenHands/blob/e95a2399e6ec42c50e6e1d73fc7a0008e398883a/.github/workflows/sync-upstream.yml"
+    },
+    {
+      "repository": "muffy86/agent-factory",
+      "path": ".github/workflows/openhands-task.yml",
+      "html_url": "https://github.com/muffy86/agent-factory/blob/a457259697d7615e22ae001a085a7a268507e068/.github/workflows/openhands-task.yml"
+    },
+    {
+      "repository": "bitswan-space/bs-monitoring",
+      "path": ".github/workflows/deploy-docs.yml",
+      "html_url": "https://github.com/bitswan-space/bs-monitoring/blob/8bb92b9dd2d1a18c530a83a6f0f681c22d67136e/.github/workflows/deploy-docs.yml"
+    },
+    {
+      "repository": "upamune/openhands-custom-sandbox",
+      "path": ".github/workflows/update-base-image.yml",
+      "html_url": "https://github.com/upamune/openhands-custom-sandbox/blob/32575729df1f7fe0cf520a8406fdd4166b5c4f3c/.github/workflows/update-base-image.yml"
+    },
+    {
+      "repository": "MHFeng907/Code-Wizard-2024",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/MHFeng907/Code-Wizard-2024/blob/3e1d4afb89924883326f1672a9f48f2d4245097f/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "aegisfleet/voicevox2video",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/aegisfleet/voicevox2video/blob/1d1cf1bcef6d4d473a79e308e2d541ac82cf27dd/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "161sam/ai-workspaces",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/161sam/ai-workspaces/blob/e95b8e3024b4c4983b3775749880a9f44bce61d1/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "cld-vasconcelos/open-hands-test",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/cld-vasconcelos/open-hands-test/blob/39edeec664434624489d19442204eb804451e130/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "Jaime393/MIU",
+      "path": ".github/workflows/openhands_resolver.yml",
+      "html_url": "https://github.com/Jaime393/MIU/blob/52fd58611af46d0dd926e7d5e494c2e5c8ebf3ea/.github/workflows/openhands_resolver.yml"
+    },
+    {
+      "repository": "Jalez/research-integrator",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/Jalez/research-integrator/blob/cfaf4674735b49c83ce194951323ad09ef78ce70/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "linogaliana/fa2png",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/linogaliana/fa2png/blob/c0e301e3e20629c65b7083333d95dd5b53dc043b/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "nimbot1997/voxtral_web",
+      "path": ".github/workflows/resolver.yml",
+      "html_url": "https://github.com/nimbot1997/voxtral_web/blob/28fe145ff02689fe4f7380ce7b8eb365823bd041/.github/workflows/resolver.yml"
+    },
+    {
+      "repository": "sinya0909/github_actions_test",
+      "path": ".github/workflows/openhands.yml",
+      "html_url": "https://github.com/sinya0909/github_actions_test/blob/76e2ec3c9862ee4bb818d923ef90315147529abc/.github/workflows/openhands.yml"
+    },
+    {
+      "repository": "igtm/tue-ofuro",
+      "path": ".github/workflows/open-hands.yml",
+      "html_url": "https://github.com/igtm/tue-ofuro/blob/5058ebdaabdab47f33bc4e5875af963b252cddb7/.github/workflows/open-hands.yml"
+    },
+    {
+      "repository": "samon11/synmax-test",
+      "path": ".github/workflows/openhands.yaml",
+      "html_url": "https://github.com/samon11/synmax-test/blob/60c2ff7a4301692739de1e20cb244e3ea6a7452d/.github/workflows/openhands.yaml"
+    },
+    {
+      "repository": "Hybrid-Gym/Hybrid-Gym",
+      "path": ".github/workflows/ghcr-build.yml",
+      "html_url": "https://github.com/Hybrid-Gym/Hybrid-Gym/blob/3aa54503db382b8ce50d9242e60f5c58457a5c82/.github/workflows/ghcr-build.yml"
+    },
+    {
+      "repository": "LambdaLabsML/roundtable",
+      "path": ".github/workflows/openhands-gpt.yml",
+      "html_url": "https://github.com/LambdaLabsML/roundtable/blob/7ce3aec8a22cea95ecde59f6dea0d6ca96fd8ca3/.github/workflows/openhands-gpt.yml"
+    },
+    {
+      "repository": "Hybrid-Gym/Hybrid-Gym",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/Hybrid-Gym/Hybrid-Gym/blob/3aa54503db382b8ce50d9242e60f5c58457a5c82/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "jayanthbagare/synthetic_rfq",
+      "path": ".github/workflows/issue-resolver.yml",
+      "html_url": "https://github.com/jayanthbagare/synthetic_rfq/blob/1512d699a72292982f6c4c6df992c8652d817e9d/.github/workflows/issue-resolver.yml"
+    },
+    {
+      "repository": "HSV-AI/hackathon-starterkit",
+      "path": ".github/workflows/openhands-issue-responder.yml",
+      "html_url": "https://github.com/HSV-AI/hackathon-starterkit/blob/0c27870ad364401af0ecb46264df7e3c97ee7279/.github/workflows/openhands-issue-responder.yml"
+    },
+    {
+      "repository": "TentacioPro/polymath-os-android",
+      "path": ".github/workflows/openhands-agent.yml",
+      "html_url": "https://github.com/TentacioPro/polymath-os-android/blob/0835ceea13b5b912b8b15198cfa7d8a2e2ef4dc5/.github/workflows/openhands-agent.yml"
+    },
+    {
+      "repository": "LambdaLabsML/roundtable",
+      "path": ".github/workflows/openhands-claude.yml",
+      "html_url": "https://github.com/LambdaLabsML/roundtable/blob/7ce3aec8a22cea95ecde59f6dea0d6ca96fd8ca3/.github/workflows/openhands-claude.yml"
+    },
+    {
+      "repository": "LambdaLabsML/roundtable",
+      "path": ".github/workflows/openhands-gemini.yml",
+      "html_url": "https://github.com/LambdaLabsML/roundtable/blob/7ce3aec8a22cea95ecde59f6dea0d6ca96fd8ca3/.github/workflows/openhands-gemini.yml"
+    },
+    {
+      "repository": "haruotsu/Software_knowledges",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/haruotsu/Software_knowledges/blob/a27418bfffe14ad7def66960a6bdb7b840b20ec8/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "shardulchavan/My-Portfolio",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/shardulchavan/My-Portfolio/blob/6d54226de79526a2f2984a3b3a2d69e36010bb6a/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "techiro/release-test",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/techiro/release-test/blob/30331dbd7e3d1bc2c82afe34f268eb2760f5deba/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "thequy/onboarding-merchant",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/thequy/onboarding-merchant/blob/3ad60e09880be8fa2c058e4d8751c0a462431dcc/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "cld-vasconcelos/libro2",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/cld-vasconcelos/libro2/blob/1bddbb97e4c695831196a2a85c1ef9d4c01fb74d/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "rakusan/eibs7-controller",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/rakusan/eibs7-controller/blob/0b19b5c42117cd435fbdcc9c2b836cd89c47e513/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "n00b001/BEST",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/n00b001/BEST/blob/791cec9577b66ffff5383ae8f853e0f0c259a6dc/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "IPUT-Osaka-AISys/TANKYU-AI",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/IPUT-Osaka-AISys/TANKYU-AI/blob/6e9028baf564104449ae606aa1abfbd669a311c7/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "Maijied/Lorapok-Labs-Bible",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/Maijied/Lorapok-Labs-Bible/blob/44e90c35cd5a94181fea758c2d0372a3e0bec60b/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "Shimada666/oh_test_react",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/Shimada666/oh_test_react/blob/91d22b24661f1a2d3220c7ac93997ed0079e6b5a/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "gbusch/sensor-orientation-app",
+      "path": ".github/workflows/openhands-resolver.yaml",
+      "html_url": "https://github.com/gbusch/sensor-orientation-app/blob/2502a11c6df947e61809fa6e8a76ed13c28c51fd/.github/workflows/openhands-resolver.yaml"
+    },
+    {
+      "repository": "larsakeekstrand/livescopegame",
+      "path": ".github/workflows/openhands-resolver.yaml",
+      "html_url": "https://github.com/larsakeekstrand/livescopegame/blob/6dd8630e89b70c0560d67bc809f9bc63b00c8231/.github/workflows/openhands-resolver.yaml"
+    },
+    {
+      "repository": "droomo/wecom-audit",
+      "path": ".github/workflows/openhands-resolvers.yml",
+      "html_url": "https://github.com/droomo/wecom-audit/blob/6c22320bb4988377504777a30d070c91d6dc3bbc/.github/workflows/openhands-resolvers.yml"
+    },
+    {
+      "repository": "rangersaibo939-gif/NEXTRON-X100-V2",
+      "path": ".github/workflows/openhands-autonomous.yml",
+      "html_url": "https://github.com/rangersaibo939-gif/NEXTRON-X100-V2/blob/557e6601246612c6e19adaad0ca69e195d4d6e61/.github/workflows/openhands-autonomous.yml"
+    },
+    {
+      "repository": "kaybarax/todo-list-turborepo",
+      "path": ".github/workflows/agent-fix-pr.yml",
+      "html_url": "https://github.com/kaybarax/todo-list-turborepo/blob/294dc54a20e89c7de747db68a98bb587bfcf115d/.github/workflows/agent-fix-pr.yml"
+    },
+    {
+      "repository": "nagiyu/nagiyu-line",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/nagiyu/nagiyu-line/blob/9259881a38cd9b9aa3cd552eb954c512f983b128/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "SitewizAI/prompt-manager",
+      "path": ".github/workflows/basic-openhands-resolver.yml",
+      "html_url": "https://github.com/SitewizAI/prompt-manager/blob/7f2c2be54670ddc9f92cbb193ccde6eedc0124c8/.github/workflows/basic-openhands-resolver.yml"
+    },
+    {
+      "repository": "nastorehub/NasDoor",
+      "path": ".github/workflows/copilot-autofix.yml",
+      "html_url": "https://github.com/nastorehub/NasDoor/blob/8038849ed23c1741d582d90a60ded9eb8854e652/.github/workflows/copilot-autofix.yml"
+    },
+    {
+      "repository": "nastorehub/NasDoor",
+      "path": ".github/workflows/openhands-bot.yml",
+      "html_url": "https://github.com/nastorehub/NasDoor/blob/8038849ed23c1741d582d90a60ded9eb8854e652/.github/workflows/openhands-bot.yml"
+    },
+    {
+      "repository": "DevinVinson/Legacy-OpenHands",
+      "path": ".github/workflows/_build-image.yml",
+      "html_url": "https://github.com/DevinVinson/Legacy-OpenHands/blob/29577935b48be2a63c7d245f198f893cdb37458c/.github/workflows/_build-image.yml"
+    },
+    {
+      "repository": "BarryYin/openhands",
+      "path": ".github/workflows/_build-image.yml",
+      "html_url": "https://github.com/BarryYin/openhands/blob/de0d9ec0ed2a6c01d4ca4f5a7e43d9477258b0ab/.github/workflows/_build-image.yml"
+    },
+    {
+      "repository": "LambdaLabsML/roundtable",
+      "path": ".github/workflows/openhands-lambda-deepseek70b.yml",
+      "html_url": "https://github.com/LambdaLabsML/roundtable/blob/7ce3aec8a22cea95ecde59f6dea0d6ca96fd8ca3/.github/workflows/openhands-lambda-deepseek70b.yml"
+    },
+    {
+      "repository": "kaybarax/todo-list-turborepo",
+      "path": ".github/workflows/agent-spec-to-pr.yml",
+      "html_url": "https://github.com/kaybarax/todo-list-turborepo/blob/294dc54a20e89c7de747db68a98bb587bfcf115d/.github/workflows/agent-spec-to-pr.yml"
+    },
+    {
+      "repository": "aliisayev008gemini-cloud/openhands-agent-test",
+      "path": ".github/workflows/openhands.yml",
+      "html_url": "https://github.com/aliisayev008gemini-cloud/openhands-agent-test/blob/6d27d761930ff588fe030216082e71560a1ac9c4/.github/workflows/openhands.yml"
+    },
+    {
+      "repository": "hjun3959-blip/telegram-ai-bot",
+      "path": ".github/workflows/openhands.yml",
+      "html_url": "https://github.com/hjun3959-blip/telegram-ai-bot/blob/61824f5f3d9b9f92c1bd579baa504135d48ae536/.github/workflows/openhands.yml"
+    },
+    {
+      "repository": "cbwinslow/new_project_bundle",
+      "path": ".github/workflows/ai-review.yml",
+      "html_url": "https://github.com/cbwinslow/new_project_bundle/blob/861145484f39bc38cc8009ea2437c4fcb1c4c34b/.github/workflows/ai-review.yml"
+    },
+    {
+      "repository": "tsuno08/aici",
+      "path": ".github/workflows/open-hands.yaml",
+      "html_url": "https://github.com/tsuno08/aici/blob/88b418b0257ed2c3c3d3c0fc8984e8564aaef9c6/.github/workflows/open-hands.yaml"
+    },
+    {
+      "repository": "akkikiki/huggingface_examples",
+      "path": ".github/workflows/openhands-resolver_org.yml",
+      "html_url": "https://github.com/akkikiki/huggingface_examples/blob/960db4d95d14275e0135a5ccb47677c2faff9480/.github/workflows/openhands-resolver_org.yml"
+    },
+    {
+      "repository": "Tetsu-is/openhands-actions-test",
+      "path": ".github/workflows/openhands-headless.yml",
+      "html_url": "https://github.com/Tetsu-is/openhands-actions-test/blob/cf1231b83c45349283c862ed7967cfc750f306de/.github/workflows/openhands-headless.yml"
+    },
+    {
+      "repository": "skullzarmy/openhands-test-1",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/skullzarmy/openhands-test-1/blob/43bb09f85aadb51300a8d71f9d96f7d06896f442/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "tkwbr999/personal-telling-service",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/tkwbr999/personal-telling-service/blob/984a6540fa77b40e4f8cea03dc595efc238bdd0d/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "malusamayo/software-agent-sdk",
+      "path": ".github/workflows/version-bump-prs.yml",
+      "html_url": "https://github.com/malusamayo/software-agent-sdk/blob/89c21968922afc746bca8a653712038d5a38d6aa/.github/workflows/version-bump-prs.yml"
+    },
+    {
+      "repository": "xie38388/software-agent-sdk",
+      "path": ".github/workflows/version-bump-prs.yml",
+      "html_url": "https://github.com/xie38388/software-agent-sdk/blob/f452b22fc02e6e648402e588dabbf9db159ff287/.github/workflows/version-bump-prs.yml"
+    },
+    {
+      "repository": "gr3eai/dr.x",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/gr3eai/dr.x/blob/cc7da1bcfb03d76d0bc9db28ee21480bba0bbf1c/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "KaiChihCodeme/flask-weather-api",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/KaiChihCodeme/flask-weather-api/blob/485f0713631fe1e6c66896a95c004984cdfd3adb/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "jayhusemi/OpenHands",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/jayhusemi/OpenHands/blob/de81020a8dc9ce1dfdcfddf7cf85fe0615b25c73/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "arrebolmedia/coffee-os",
+      "path": ".github/workflows/agent-proposal.yml",
+      "html_url": "https://github.com/arrebolmedia/coffee-os/blob/fb2d16bb9d64507bb3d9ec8a6233eea27e643f3b/.github/workflows/agent-proposal.yml"
+    },
+    {
+      "repository": "dithosolucoes/Create_open",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/dithosolucoes/Create_open/blob/69ece697637a8ff6bdfeb46341e51edf7a1670b9/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "Munirmohammed/OpenHandsAI",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "html_url": "https://github.com/Munirmohammed/OpenHandsAI/blob/f0257c793bbce37657299425fb026338946ad802/.github/workflows/openhands-resolver.yml"
+    },
+    {
+      "repository": "arturwyroslak/openhands",
+      "path": ".github/workflows/ghcr-build.yml",
+      "html_url": "https://github.com/arturwyroslak/openhands/blob/ab29ad11f5d5b6dbe0ae526e1c38c5e41c1783ae/.github/workflows/ghcr-build.yml"
+    },
+    {
+      "repository": "Vibe-demo/OpenHands-0.49.0",
+      "path": ".github/workflows/ghcr-build.yml",
+      "html_url": "https://github.com/Vibe-demo/OpenHands-0.49.0/blob/b152ad058e552835a1f73a1dc73a3d0caca0d692/.github/workflows/ghcr-build.yml"
+    },
+    {
+      "repository": "togethercomputer/OpenHands",
+      "path": ".github/workflows/ghcr-build.yml",
+      "html_url": "https://github.com/togethercomputer/OpenHands/blob/9943edc64d2b8c1655be452ea47ef83724fd73bf/.github/workflows/ghcr-build.yml"
+    },
+    {
+      "repository": "CK-Daniel/CoreKit",
+      "path": ".github/workflows/ghcr-build.yml",
+      "html_url": "https://github.com/CK-Daniel/CoreKit/blob/9850b0c4ad19f3906956db39f1548f07fbd1f072/.github/workflows/ghcr-build.yml"
+    },
+    {
+      "repository": "jayhusemi/OpenHands",
+      "path": ".github/workflows/ghcr-build.yml",
+      "html_url": "https://github.com/jayhusemi/OpenHands/blob/de81020a8dc9ce1dfdcfddf7cf85fe0615b25c73/.github/workflows/ghcr-build.yml"
+    },
+    {
+      "repository": "gr3eai/dr.x",
+      "path": ".github/workflows/ghcr-build.yml",
+      "html_url": "https://github.com/gr3eai/dr.x/blob/cc7da1bcfb03d76d0bc9db28ee21480bba0bbf1c/.github/workflows/ghcr-build.yml"
+    }
+  ]
+}

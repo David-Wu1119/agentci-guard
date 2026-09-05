@@ -1,0 +1,34 @@
+{
+  "scanned_at": "2026-09-05T18:21:44.379Z",
+  "root": "/Users/davidwu/Documents/Codex/agentci-guard/evidence/sprint-2026-09-05/day5/snapshots/u-07",
+  "workflow_count": 1,
+  "agent_usages": [],
+  "findings": [],
+  "summary": {
+    "low": 0,
+    "medium": 0,
+    "high": 0,
+    "critical": 0
+  },
+  "diagnostics": [
+    {
+      "code": "agentci/analysis-event-condition",
+      "kind": "analysis",
+      "severity": "warning",
+      "file": ".github/workflows/openhands-resolver.yml",
+      "job": "call-openhands-resolver",
+      "line": 8,
+      "message": "Could not fully interpret this job's github.event_name condition; event reachability was kept conservative."
+    },
+    {
+      "code": "agentci/analysis-remote-reusable-workflow",
+      "kind": "analysis",
+      "severity": "warning",
+      "file": ".github/workflows/openhands-resolver.yml",
+      "job": "call-openhands-resolver",
+      "line": 8,
+      "message": "Remote reusable workflow cannot be resolved statically: All-Hands-AI/openhands-resolver/.github/workflows/openhands-resolver.yml@main"
+    }
+  ],
+  "analysis_complete": false
+}

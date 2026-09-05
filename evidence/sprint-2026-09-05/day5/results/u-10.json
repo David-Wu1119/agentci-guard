@@ -1,0 +1,15 @@
+{
+  "scanned_at": "2026-09-05T18:21:44.532Z",
+  "root": "/Users/davidwu/Documents/Codex/agentci-guard/evidence/sprint-2026-09-05/day5/snapshots/u-10",
+  "workflow_count": 1,
+  "agent_usages": [],
+  "findings": [],
+  "summary": {
+    "low": 0,
+    "medium": 0,
+    "high": 0,
+    "critical": 0
+  },
+  "diagnostics": [],
+  "analysis_complete": true
+}

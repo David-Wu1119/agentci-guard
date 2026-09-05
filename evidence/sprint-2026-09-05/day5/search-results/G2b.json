@@ -1,0 +1,507 @@
+{
+  "fetched_at": "2026-09-05T18:16:21.571Z",
+  "endpoint": "search/code?q=%22google-github-actions%2Frun-gemini-cli%22%20path%3A.github%2Fworkflows&sort=indexed&order=desc&per_page=100",
+  "total_count": 1220,
+  "items": [
+    {
+      "repository": "google-gemini/gemini-cli",
+      "path": ".github/workflows/docs-audit.yml",
+      "html_url": "https://github.com/google-gemini/gemini-cli/blob/85aca163f6c73ac6ce380b5447359146b8adcae4/.github/workflows/docs-audit.yml"
+    },
+    {
+      "repository": "google-gemini/gemini-cli",
+      "path": ".github/workflows/community-report.yml",
+      "html_url": "https://github.com/google-gemini/gemini-cli/blob/85aca163f6c73ac6ce380b5447359146b8adcae4/.github/workflows/community-report.yml"
+    },
+    {
+      "repository": "google-gemini/gemini-cli",
+      "path": ".github/workflows/gemini-automated-issue-dedup.yml",
+      "html_url": "https://github.com/google-gemini/gemini-cli/blob/85aca163f6c73ac6ce380b5447359146b8adcae4/.github/workflows/gemini-automated-issue-dedup.yml"
+    },
+    {
+      "repository": "google-gemini/gemini-cli",
+      "path": ".github/workflows/gemini-scheduled-issue-triage.yml",
+      "html_url": "https://github.com/google-gemini/gemini-cli/blob/85aca163f6c73ac6ce380b5447359146b8adcae4/.github/workflows/gemini-scheduled-issue-triage.yml"
+    },
+    {
+      "repository": "google-gemini/gemini-cli",
+      "path": ".github/workflows/gemini-automated-issue-triage.yml",
+      "html_url": "https://github.com/google-gemini/gemini-cli/blob/85aca163f6c73ac6ce380b5447359146b8adcae4/.github/workflows/gemini-automated-issue-triage.yml"
+    },
+    {
+      "repository": "flutter/samples",
+      "path": ".github/workflows/gemini-cli.yml",
+      "html_url": "https://github.com/flutter/samples/blob/463e365e4842f252ffab9c6198594a504d69469f/.github/workflows/gemini-cli.yml"
+    },
+    {
+      "repository": "flutter/samples",
+      "path": ".github/workflows/gemini-issue-scheduled-triage.yml",
+      "html_url": "https://github.com/flutter/samples/blob/463e365e4842f252ffab9c6198594a504d69469f/.github/workflows/gemini-issue-scheduled-triage.yml"
+    },
+    {
+      "repository": "flutter/samples",
+      "path": ".github/workflows/gemini-issue-automated-triage.yml",
+      "html_url": "https://github.com/flutter/samples/blob/463e365e4842f252ffab9c6198594a504d69469f/.github/workflows/gemini-issue-automated-triage.yml"
+    },
+    {
+      "repository": "flutter/samples",
+      "path": ".github/workflows/gemini-pr-review.yml",
+      "html_url": "https://github.com/flutter/samples/blob/463e365e4842f252ffab9c6198594a504d69469f/.github/workflows/gemini-pr-review.yml"
+    },
+    {
+      "repository": "google/draco",
+      "path": ".github/workflows/gemini-cli.yml",
+      "html_url": "https://github.com/google/draco/blob/052a31124c75e64dfbf4f9bc0df066e626aeef41/.github/workflows/gemini-cli.yml"
+    },
+    {
+      "repository": "MervinPraison/PraisonAI",
+      "path": ".github/workflows/gemini-issue-review.yml",
+      "html_url": "https://github.com/MervinPraison/PraisonAI/blob/edac097585b032451d5dd9d8a7f906573dbf1d0f/.github/workflows/gemini-issue-review.yml"
+    },
+    {
+      "repository": "mockk/mockk",
+      "path": ".github/workflows/gemini-issue-scheduled-triage.yml",
+      "html_url": "https://github.com/mockk/mockk/blob/14fbd83eb43582ce6f80ac58b87b0e143e8cb43e/.github/workflows/gemini-issue-scheduled-triage.yml"
+    },
+    {
+      "repository": "AI-Hypercomputer/maxtext",
+      "path": ".github/workflows/gemini_invoke.yml",
+      "html_url": "https://github.com/AI-Hypercomputer/maxtext/blob/cf91228ac25635b679f9b57a1bed3608d575d64b/.github/workflows/gemini_invoke.yml"
+    },
+    {
+      "repository": "AI-Hypercomputer/maxtext",
+      "path": ".github/workflows/gemini_review.yml",
+      "html_url": "https://github.com/AI-Hypercomputer/maxtext/blob/cf91228ac25635b679f9b57a1bed3608d575d64b/.github/workflows/gemini_review.yml"
+    },
+    {
+      "repository": "AI-Hypercomputer/maxtext",
+      "path": ".github/workflows/gemini_investigate.yml",
+      "html_url": "https://github.com/AI-Hypercomputer/maxtext/blob/cf91228ac25635b679f9b57a1bed3608d575d64b/.github/workflows/gemini_investigate.yml"
+    },
+    {
+      "repository": "google-github-actions/run-gemini-cli",
+      "path": ".github/workflows/gemini-review.yml",
+      "html_url": "https://github.com/google-github-actions/run-gemini-cli/blob/387c8ddb7a72078825da941758b811b9153c71e8/.github/workflows/gemini-review.yml"
+    },
+    {
+      "repository": "google-github-actions/run-gemini-cli",
+      "path": ".github/workflows/gemini-invoke.yml",
+      "html_url": "https://github.com/google-github-actions/run-gemini-cli/blob/387c8ddb7a72078825da941758b811b9153c71e8/.github/workflows/gemini-invoke.yml"
+    },
+    {
+      "repository": "google-github-actions/run-gemini-cli",
+      "path": ".github/workflows/gemini-issue-fixer.yml",
+      "html_url": "https://github.com/google-github-actions/run-gemini-cli/blob/387c8ddb7a72078825da941758b811b9153c71e8/.github/workflows/gemini-issue-fixer.yml"
+    },
+    {
+      "repository": "google/android-cuttlefish",
+      "path": ".github/workflows/gemini-invoke.yml",
+      "html_url": "https://github.com/google/android-cuttlefish/blob/c546c02bfa7f5a257f4d5dc7b1c903a13620e7fd/.github/workflows/gemini-invoke.yml"
+    },
+    {
+      "repository": "GoogleCloudPlatform/vertex-ai-creative-studio",
+      "path": ".github/workflows/gemini-triage.yml",
+      "html_url": "https://github.com/GoogleCloudPlatform/vertex-ai-creative-studio/blob/05a061f647ad8c34586360989f806db702e94a1a/.github/workflows/gemini-triage.yml"
+    },
+    {
+      "repository": "google-github-actions/run-gemini-cli",
+      "path": ".github/workflows/gemini-plan-execute.yml",
+      "html_url": "https://github.com/google-github-actions/run-gemini-cli/blob/387c8ddb7a72078825da941758b811b9153c71e8/.github/workflows/gemini-plan-execute.yml"
+    },
+    {
+      "repository": "google/android-cuttlefish",
+      "path": ".github/workflows/gemini-plan-execute.yml",
+      "html_url": "https://github.com/google/android-cuttlefish/blob/c546c02bfa7f5a257f4d5dc7b1c903a13620e7fd/.github/workflows/gemini-plan-execute.yml"
+    },
+    {
+      "repository": "GoogleCloudPlatform/vertex-ai-creative-studio",
+      "path": ".github/workflows/gemini-invoke.yml",
+      "html_url": "https://github.com/GoogleCloudPlatform/vertex-ai-creative-studio/blob/05a061f647ad8c34586360989f806db702e94a1a/.github/workflows/gemini-invoke.yml"
+    },
+    {
+      "repository": "GoogleCloudPlatform/vertex-ai-creative-studio",
+      "path": ".github/workflows/gemini-review.yml",
+      "html_url": "https://github.com/GoogleCloudPlatform/vertex-ai-creative-studio/blob/05a061f647ad8c34586360989f806db702e94a1a/.github/workflows/gemini-review.yml"
+    },
+    {
+      "repository": "haseeb-heaven/open-agent",
+      "path": ".github/workflows/release-notes.yml",
+      "html_url": "https://github.com/haseeb-heaven/open-agent/blob/575401684ec13df646fa831f1c824388b5b30574/.github/workflows/release-notes.yml"
+    },
+    {
+      "repository": "haseeb-heaven/open-agent",
+      "path": ".github/workflows/docs-audit.yml",
+      "html_url": "https://github.com/haseeb-heaven/open-agent/blob/575401684ec13df646fa831f1c824388b5b30574/.github/workflows/docs-audit.yml"
+    },
+    {
+      "repository": "gemini-cli-extensions/security",
+      "path": ".github/workflows/gemini-review.yml",
+      "html_url": "https://github.com/gemini-cli-extensions/security/blob/2227f3cf7150972baac695b8233abc2186408538/.github/workflows/gemini-review.yml"
+    },
+    {
+      "repository": "google-github-actions/run-gemini-cli",
+      "path": ".github/workflows/gemini-scheduled-triage.yml",
+      "html_url": "https://github.com/google-github-actions/run-gemini-cli/blob/387c8ddb7a72078825da941758b811b9153c71e8/.github/workflows/gemini-scheduled-triage.yml"
+    },
+    {
+      "repository": "Realiserad/fish-ai",
+      "path": ".github/workflows/translate-docs.yaml",
+      "html_url": "https://github.com/Realiserad/fish-ai/blob/28c94755b7fa3f0c922e80db3160b8b341d9a8d1/.github/workflows/translate-docs.yaml"
+    },
+    {
+      "repository": "GoogleCloudPlatform/vertex-ai-creative-studio",
+      "path": ".github/workflows/gemini-scheduled-triage.yml",
+      "html_url": "https://github.com/GoogleCloudPlatform/vertex-ai-creative-studio/blob/05a061f647ad8c34586360989f806db702e94a1a/.github/workflows/gemini-scheduled-triage.yml"
+    },
+    {
+      "repository": "tag1consulting/goose",
+      "path": ".github/workflows/gemini-pr-review.yml",
+      "html_url": "https://github.com/tag1consulting/goose/blob/614f75149cab5a963a8bc26d7b62639dedfa7a2b/.github/workflows/gemini-pr-review.yml"
+    },
+    {
+      "repository": "AI-Hypercomputer/maxdiffusion",
+      "path": ".github/workflows/gemini-invoke.yml",
+      "html_url": "https://github.com/AI-Hypercomputer/maxdiffusion/blob/8e3e8433a03861b24974043bbf66bf7d96483b6f/.github/workflows/gemini-invoke.yml"
+    },
+    {
+      "repository": "AI-Hypercomputer/maxdiffusion",
+      "path": ".github/workflows/gemini-review.yml",
+      "html_url": "https://github.com/AI-Hypercomputer/maxdiffusion/blob/8e3e8433a03861b24974043bbf66bf7d96483b6f/.github/workflows/gemini-review.yml"
+    },
+    {
+      "repository": "davidmigloz/langchain_dart",
+      "path": ".github/workflows/gemini-issue-automated-triage.yml",
+      "html_url": "https://github.com/davidmigloz/langchain_dart/blob/9cc8d8f4ca8af24f90b75b9c294890486e215757/.github/workflows/gemini-issue-automated-triage.yml"
+    },
+    {
+      "repository": "davidmigloz/langchain_dart",
+      "path": ".github/workflows/gemini-pr-review.yml",
+      "html_url": "https://github.com/davidmigloz/langchain_dart/blob/9cc8d8f4ca8af24f90b75b9c294890486e215757/.github/workflows/gemini-pr-review.yml"
+    },
+    {
+      "repository": "google/adk-python-community",
+      "path": ".github/workflows/gemini-invoke.yml",
+      "html_url": "https://github.com/google/adk-python-community/blob/396da17a9597d8d5f96e7e1aa8c1c396c738d146/.github/workflows/gemini-invoke.yml"
+    },
+    {
+      "repository": "google/adk-python-community",
+      "path": ".github/workflows/gemini-review.yml",
+      "html_url": "https://github.com/google/adk-python-community/blob/396da17a9597d8d5f96e7e1aa8c1c396c738d146/.github/workflows/gemini-review.yml"
+    },
+    {
+      "repository": "haseeb-heaven/open-agent",
+      "path": ".github/workflows/community-report.yml",
+      "html_url": "https://github.com/haseeb-heaven/open-agent/blob/575401684ec13df646fa831f1c824388b5b30574/.github/workflows/community-report.yml"
+    },
+    {
+      "repository": "felipebarcelospro/igniter-js",
+      "path": ".github/workflows/lia-triage.yml",
+      "html_url": "https://github.com/felipebarcelospro/igniter-js/blob/e5d42e833983408ffd2e922cad9fd32fa462362d/.github/workflows/lia-triage.yml"
+    },
+    {
+      "repository": "tsg-ut/slackbot",
+      "path": ".github/workflows/gemini-review.yml",
+      "html_url": "https://github.com/tsg-ut/slackbot/blob/9783f6aac32cc9321324b54e26715bbf6ff0ea88/.github/workflows/gemini-review.yml"
+    },
+    {
+      "repository": "Shreemanarjun/flutter_sharez",
+      "path": ".github/workflows/gemini-scheduled-triage.ymlss",
+      "html_url": "https://github.com/Shreemanarjun/flutter_sharez/blob/165ad9c085a45cbb63e13a7b7e23c7fd3b4b335b/.github/workflows/gemini-scheduled-triage.ymlss"
+    },
+    {
+      "repository": "felipebarcelospro/igniter-js",
+      "path": ".github/workflows/lia-invoke.yml",
+      "html_url": "https://github.com/felipebarcelospro/igniter-js/blob/e5d42e833983408ffd2e922cad9fd32fa462362d/.github/workflows/lia-invoke.yml"
+    },
+    {
+      "repository": "fujitatomoya/ros2ai",
+      "path": ".github/workflows/gemini-review.yml",
+      "html_url": "https://github.com/fujitatomoya/ros2ai/blob/c7e39501b72a018454395a45622b304f3010b3a1/.github/workflows/gemini-review.yml"
+    },
+    {
+      "repository": "elC0mpa/aws-doctor",
+      "path": ".github/workflows/gemini.yml",
+      "html_url": "https://github.com/elC0mpa/aws-doctor/blob/0e53b0b68a64e1aef71c810398460e3d2e9a4adf/.github/workflows/gemini.yml"
+    },
+    {
+      "repository": "AI-Hypercomputer/xpk",
+      "path": ".github/workflows/gemini-invoke.yml",
+      "html_url": "https://github.com/AI-Hypercomputer/xpk/blob/c3c57e7ab85bc68cc8abb972f23689e1bc423d2f/.github/workflows/gemini-invoke.yml"
+    },
+    {
+      "repository": "felipebarcelospro/igniter-js",
+      "path": ".github/workflows/lia-review.yml",
+      "html_url": "https://github.com/felipebarcelospro/igniter-js/blob/e5d42e833983408ffd2e922cad9fd32fa462362d/.github/workflows/lia-review.yml"
+    },
+    {
+      "repository": "fujitatomoya/ros2ai",
+      "path": ".github/workflows/gemini-invoke.yml",
+      "html_url": "https://github.com/fujitatomoya/ros2ai/blob/c7e39501b72a018454395a45622b304f3010b3a1/.github/workflows/gemini-invoke.yml"
+    },
+    {
+      "repository": "AI-Hypercomputer/xpk",
+      "path": ".github/workflows/gemini-review.yml",
+      "html_url": "https://github.com/AI-Hypercomputer/xpk/blob/c3c57e7ab85bc68cc8abb972f23689e1bc423d2f/.github/workflows/gemini-review.yml"
+    },
+    {
+      "repository": "evochora/evochora",
+      "path": ".github/workflows/gemini-code-review.yml.disabeld",
+      "html_url": "https://github.com/evochora/evochora/blob/8948933911ec4ae9c1b751af89cfaf38e3529434/.github/workflows/gemini-code-review.yml.disabeld"
+    },
+    {
+      "repository": "fujitatomoya/ros2_persist_parameter_server",
+      "path": ".github/workflows/gemini-review.yml",
+      "html_url": "https://github.com/fujitatomoya/ros2_persist_parameter_server/blob/894d65e1332b69c0dda5dfb6aacdddba3c9c9c9e/.github/workflows/gemini-review.yml"
+    },
+    {
+      "repository": "pantavisor/pantavisor",
+      "path": ".github/workflows/gemini-review.yml",
+      "html_url": "https://github.com/pantavisor/pantavisor/blob/0950396cc9f3ffd125a3f230910b4d275ccb77ff/.github/workflows/gemini-review.yml"
+    },
+    {
+      "repository": "fujitatomoya/ros2ai",
+      "path": ".github/workflows/gemini-triage.yml",
+      "html_url": "https://github.com/fujitatomoya/ros2ai/blob/c7e39501b72a018454395a45622b304f3010b3a1/.github/workflows/gemini-triage.yml"
+    },
+    {
+      "repository": "Sunwood-ai-labs/gemini-filesearch-drive-line-gas",
+      "path": ".github/workflows/architecture.md",
+      "html_url": "https://github.com/Sunwood-ai-labs/gemini-filesearch-drive-line-gas/blob/49e593d63a566af968fe95fc98fc2b4dd60b4568/.github/workflows/architecture.md"
+    },
+    {
+      "repository": "felipebarcelospro/igniter-js",
+      "path": ".github/workflows/lia-scheduled-triage.yml",
+      "html_url": "https://github.com/felipebarcelospro/igniter-js/blob/e5d42e833983408ffd2e922cad9fd32fa462362d/.github/workflows/lia-scheduled-triage.yml"
+    },
+    {
+      "repository": "danielcherubini/elegoo-homeassistant",
+      "path": ".github/workflows/gemini-cli.yml",
+      "html_url": "https://github.com/danielcherubini/elegoo-homeassistant/blob/3ebcbd29ebcf2d8628a0cc820b17fd34cda2cc09/.github/workflows/gemini-cli.yml"
+    },
+    {
+      "repository": "adaj/consent",
+      "path": ".github/workflows/issue-triage/README.md",
+      "html_url": "https://github.com/adaj/consent/blob/788e30667787ca4ff9cff3c6aef271c57c214dab/.github/workflows/issue-triage/README.md"
+    },
+    {
+      "repository": "cesine/tic-tac-toe",
+      "path": ".github/workflows/issue-triage/README.md",
+      "html_url": "https://github.com/cesine/tic-tac-toe/blob/1f6c6a80f6cf879316506a83a08604930e9b50c4/.github/workflows/issue-triage/README.md"
+    },
+    {
+      "repository": "clouddrove/github-shared-workflows",
+      "path": ".github/workflows/pr-gemini-review.yml",
+      "html_url": "https://github.com/clouddrove/github-shared-workflows/blob/310fe7dd76ad70c730900ac46168fc7eb082ba73/.github/workflows/pr-gemini-review.yml"
+    },
+    {
+      "repository": "fujitatomoya/ros2ai",
+      "path": ".github/workflows/gemini-scheduled-triage.yml",
+      "html_url": "https://github.com/fujitatomoya/ros2ai/blob/c7e39501b72a018454395a45622b304f3010b3a1/.github/workflows/gemini-scheduled-triage.yml"
+    },
+    {
+      "repository": "GoogleCloudPlatform/gcc-creative-studio",
+      "path": ".github/workflows/gemini-review.yml",
+      "html_url": "https://github.com/GoogleCloudPlatform/gcc-creative-studio/blob/1f19478768e20857d9215c6f93a313ad25ef0d31/.github/workflows/gemini-review.yml"
+    },
+    {
+      "repository": "danielcherubini/elegoo-homeassistant",
+      "path": ".github/workflows/gemini-pr-review.yml",
+      "html_url": "https://github.com/danielcherubini/elegoo-homeassistant/blob/3ebcbd29ebcf2d8628a0cc820b17fd34cda2cc09/.github/workflows/gemini-pr-review.yml"
+    },
+    {
+      "repository": "enuno/unifi-mcp-server",
+      "path": ".github/workflows/gemini-scheduled-triage.yml",
+      "html_url": "https://github.com/enuno/unifi-mcp-server/blob/a34c7dd6a459d964a13316fe7e627f0ad66dad2d/.github/workflows/gemini-scheduled-triage.yml"
+    },
+    {
+      "repository": "Shreemanarjun/flutter_sharez",
+      "path": ".github/workflows/gemini.yaml",
+      "html_url": "https://github.com/Shreemanarjun/flutter_sharez/blob/165ad9c085a45cbb63e13a7b7e23c7fd3b4b335b/.github/workflows/gemini.yaml"
+    },
+    {
+      "repository": "jerry609/PaperBot",
+      "path": ".github/workflows/gemini-review.yml",
+      "html_url": "https://github.com/jerry609/PaperBot/blob/9030c5e2e327f0205f5fa0a8a62b6529b760104e/.github/workflows/gemini-review.yml"
+    },
+    {
+      "repository": "danielcherubini/elegoo-homeassistant",
+      "path": ".github/workflows/gemini-issue-scheduled-triage.yml",
+      "html_url": "https://github.com/danielcherubini/elegoo-homeassistant/blob/3ebcbd29ebcf2d8628a0cc820b17fd34cda2cc09/.github/workflows/gemini-issue-scheduled-triage.yml"
+    },
+    {
+      "repository": "danielcherubini/elegoo-homeassistant",
+      "path": ".github/workflows/gemini-issue-automated-triage.yml",
+      "html_url": "https://github.com/danielcherubini/elegoo-homeassistant/blob/3ebcbd29ebcf2d8628a0cc820b17fd34cda2cc09/.github/workflows/gemini-issue-automated-triage.yml"
+    },
+    {
+      "repository": "yuubinnkyoku/school-converter",
+      "path": ".github/workflows/AWESOME.md",
+      "html_url": "https://github.com/yuubinnkyoku/school-converter/blob/48fae87038c779a86bb33f74ba8128b620e0b66a/.github/workflows/AWESOME.md"
+    },
+    {
+      "repository": "SaptaDey/Adaptive-Graph-of-Thoughts-MCP-server",
+      "path": ".github/workflows/codacy.yml",
+      "html_url": "https://github.com/SaptaDey/Adaptive-Graph-of-Thoughts-MCP-server/blob/1c4b6580fd66394dee151a8507606cb216d14ebd/.github/workflows/codacy.yml"
+    },
+    {
+      "repository": "toyfer/Fontify",
+      "path": ".github/workflows/README.md",
+      "html_url": "https://github.com/toyfer/Fontify/blob/82dd62c449a98a88c7316a69d3b0295e7a389f2b/.github/workflows/README.md"
+    },
+    {
+      "repository": "openfoodfacts/openfoodfacts-web",
+      "path": ".github/workflows/gemini-cli.yml",
+      "html_url": "https://github.com/openfoodfacts/openfoodfacts-web/blob/df3fdaa219a8fc8ccbf3d7d82d9eb4a791fb5fa3/.github/workflows/gemini-cli.yml"
+    },
+    {
+      "repository": "afu6609/gemini-api2cli",
+      "path": ".github/workflows/release-notes.yml",
+      "html_url": "https://github.com/afu6609/gemini-api2cli/blob/8fed999dba2156b615fb72e257c2aa8b03206e63/.github/workflows/release-notes.yml"
+    },
+    {
+      "repository": "adaj/consent",
+      "path": ".github/workflows/README.md",
+      "html_url": "https://github.com/adaj/consent/blob/788e30667787ca4ff9cff3c6aef271c57c214dab/.github/workflows/README.md"
+    },
+    {
+      "repository": "cesine/tic-tac-toe",
+      "path": ".github/workflows/README.md",
+      "html_url": "https://github.com/cesine/tic-tac-toe/blob/1f6c6a80f6cf879316506a83a08604930e9b50c4/.github/workflows/README.md"
+    },
+    {
+      "repository": "DavidLiuXh/jarvis-personal-ai",
+      "path": ".github/workflows/release-notes.yml",
+      "html_url": "https://github.com/DavidLiuXh/jarvis-personal-ai/blob/f7820f21e00d31ff2eaaef0f08a0267f32b53d08/.github/workflows/release-notes.yml"
+    },
+    {
+      "repository": "afu6609/gemini-api2cli",
+      "path": ".github/workflows/docs-audit.yml",
+      "html_url": "https://github.com/afu6609/gemini-api2cli/blob/8fed999dba2156b615fb72e257c2aa8b03206e63/.github/workflows/docs-audit.yml"
+    },
+    {
+      "repository": "cesine/tic-tac-toe",
+      "path": ".github/workflows/gemini-assistant/README.md",
+      "html_url": "https://github.com/cesine/tic-tac-toe/blob/1f6c6a80f6cf879316506a83a08604930e9b50c4/.github/workflows/gemini-assistant/README.md"
+    },
+    {
+      "repository": "SlightlyOffset/PJ_Cafe",
+      "path": ".github/workflows/gemini-assistant/README.md",
+      "html_url": "https://github.com/SlightlyOffset/PJ_Cafe/blob/a9f9f5d82d7582e11d53874b96718f7f591904e9/.github/workflows/gemini-assistant/README.md"
+    },
+    {
+      "repository": "google/secops-wrapper",
+      "path": ".github/workflows/gemini-review.yml",
+      "html_url": "https://github.com/google/secops-wrapper/blob/60b3e4a8fa006466dc7886783d1e9bff7e9deda9/.github/workflows/gemini-review.yml"
+    },
+    {
+      "repository": "tsg-ut/slackbot",
+      "path": ".github/workflows/gemini-dispatch.yml",
+      "html_url": "https://github.com/tsg-ut/slackbot/blob/9783f6aac32cc9321324b54e26715bbf6ff0ea88/.github/workflows/gemini-dispatch.yml"
+    },
+    {
+      "repository": "gemini-cli-extensions/sre",
+      "path": ".github/workflows/gemini-review.yml",
+      "html_url": "https://github.com/gemini-cli-extensions/sre/blob/ef738e33bad6f8439aad70d65a52b381b8d1f6e1/.github/workflows/gemini-review.yml"
+    },
+    {
+      "repository": "Shreemanarjun/flutter_sharez",
+      "path": ".github/workflows/gemin_invoke.yaml",
+      "html_url": "https://github.com/Shreemanarjun/flutter_sharez/blob/165ad9c085a45cbb63e13a7b7e23c7fd3b4b335b/.github/workflows/gemin_invoke.yaml"
+    },
+    {
+      "repository": "conforma/policy",
+      "path": ".github/workflows/release.yaml",
+      "html_url": "https://github.com/conforma/policy/blob/b2b481e1cc3fcae5e369e8e06aaf4db1bff8c8ee/.github/workflows/release.yaml"
+    },
+    {
+      "repository": "openfoodfacts/openfoodfacts-web",
+      "path": ".github/workflows/gemini-issue-automated-triage.yml",
+      "html_url": "https://github.com/openfoodfacts/openfoodfacts-web/blob/df3fdaa219a8fc8ccbf3d7d82d9eb4a791fb5fa3/.github/workflows/gemini-issue-automated-triage.yml"
+    },
+    {
+      "repository": "zsais/go-gin-prometheus",
+      "path": ".github/workflows/gemini-issue-scheduled-triage.yml",
+      "html_url": "https://github.com/zsais/go-gin-prometheus/blob/9051d46c6a4b9f7acd950fcdfbe00648f4fcf4cd/.github/workflows/gemini-issue-scheduled-triage.yml"
+    },
+    {
+      "repository": "zsais/go-gin-prometheus",
+      "path": ".github/workflows/gemini-issue-automated-triage.yml",
+      "html_url": "https://github.com/zsais/go-gin-prometheus/blob/9051d46c6a4b9f7acd950fcdfbe00648f4fcf4cd/.github/workflows/gemini-issue-automated-triage.yml"
+    },
+    {
+      "repository": "gemini-cli-extensions/sre",
+      "path": ".github/workflows/gemini-invoke.yml",
+      "html_url": "https://github.com/gemini-cli-extensions/sre/blob/ef738e33bad6f8439aad70d65a52b381b8d1f6e1/.github/workflows/gemini-invoke.yml"
+    },
+    {
+      "repository": "adaj/consent",
+      "path": ".github/workflows/AWESOME.md",
+      "html_url": "https://github.com/adaj/consent/blob/788e30667787ca4ff9cff3c6aef271c57c214dab/.github/workflows/AWESOME.md"
+    },
+    {
+      "repository": "cesine/tic-tac-toe",
+      "path": ".github/workflows/AWESOME.md",
+      "html_url": "https://github.com/cesine/tic-tac-toe/blob/1f6c6a80f6cf879316506a83a08604930e9b50c4/.github/workflows/AWESOME.md"
+    },
+    {
+      "repository": "ssttkkl/mahjong-utils-app",
+      "path": ".github/workflows/gemini-pr-review.yml",
+      "html_url": "https://github.com/ssttkkl/mahjong-utils-app/blob/73f5e071c7ae6f79df0864375b2afdd646b6bfb0/.github/workflows/gemini-pr-review.yml"
+    },
+    {
+      "repository": "intrinsic-opensource/ros-central-registry",
+      "path": ".github/workflows/gemini_support.yml",
+      "html_url": "https://github.com/intrinsic-opensource/ros-central-registry/blob/38de3c61c2fc845eec57f360d617528fa1cd63a2/.github/workflows/gemini_support.yml"
+    },
+    {
+      "repository": "RohanG21/cicd_sql_github_action_summary",
+      "path": ".github/workflows/gemini_cli_sql_summary",
+      "html_url": "https://github.com/RohanG21/cicd_sql_github_action_summary/blob/c3698f6a9079e66d5dee2e30cf6b5fe98dc1e6ac/.github/workflows/gemini_cli_sql_summary"
+    },
+    {
+      "repository": "LucasBurgessDev/LucasBurgessDev.github.io",
+      "path": ".github/workflows/gemini-feature.yml.hold",
+      "html_url": "https://github.com/LucasBurgessDev/LucasBurgessDev.github.io/blob/56d1b8b316de87e9c8ff5bf86134585b050f2d12/.github/workflows/gemini-feature.yml.hold"
+    },
+    {
+      "repository": "tudragon154203/scrapling-fastapi",
+      "path": ".github/workflows/stable/README.md",
+      "html_url": "https://github.com/tudragon154203/scrapling-fastapi/blob/9986bf511a57fb5ea81f25bc209d33a0b8e6b2a5/.github/workflows/stable/README.md"
+    },
+    {
+      "repository": "LucasBurgessDev/LucasBurgessDev.github.io",
+      "path": ".github/workflows/gemini-security.yml.hold",
+      "html_url": "https://github.com/LucasBurgessDev/LucasBurgessDev.github.io/blob/56d1b8b316de87e9c8ff5bf86134585b050f2d12/.github/workflows/gemini-security.yml.hold"
+    },
+    {
+      "repository": "adaj/consent",
+      "path": ".github/workflows/pr-review/README.md",
+      "html_url": "https://github.com/adaj/consent/blob/788e30667787ca4ff9cff3c6aef271c57c214dab/.github/workflows/pr-review/README.md"
+    },
+    {
+      "repository": "cesine/tic-tac-toe",
+      "path": ".github/workflows/pr-review/README.md",
+      "html_url": "https://github.com/cesine/tic-tac-toe/blob/1f6c6a80f6cf879316506a83a08604930e9b50c4/.github/workflows/pr-review/README.md"
+    },
+    {
+      "repository": "yuubinnkyoku/school-converter",
+      "path": ".github/workflows/issue-triage/README.md",
+      "html_url": "https://github.com/yuubinnkyoku/school-converter/blob/48fae87038c779a86bb33f74ba8128b620e0b66a/.github/workflows/issue-triage/README.md"
+    },
+    {
+      "repository": "adaj/consent",
+      "path": ".github/workflows/gemini-assistant/README.md",
+      "html_url": "https://github.com/adaj/consent/blob/788e30667787ca4ff9cff3c6aef271c57c214dab/.github/workflows/gemini-assistant/README.md"
+    },
+    {
+      "repository": "mashharuki/Gemini-cli-GitHubActions-Sample",
+      "path": ".github/workflows/issue-triage/README.md",
+      "html_url": "https://github.com/mashharuki/Gemini-cli-GitHubActions-Sample/blob/32d381c385307bf68b632b8c2aa58ca91935eab0/.github/workflows/issue-triage/README.md"
+    },
+    {
+      "repository": "metao1/microservice-online-store",
+      "path": ".github/workflows/gemini-review.yml",
+      "html_url": "https://github.com/metao1/microservice-online-store/blob/c725ff7fce79fdca7ddc48fc575a967a41263fa3/.github/workflows/gemini-review.yml"
+    }
+  ]
+}

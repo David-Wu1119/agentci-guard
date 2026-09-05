@@ -1,0 +1,261 @@
+{
+  "protocol": "PROTOCOL.md",
+  "started_at": "2026-09-05T18:15:16.911Z",
+  "finished_at": "2026-09-05T18:15:38.782Z",
+  "cases": [
+    {
+      "case_id": "u-01",
+      "group": "G1-claude",
+      "group_query": "G1",
+      "search_rank": 2,
+      "repository": "remotion-dev/remotion",
+      "path": ".github/workflows/claude.yml",
+      "default_branch": "main",
+      "head_commit": "cb053ab25292f8e7559dc5295f4286cde2268481",
+      "raw_url": "https://raw.githubusercontent.com/remotion-dev/remotion/cb053ab25292f8e7559dc5295f4286cde2268481/.github/workflows/claude.yml",
+      "sha256": "f51ed3a217a5ebdcec490329287cb010b3126cf498e962e2acc209315d1d49c5",
+      "bytes": 1910,
+      "collected_at": "2026-09-05T18:15:19.661Z"
+    },
+    {
+      "case_id": "u-02",
+      "group": "G1-claude",
+      "group_query": "G1",
+      "search_rank": 4,
+      "repository": "instructure/canvas-lms",
+      "path": ".github/workflows/claude.yml",
+      "default_branch": "master",
+      "head_commit": "1c9f0bb8013ed69c4f2efe11fd483025469b7e6c",
+      "raw_url": "https://raw.githubusercontent.com/instructure/canvas-lms/1c9f0bb8013ed69c4f2efe11fd483025469b7e6c/.github/workflows/claude.yml",
+      "sha256": "d8c67a50d386d644ee1c902200a22b43bb26472bffcde63c01e275cbc5c7e8dc",
+      "bytes": 1394,
+      "collected_at": "2026-09-05T18:15:20.825Z"
+    },
+    {
+      "case_id": "u-03",
+      "group": "G1-claude",
+      "group_query": "G1",
+      "search_rank": 6,
+      "repository": "shopware/shopware",
+      "path": ".github/workflows/claude.yml",
+      "default_branch": "trunk",
+      "head_commit": "2bf15434a9df102048bafd136bf48e3b2892d5c6",
+      "raw_url": "https://raw.githubusercontent.com/shopware/shopware/2bf15434a9df102048bafd136bf48e3b2892d5c6/.github/workflows/claude.yml",
+      "sha256": "513f25f830a6404b483fb3daa6eb0e17a840a200a52d5722acce97676a2baf70",
+      "bytes": 1988,
+      "collected_at": "2026-09-05T18:15:21.716Z"
+    },
+    {
+      "case_id": "u-04",
+      "group": "G1-claude",
+      "group_query": "G1",
+      "search_rank": 9,
+      "repository": "fxsound2/fxsound-app",
+      "path": ".github/workflows/claude.yml",
+      "default_branch": "main",
+      "head_commit": "c639f20c036f2c8b20d6ceadd98f4726c69c538b",
+      "raw_url": "https://raw.githubusercontent.com/fxsound2/fxsound-app/c639f20c036f2c8b20d6ceadd98f4726c69c538b/.github/workflows/claude.yml",
+      "sha256": "d2e26bc4b1a54b58870a63f16e0822c9e054cc6d516993ff653f6acb4048d9fc",
+      "bytes": 1634,
+      "collected_at": "2026-09-05T18:15:27.149Z"
+    },
+    {
+      "case_id": "u-05",
+      "group": "G2-other-agent",
+      "group_query": "G2a",
+      "search_rank": 1,
+      "repository": "openclaw/openclaw",
+      "path": ".github/workflows/dated-todo-sweep.yml",
+      "default_branch": "main",
+      "head_commit": "717f824924fe0e801d9467403cc5680faa05c5e7",
+      "raw_url": "https://raw.githubusercontent.com/openclaw/openclaw/717f824924fe0e801d9467403cc5680faa05c5e7/.github/workflows/dated-todo-sweep.yml",
+      "sha256": "6d5fcf86ad35696f7cc1cb60de473b83f767bba0969bf93c79839b9b36c26721",
+      "bytes": 5849,
+      "collected_at": "2026-09-05T18:15:28.698Z"
+    },
+    {
+      "case_id": "u-06",
+      "group": "G2-other-agent",
+      "group_query": "G2b",
+      "search_rank": 1,
+      "repository": "google-gemini/gemini-cli",
+      "path": ".github/workflows/docs-audit.yml",
+      "default_branch": "main",
+      "head_commit": "85aca163f6c73ac6ce380b5447359146b8adcae4",
+      "raw_url": "https://raw.githubusercontent.com/google-gemini/gemini-cli/85aca163f6c73ac6ce380b5447359146b8adcae4/.github/workflows/docs-audit.yml",
+      "sha256": "a8b62aa16c697f425ceb09d4890051429a7c66384f1d212339b0313eb742c03c",
+      "bytes": 2254,
+      "collected_at": "2026-09-05T18:15:30.255Z"
+    },
+    {
+      "case_id": "u-07",
+      "group": "G2-other-agent",
+      "group_query": "G2c",
+      "search_rank": 2,
+      "repository": "TheAgentCompany/TheAgentCompany",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "default_branch": "main",
+      "head_commit": "98b68ef82a47690c316f42fddb05baafaab56851",
+      "raw_url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/.github/workflows/openhands-resolver.yml",
+      "sha256": "cfcc18614e349f6daaf24366a83a35393982d86454d2dbac24f3f85389ee696e",
+      "bytes": 567,
+      "collected_at": "2026-09-05T18:15:32.391Z"
+    },
+    {
+      "case_id": "u-08",
+      "group": "G2-other-agent",
+      "group_query": "G2a",
+      "search_rank": 8,
+      "repository": "dbcli/pgcli",
+      "path": ".github/workflows/codex-review.yml",
+      "default_branch": "main",
+      "head_commit": "8e4aef4fe1bf36db25a80e1478d3952a11c839f1",
+      "raw_url": "https://raw.githubusercontent.com/dbcli/pgcli/8e4aef4fe1bf36db25a80e1478d3952a11c839f1/.github/workflows/codex-review.yml",
+      "sha256": "846b0b43fb0c9a829fa498dd3925768eea726e59a0df65d1812f48c497738ea4",
+      "bytes": 2871,
+      "collected_at": "2026-09-05T18:15:33.198Z"
+    },
+    {
+      "case_id": "u-09",
+      "group": "G3-control",
+      "group_query": "G3",
+      "search_rank": 1,
+      "repository": "Gitdigital-products/solana-compliance-registry",
+      "path": ".GitHub/workflows/build.yml",
+      "default_branch": "main",
+      "head_commit": "e257b6291a4a032a35b1f02cce65576d1f8c0771",
+      "raw_url": "https://raw.githubusercontent.com/Gitdigital-products/solana-compliance-registry/e257b6291a4a032a35b1f02cce65576d1f8c0771/.GitHub/workflows/build.yml",
+      "sha256": "9edf50b8a791d8bad8a936ae3618b09e7326032e2688e548ffc0382d2f4263e6",
+      "bytes": 263,
+      "collected_at": "2026-09-05T18:15:36.168Z"
+    },
+    {
+      "case_id": "u-10",
+      "group": "G3-control",
+      "group_query": "G3",
+      "search_rank": 2,
+      "repository": "Ibraah2/LEOPARD",
+      "path": ".GitHub/workflows/continuous.yml",
+      "default_branch": "main",
+      "head_commit": "90411a030e646e07f696939b438e9ae3405853ba",
+      "raw_url": "https://raw.githubusercontent.com/Ibraah2/LEOPARD/90411a030e646e07f696939b438e9ae3405853ba/.GitHub/workflows/continuous.yml",
+      "sha256": "43c281fb0f6b115e7d422024669d97f4c005a0c8b62963048f24d4236b189022",
+      "bytes": 974,
+      "collected_at": "2026-09-05T18:15:36.999Z"
+    },
+    {
+      "case_id": "u-11",
+      "group": "G3-control",
+      "group_query": "G3",
+      "search_rank": 3,
+      "repository": "Devteam713/Porkelon-Ecosystem",
+      "path": ".GitHub/workflows/ci.yml",
+      "default_branch": "main",
+      "head_commit": "4908582ae554578905f6f0bc5ed928c4977fc291",
+      "raw_url": "https://raw.githubusercontent.com/Devteam713/Porkelon-Ecosystem/4908582ae554578905f6f0bc5ed928c4977fc291/.GitHub/workflows/ci.yml",
+      "sha256": "f14794fa34f4d5670556c616ed992efaaa901d82e79ebfcd1d18ad09ca2effad",
+      "bytes": 396,
+      "collected_at": "2026-09-05T18:15:37.841Z"
+    },
+    {
+      "case_id": "u-12",
+      "group": "G3-control",
+      "group_query": "G3",
+      "search_rank": 4,
+      "repository": "HLSV/ldea",
+      "path": ".Github/workflows/Ci.yml",
+      "default_branch": "main",
+      "head_commit": "0c6f744ae74639e340914d8c26bb92a94d97a160",
+      "raw_url": "https://raw.githubusercontent.com/HLSV/ldea/0c6f744ae74639e340914d8c26bb92a94d97a160/.Github/workflows/Ci.yml",
+      "sha256": "a2241b1b88e35fa976d0fa7a698c86b8e96f2fd911cc99948b26b9c43076a6e8",
+      "bytes": 455,
+      "collected_at": "2026-09-05T18:15:38.782Z"
+    }
+  ],
+  "replacements": [
+    {
+      "group_query": "G1",
+      "rank": 1,
+      "repository": "FastLED/FastLED",
+      "path": ".github/workflows/README.md",
+      "reason": "4: not directly under .github/workflows with yml/yaml suffix"
+    },
+    {
+      "group_query": "G1",
+      "rank": 3,
+      "repository": "taikoxyz/taiko-mono",
+      "path": ".github/workflows/claude-layout-review.yml.bkup",
+      "reason": "4: not directly under .github/workflows with yml/yaml suffix"
+    },
+    {
+      "group_query": "G1",
+      "rank": 5,
+      "repository": "autobrr/qui",
+      "path": ".github/workflows/claude.yml.disabled",
+      "reason": "1: repository in benchmark/corpus/exclusion list"
+    },
+    {
+      "group_query": "G1",
+      "rank": 7,
+      "repository": "EvotecIT/PSWriteHTML",
+      "path": ".github/workflows/claude-code-review.yml.disabled",
+      "reason": "4: not directly under .github/workflows with yml/yaml suffix"
+    },
+    {
+      "group_query": "G1",
+      "rank": 8,
+      "repository": "EvotecIT/EventViewerX",
+      "path": ".github/workflows/claude.yml.disabled",
+      "reason": "4: not directly under .github/workflows with yml/yaml suffix"
+    },
+    {
+      "group_query": "G2c",
+      "rank": 1,
+      "repository": "OpenHands/software-agent-sdk",
+      "path": ".github/workflows/oh-update-documentation.yml.back",
+      "reason": "4: not directly under .github/workflows with yml/yaml suffix"
+    },
+    {
+      "group_query": "G2a",
+      "rank": 2,
+      "repository": "openclaw/openclaw",
+      "path": ".github/workflows/docs-agent.yml",
+      "reason": "2: repository already selected"
+    },
+    {
+      "group_query": "G2a",
+      "rank": 3,
+      "repository": "openclaw/openclaw",
+      "path": ".github/workflows/release-validation-skill-runner.yml",
+      "reason": "2: repository already selected"
+    },
+    {
+      "group_query": "G2a",
+      "rank": 4,
+      "repository": "astral-sh/uv",
+      "path": ".github/workflows/release-prepare.yml",
+      "reason": "1: repository in benchmark/corpus/exclusion list"
+    },
+    {
+      "group_query": "G2a",
+      "rank": 5,
+      "repository": "astral-sh/uv",
+      "path": ".github/workflows/reproduce-bug.yml",
+      "reason": "1: repository in benchmark/corpus/exclusion list"
+    },
+    {
+      "group_query": "G2a",
+      "rank": 6,
+      "repository": "astral-sh/uv",
+      "path": ".github/workflows/pull-request-labels.yml",
+      "reason": "1: repository in benchmark/corpus/exclusion list"
+    },
+    {
+      "group_query": "G2a",
+      "rank": 7,
+      "repository": "astral-sh/uv",
+      "path": ".github/workflows/fix-bug.yml",
+      "reason": "1: repository in benchmark/corpus/exclusion list"
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "scanned_at": "2026-09-05T18:21:44.180Z",
+  "root": "/Users/davidwu/Documents/Codex/agentci-guard/evidence/sprint-2026-09-05/day5/snapshots/u-03",
+  "workflow_count": 1,
+  "agent_usages": [
+    {
+      "id": ".github/workflows/claude.yml:claude:1:",
+      "file": ".github/workflows/claude.yml",
+      "job": "claude",
+      "step": "Run Claude Code",
+      "step_index": 1,
+      "kind": "action",
+      "evidence": "anthropics/claude-code-action@d40ddef4c030e508327d6e35a9c45f3368482c50",
+      "line": 33,
+      "reachable_events": [
+        "issue_comment",
+        "pull_request_review_comment",
+        "issues",
+        "pull_request_review"
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "agentci/ai-with-secrets:.github/workflows/claude.yml:claude::",
+      "rule_id": "agentci/ai-with-secrets",
+      "title": "AI agent job has access to secrets",
+      "severity": "medium",
+      "file": ".github/workflows/claude.yml",
+      "job": "claude",
+      "message": "AI agent job has access to secrets",
+      "why": "Secrets mounted into an AI-agent job can be exfiltrated if untrusted prompt content influences tool use, shell commands, or generated output. Most AI actions require a provider key, so this is a baseline exposure to review rather than a vulnerability on its own — it becomes high-risk when combined with untrusted input or write permissions (see agentci/untrusted-ai-write-token).",
+      "fix": [
+        "Do not expose secrets to agent jobs that process untrusted content.",
+        "Use short-lived scoped tokens.",
+        "Move secret-bearing actions behind manual approval."
+      ],
+      "evidence": "AI step's effective environment or inputs reference a secret/token",
+      "line": 14,
+      "reachable_events": [
+        "issue_comment",
+        "issues",
+        "pull_request_review",
+        "pull_request_review_comment"
+      ]
+    }
+  ],
+  "summary": {
+    "low": 0,
+    "medium": 1,
+    "high": 0,
+    "critical": 0
+  },
+  "diagnostics": [
+    {
+      "code": "agentci/analysis-event-condition",
+      "kind": "analysis",
+      "severity": "warning",
+      "file": ".github/workflows/claude.yml",
+      "job": "claude",
+      "line": 14,
+      "message": "Could not fully interpret this job's github.event_name condition; event reachability was kept conservative."
+    }
+  ],
+  "analysis_complete": false
+}

@@ -1,0 +1,8 @@
+v0.5.1 tag-smoke run 33984277232
+tag-smoke: success https://github.com/David-Wu1119/agentci-guard/actions/runs/33984277232
+v0 moved to 6961311
+a38aae1863eccc81c028f742d4bcc15b3af9faba	refs/tags/v0
+69613119330324346ed215148db7d672b4e2fd69	refs/tags/v0^{}
+69613119330324346ed215148db7d672b4e2fd69	refs/tags/v0.5.1^{}
+
+[exited with code 0]
