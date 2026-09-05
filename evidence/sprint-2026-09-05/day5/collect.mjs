@@ -93,7 +93,7 @@ function tryItem(query, item, rank, groupName) {
   const meta = api(`repos/${repo}`);
   if (meta.archived) return reject(query, item, rank, "3: archived");
   if (meta.fork) return reject(query, item, rank, "3: fork");
-  if (!/^\.github\/workflows\/[^/]+\.ya?ml$/i.test(item.path)) return reject(query, item, rank, "4: not directly under .github/workflows with yml/yaml suffix");
+  if (!/^\.github\/workflows\/[^/]+\.ya?ml$/.test(item.path)) return reject(query, item, rank, "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix");
   const head = api(`repos/${repo}/commits/${encodeURIComponent(meta.default_branch)}`).sha;
   const rawUrl = `https://raw.githubusercontent.com/${repo}/${head}/${item.path}`;
   let raw;

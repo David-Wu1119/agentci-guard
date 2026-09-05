@@ -1,0 +1,507 @@
+{
+  "fetched_at": "2026-09-05T18:15:18.469Z",
+  "endpoint": "search/code?q=%22anthropics%2Fclaude-code-action%22%20path%3A.github%2Fworkflows&sort=indexed&order=desc&per_page=100",
+  "total_count": 17440,
+  "items": [
+    {
+      "repository": "FastLED/FastLED",
+      "path": ".github/workflows/README.md",
+      "html_url": "https://github.com/FastLED/FastLED/blob/ff322e2ca0c6aca9174f752d7156c6fee09c5420/.github/workflows/README.md"
+    },
+    {
+      "repository": "remotion-dev/remotion",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/remotion-dev/remotion/blob/cb053ab25292f8e7559dc5295f4286cde2268481/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "taikoxyz/taiko-mono",
+      "path": ".github/workflows/claude-layout-review.yml.bkup",
+      "html_url": "https://github.com/taikoxyz/taiko-mono/blob/e9c9417bff677f5c446603a88aaa6735686a0ee7/.github/workflows/claude-layout-review.yml.bkup"
+    },
+    {
+      "repository": "instructure/canvas-lms",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/instructure/canvas-lms/blob/1c9f0bb8013ed69c4f2efe11fd483025469b7e6c/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "autobrr/qui",
+      "path": ".github/workflows/claude.yml.disabled",
+      "html_url": "https://github.com/autobrr/qui/blob/865d26a87899acc73b8e355ee3f6557705d7163c/.github/workflows/claude.yml.disabled"
+    },
+    {
+      "repository": "shopware/shopware",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/shopware/shopware/blob/2bf15434a9df102048bafd136bf48e3b2892d5c6/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "EvotecIT/PSWriteHTML",
+      "path": ".github/workflows/claude-code-review.yml.disabled",
+      "html_url": "https://github.com/EvotecIT/PSWriteHTML/blob/06a72449f57f28e2758a612d062a8c0b34e9d433/.github/workflows/claude-code-review.yml.disabled"
+    },
+    {
+      "repository": "EvotecIT/EventViewerX",
+      "path": ".github/workflows/claude.yml.disabled",
+      "html_url": "https://github.com/EvotecIT/EventViewerX/blob/2a7de7f5eb14a5157db65e080ea270f1490931c7/.github/workflows/claude.yml.disabled"
+    },
+    {
+      "repository": "fxsound2/fxsound-app",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/fxsound2/fxsound-app/blob/c639f20c036f2c8b20d6ceadd98f4726c69c538b/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "windmill-labs/windmill",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/windmill-labs/windmill/blob/c37f59e22a1948d63f10ad443690a6d341248c5b/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "workadventure/workadventure",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/workadventure/workadventure/blob/a4e0c5c12e566612224973fbe452e3fb0e045e87/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "wvlet/airframe",
+      "path": ".github/workflows/claude-code-review.yml.disabled",
+      "html_url": "https://github.com/wvlet/airframe/blob/95a7254c3c6dc2a3dd617d3bf11f602699c76a6a/.github/workflows/claude-code-review.yml.disabled"
+    },
+    {
+      "repository": "mxpv/podsync",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/mxpv/podsync/blob/2e7bf1922b18d7b4dbaaf64d10ebe0a116c9164e/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "medplum/medplum",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/medplum/medplum/blob/7c6488d3ac1bd7abd33414751ee12c3852c8a4e0/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "mattzcarey/shippie",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/mattzcarey/shippie/blob/23e91d0c3ed12950c5de591e9e11d9b0c6dbf3f8/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "bcherny/json-schema-to-typescript",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/bcherny/json-schema-to-typescript/blob/dd33ded9766582114e6c9a189a8d2cac1d62d474/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "EvotecIT/EventViewerX",
+      "path": ".github/workflows/claude-code-review.yml.disabled",
+      "html_url": "https://github.com/EvotecIT/EventViewerX/blob/2a7de7f5eb14a5157db65e080ea270f1490931c7/.github/workflows/claude-code-review.yml.disabled"
+    },
+    {
+      "repository": "ElDavoo/wa-crypt-tools",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/ElDavoo/wa-crypt-tools/blob/354bf5b0d1b4dfff03bf24c70c937c57d25d9782/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "autobrr/qui",
+      "path": ".github/workflows/pr-review.yml.disabled",
+      "html_url": "https://github.com/autobrr/qui/blob/865d26a87899acc73b8e355ee3f6557705d7163c/.github/workflows/pr-review.yml.disabled"
+    },
+    {
+      "repository": "slhck/ffmpeg-normalize",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/slhck/ffmpeg-normalize/blob/0809f68ab5cb3117f9f1fbf624bca5f51f11e5e8/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "aws-samples/bedrock-chat",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/aws-samples/bedrock-chat/blob/e102619548891e723042947d9ea0d71c0728a210/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "pdpipe/pdpipe",
+      "path": ".github/workflows/claude-code-review.ymlbackup",
+      "html_url": "https://github.com/pdpipe/pdpipe/blob/b50001d62f7fa5e8e3f81c2f4cb076fc304475b6/.github/workflows/claude-code-review.ymlbackup"
+    },
+    {
+      "repository": "rodrigorodrigues/microservices-design-patterns",
+      "path": ".github/workflows/CLAUDE_SETUP.md",
+      "html_url": "https://github.com/rodrigorodrigues/microservices-design-patterns/blob/6bd4bb6cdefcc2845276d34c3202e942202dad48/.github/workflows/CLAUDE_SETUP.md"
+    },
+    {
+      "repository": "SHAdd0WTAka/Zen-Ai-Pentest",
+      "path": ".github/workflows/archive/claude.yml.disabled",
+      "html_url": "https://github.com/SHAdd0WTAka/Zen-Ai-Pentest/blob/a32344d8e4c094113c630beeaff131fe06171e12/.github/workflows/archive/claude.yml.disabled"
+    },
+    {
+      "repository": "agent-sh/agnix",
+      "path": ".github/workflows/README.md",
+      "html_url": "https://github.com/agent-sh/agnix/blob/6a316a5d01f0c4cd6a1a6f48f1be4da34b792ec6/.github/workflows/README.md"
+    },
+    {
+      "repository": "humanlayer/agentcontrolplane",
+      "path": ".github/workflows/claude-code-review.yml.disabled",
+      "html_url": "https://github.com/humanlayer/agentcontrolplane/blob/eaa2a7ed1d9cb4e13dc53defaf420e36f481dcad/.github/workflows/claude-code-review.yml.disabled"
+    },
+    {
+      "repository": "i-am-bee/agentstack",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/i-am-bee/agentstack/blob/79c786049d39684841d77fef9abfd8457a58b0bf/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "etal/cnvkit",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/etal/cnvkit/blob/b4509b4f4582571590cf400b04ad965662a3d121/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "humanlayer/agentcontrolplane",
+      "path": ".github/workflows/claude-comment-response.yml.disabled",
+      "html_url": "https://github.com/humanlayer/agentcontrolplane/blob/eaa2a7ed1d9cb4e13dc53defaf420e36f481dcad/.github/workflows/claude-comment-response.yml.disabled"
+    },
+    {
+      "repository": "data-prep-kit/data-prep-kit",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/data-prep-kit/data-prep-kit/blob/902c4b5b3ea123368711543e9a8085c1ffa74771/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "alirezarezvani/claude-code-skill-factory",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/alirezarezvani/claude-code-skill-factory/blob/ba18b31703542d9d7eda5f9ba94f0df65a59dddf/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "gronxb/hot-updater",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/gronxb/hot-updater/blob/fbfd335445831bd724517793c7a3eb7e00744abf/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "dimagi/open-chat-studio",
+      "path": ".github/workflows/README-claude-workflows.md",
+      "html_url": "https://github.com/dimagi/open-chat-studio/blob/289d6f0479dd3deee445b59fe0b6a8e014b47cc9/.github/workflows/README-claude-workflows.md"
+    },
+    {
+      "repository": "SHAdd0WTAka/Zen-Ai-Pentest",
+      "path": ".github/workflows/archive/claude-code-review.yml.disabled",
+      "html_url": "https://github.com/SHAdd0WTAka/Zen-Ai-Pentest/blob/a32344d8e4c094113c630beeaff131fe06171e12/.github/workflows/archive/claude-code-review.yml.disabled"
+    },
+    {
+      "repository": "mattgodbolt/jsbeeb",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/mattgodbolt/jsbeeb/blob/ead788f03909a408a2842bcc315ff4a111798823/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "hookdeck/outpost",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/hookdeck/outpost/blob/f67ae011b287ff2588cb06699d808a69bba6ab4d/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "EvotecIT/ADEssentials",
+      "path": ".github/workflows/claude-code-review.yml.disabled",
+      "html_url": "https://github.com/EvotecIT/ADEssentials/blob/7b76945f6f2bf67c16750178d34dc273c855cb4f/.github/workflows/claude-code-review.yml.disabled"
+    },
+    {
+      "repository": "prof18/feed-flow",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/prof18/feed-flow/blob/28e961cf6bccc16d6831c97d7b6c31ef58beb809/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "codeyousef/summon",
+      "path": ".github/workflows/claude.yml.disabled",
+      "html_url": "https://github.com/codeyousef/summon/blob/c66968f4038a78b9bf15035d24c91af44f4a833f/.github/workflows/claude.yml.disabled"
+    },
+    {
+      "repository": "mxpv/podsync",
+      "path": ".github/workflows/triage.yml",
+      "html_url": "https://github.com/mxpv/podsync/blob/2e7bf1922b18d7b4dbaaf64d10ebe0a116c9164e/.github/workflows/triage.yml"
+    },
+    {
+      "repository": "joe-bell/cva",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/joe-bell/cva/blob/b453ccb17f6bce5f8286c5bf8921b4c12edaf9e9/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "humanlayer/agentcontrolplane",
+      "path": ".github/workflows/claude-pr-creation.yml.disabled",
+      "html_url": "https://github.com/humanlayer/agentcontrolplane/blob/eaa2a7ed1d9cb4e13dc53defaf420e36f481dcad/.github/workflows/claude-pr-creation.yml.disabled"
+    },
+    {
+      "repository": "dandye/ai-runbooks",
+      "path": ".github/workflows/claude.yml.disabled",
+      "html_url": "https://github.com/dandye/ai-runbooks/blob/72a6863374f92bfaaaf866fe659645783fb4e23d/.github/workflows/claude.yml.disabled"
+    },
+    {
+      "repository": "tegnike/aituber-kit",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/tegnike/aituber-kit/blob/6be82fe707ca21c496fc201b10aa9ed43af4eb15/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "freenet/freenet-core",
+      "path": ".github/workflows/ci.yml",
+      "html_url": "https://github.com/freenet/freenet-core/blob/af7c52e7fec1a20c2e842093080b7f6d43e980b1/.github/workflows/ci.yml"
+    },
+    {
+      "repository": "EvotecIT/OfficeIMO",
+      "path": ".github/workflows/claude-code-review.yml.disabled",
+      "html_url": "https://github.com/EvotecIT/OfficeIMO/blob/2bfa3898f6860a3f36f2eafc594a2d5a921748bb/.github/workflows/claude-code-review.yml.disabled"
+    },
+    {
+      "repository": "studie-tech/TheNinjaRPG",
+      "path": ".github/workflows/claude.yml.disabled",
+      "html_url": "https://github.com/studie-tech/TheNinjaRPG/blob/345d18accf6d8ea8d8d47ef0e61b5aff7d5a1cf9/.github/workflows/claude.yml.disabled"
+    },
+    {
+      "repository": "Mehigh17/BlazorLeaflet",
+      "path": ".github/workflows/main.yml",
+      "html_url": "https://github.com/Mehigh17/BlazorLeaflet/blob/7c03fc99e1b694716482c2fa16cd511f8fd32185/.github/workflows/main.yml"
+    },
+    {
+      "repository": "go-kratos/blades",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/go-kratos/blades/blob/b78fec59029d11e02c135ea10da8986ed006521f/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "BayraktarLab/cell2location",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/BayraktarLab/cell2location/blob/afb07fda7f89458e44a4afdf21c26aeb7251ebfa/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "EvotecIT/Mailozaurr",
+      "path": ".github/workflows/claude-code-review.yml.disabled",
+      "html_url": "https://github.com/EvotecIT/Mailozaurr/blob/7338bc4471a992169edc6a15a475f9e369f141fa/.github/workflows/claude-code-review.yml.disabled"
+    },
+    {
+      "repository": "PyPSA/linopy",
+      "path": ".github/workflows/claude-code-review.yml.bkp",
+      "html_url": "https://github.com/PyPSA/linopy/blob/b71e9a93716136c82058f0a67e4e5c9123fe93a6/.github/workflows/claude-code-review.yml.bkp"
+    },
+    {
+      "repository": "StuMason/coolify-mcp",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/StuMason/coolify-mcp/blob/07a423469053dbbd924ef95a32a9833da0124383/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "EvotecIT/PSPublishModule",
+      "path": ".github/workflows/claude.yml.disabled",
+      "html_url": "https://github.com/EvotecIT/PSPublishModule/blob/3fb959e848e8d05744af826b7a74ae7edcc1e41d/.github/workflows/claude.yml.disabled"
+    },
+    {
+      "repository": "TesslateAI/OpenSail",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/TesslateAI/OpenSail/blob/bc6cf79fda5b13c937dbae92bdf2d912a987eeb0/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "ahmedelgabri/dotfiles",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/ahmedelgabri/dotfiles/blob/df5a0d3531d6e3c73d5cbc3e79f1e1521377805c/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "grafana/plugin-ci-workflows",
+      "path": ".github/workflows/CHANGELOG.md",
+      "html_url": "https://github.com/grafana/plugin-ci-workflows/blob/6ad44d5bcd6cbdea9042c1b9edec07d37c2a9fd4/.github/workflows/CHANGELOG.md"
+    },
+    {
+      "repository": "anthropics/healthcare",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/anthropics/healthcare/blob/c7ed150d376bdd13219eb0bfeb4203e12da85516/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "WildMeOrg/Wildbook",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/WildMeOrg/Wildbook/blob/167915195e334ffbde3fafe7d31c97b62e112a33/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "mattermost/mattermost-developer-documentation",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/mattermost/mattermost-developer-documentation/blob/1bdd32eb2ef7ca3f4bd4cb87132e71c314c6da1d/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "pierreaubert/sotf",
+      "path": ".github/workflows/claude.yml.tobefixed",
+      "html_url": "https://github.com/pierreaubert/sotf/blob/a8861078ee4c9bcca06a6e5c13cd231aa2fd20cb/.github/workflows/claude.yml.tobefixed"
+    },
+    {
+      "repository": "typstyle-rs/typstyle",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/typstyle-rs/typstyle/blob/8a3c6e200b9548fb0bc22d9cd7470bb55b3667dc/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "chongdashu/cc-statusline",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/chongdashu/cc-statusline/blob/6fe55d96e8688d7951fbab35e5d4a4545e37dd4a/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "umbraco/Umbraco.AI",
+      "path": ".github/workflows/claude.yml.disabled",
+      "html_url": "https://github.com/umbraco/Umbraco.AI/blob/4267f20a4f72a3b7bdd519dc3f296d0ef965ee55/.github/workflows/claude.yml.disabled"
+    },
+    {
+      "repository": "Pseudo-Corp/SynergismOfficial",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/Pseudo-Corp/SynergismOfficial/blob/c19e0db1a15fd5abfb8fffc8812409ad1c8ba490/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "dandye/ai-runbooks",
+      "path": ".github/workflows/claude-code-review.yml.disabled",
+      "html_url": "https://github.com/dandye/ai-runbooks/blob/72a6863374f92bfaaaf866fe659645783fb4e23d/.github/workflows/claude-code-review.yml.disabled"
+    },
+    {
+      "repository": "semgrep/skills",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/semgrep/skills/blob/68177b8830f96cd9d10dacbb14dde2566360503d/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "jackluson/sync-your-cookie",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/jackluson/sync-your-cookie/blob/faf31f67eafa2bed8a7ca61f9fba2ec9196ee1d0/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "mlc-ai/pith-train",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/mlc-ai/pith-train/blob/37ec79d4ae348e0f575dbde52f828935713691df/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "severity1/claude-agent-sdk-go",
+      "path": ".github/workflows/claude-code-review.yml.disabled",
+      "html_url": "https://github.com/severity1/claude-agent-sdk-go/blob/4e9da3bcc976941b5b34765d2536239651540b5a/.github/workflows/claude-code-review.yml.disabled"
+    },
+    {
+      "repository": "colopl/laravel-spanner",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/colopl/laravel-spanner/blob/c1799ad37f4cdde716ef6e299ff9135fd7015a44/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "EvotecIT/PSPublishModule",
+      "path": ".github/workflows/claude-code-review.yml.disabled",
+      "html_url": "https://github.com/EvotecIT/PSPublishModule/blob/3fb959e848e8d05744af826b7a74ae7edcc1e41d/.github/workflows/claude-code-review.yml.disabled"
+    },
+    {
+      "repository": "octaviospain/Musicott",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/octaviospain/Musicott/blob/32c6662850ee16b1234fa8413cd12911b31fbe0b/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "changjonathanc/llmproc",
+      "path": ".github/workflows/README.md",
+      "html_url": "https://github.com/changjonathanc/llmproc/blob/6632583e3cf27a84683eee1bad38945c79d075ac/.github/workflows/README.md"
+    },
+    {
+      "repository": "PierrunoYT/Kokoro-TTS-Local",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/PierrunoYT/Kokoro-TTS-Local/blob/0906a4e3a32b988307615309c722cdc866782dce/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "kargnas/laravel-ai-translator",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/kargnas/laravel-ai-translator/blob/2d06ede9d59c0c906b016b152e1075b3d2603d01/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "EvotecIT/DomainDetective",
+      "path": ".github/workflows/claude-code-review.yml.disabled",
+      "html_url": "https://github.com/EvotecIT/DomainDetective/blob/0f63d2a08fe6b1810e55fc4237a365f83a854d0b/.github/workflows/claude-code-review.yml.disabled"
+    },
+    {
+      "repository": "LFDT-Lineth/lineth-monorepo",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/LFDT-Lineth/lineth-monorepo/blob/d3e19a5e5abb9be29757d70270b34d4ec8b8e6e1/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "wvlet/wvlet",
+      "path": ".github/workflows/claude-code-review.yml.template",
+      "html_url": "https://github.com/wvlet/wvlet/blob/5a2d74d2ed21d6c8ac8d2ac634d3f3b2eb17b073/.github/workflows/claude-code-review.yml.template"
+    },
+    {
+      "repository": "indextables/indextables_spark",
+      "path": ".github/workflows/claude.yml.disabled",
+      "html_url": "https://github.com/indextables/indextables_spark/blob/843ed3ccdf0e72185d414fc012d1775a01586cf5/.github/workflows/claude.yml.disabled"
+    },
+    {
+      "repository": "GeorgeVassilakis/SMPy",
+      "path": ".github/workflows/claude.yml.disabled",
+      "html_url": "https://github.com/GeorgeVassilakis/SMPy/blob/26d231f5b4b22b41e76cb3bd3143d799c2e7ebfe/.github/workflows/claude.yml.disabled"
+    },
+    {
+      "repository": "tangle-network/blueprint",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/tangle-network/blueprint/blob/54f06f2e8cc697435c862f9e24fcefe45aab3324/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "ben-vargas/ai-sdk-provider-claude-code",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/ben-vargas/ai-sdk-provider-claude-code/blob/ac40fa608889b95df22eccb94926c1799d6adf22/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "madara-alliance/madara",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/madara-alliance/madara/blob/daaacf0055fbea1dca67b49aab5a74426efbf49c/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "trailofbits/mcp-context-protector",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/trailofbits/mcp-context-protector/blob/05e56c1616f4382ca25eb15bdfc98c4967bbdd74/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "Conceptual-Machines/magda-core",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/Conceptual-Machines/magda-core/blob/15e9071d657bf9179432c6a0a3a62f8dd686d8a1/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "yoshiko-pg/o3-search-mcp",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/yoshiko-pg/o3-search-mcp/blob/1ad6938fcfe504246feef32c153e840436f0496c/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "elegooofficial/ElegooSlicer",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/elegooofficial/ElegooSlicer/blob/3f1042e9e44c4ad10a721d7c9432c8fe15205202/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "AliAkhtari78/SpotifyScraper",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/AliAkhtari78/SpotifyScraper/blob/9cbf05aa4963bac3684bb941270dcb62fc851ab7/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "alivecontext/alive",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/alivecontext/alive/blob/81b488cd8e949de6212ac45eeba59035990f2582/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "usetrmnl/trmnl-home-assistant",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/usetrmnl/trmnl-home-assistant/blob/db90320269d507bba3f36a6ed0d65a9e182c05e4/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "steffenfritz/mxcheck",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/steffenfritz/mxcheck/blob/08ac69d7a299e1af62506b836f1f60fe0a4afc3d/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "umbraco/Umbraco.AI",
+      "path": ".github/workflows/claude-code-review.yml.disabled",
+      "html_url": "https://github.com/umbraco/Umbraco.AI/blob/4267f20a4f72a3b7bdd519dc3f296d0ef965ee55/.github/workflows/claude-code-review.yml.disabled"
+    },
+    {
+      "repository": "evochora/evochora",
+      "path": ".github/workflows/claude.yml.disabled",
+      "html_url": "https://github.com/evochora/evochora/blob/8948933911ec4ae9c1b751af89cfaf38e3529434/.github/workflows/claude.yml.disabled"
+    },
+    {
+      "repository": "kesslerio/attio-mcp-server",
+      "path": ".github/workflows/claude-code-review.yml.deactivated",
+      "html_url": "https://github.com/kesslerio/attio-mcp-server/blob/eee71a9dac9072ead397f52d307af45288c0e89c/.github/workflows/claude-code-review.yml.deactivated"
+    },
+    {
+      "repository": "ecto/vcad",
+      "path": ".github/workflows/agent.yml",
+      "html_url": "https://github.com/ecto/vcad/blob/e076142b019af5369b3f563c811ba758ca5ba2d8/.github/workflows/agent.yml"
+    },
+    {
+      "repository": "fragcolor-xyz/shards",
+      "path": ".github/workflows/claude.yml",
+      "html_url": "https://github.com/fragcolor-xyz/shards/blob/5cf2df4263dc009f7349ec881885578fe8f2ee3f/.github/workflows/claude.yml"
+    },
+    {
+      "repository": "indextables/indextables_spark",
+      "path": ".github/workflows/claude-review.yml.disabled",
+      "html_url": "https://github.com/indextables/indextables_spark/blob/843ed3ccdf0e72185d414fc012d1775a01586cf5/.github/workflows/claude-review.yml.disabled"
+    },
+    {
+      "repository": "IAD-INTERNATIONAL/serverless-step-functions-local",
+      "path": ".github/workflows/README.md",
+      "html_url": "https://github.com/IAD-INTERNATIONAL/serverless-step-functions-local/blob/8ce5936053d38ab7f5f45a0a97373d202e0eb6d8/.github/workflows/README.md"
+    },
+    {
+      "repository": "EvotecIT/DesktopManager",
+      "path": ".github/workflows/claude.yml.disabled",
+      "html_url": "https://github.com/EvotecIT/DesktopManager/blob/4146ca006b71a602623fa1046b39429404a9d313/.github/workflows/claude.yml.disabled"
+    }
+  ]
+}
