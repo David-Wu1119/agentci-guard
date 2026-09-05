@@ -35,6 +35,13 @@ produced the `gated-ai-write-token` severity. Each is recorded with its measured
 effect in [`CHANGELOG.md`](CHANGELOG.md). A 38-case adversarial corpus is
 frozen and has overruled two proposed changes; both times it was right.
 
+The benchmark's evaluation split is **no longer held out**: it was opened
+during this week's detector correction and is development data under the
+benchmark's own leakage rule (see [`BENCHMARK.md`](BENCHMARK.md)). A checksum
+freeze proves the snapshots are immutable, not that they were unseen. Its
+annotation registry also predates the ninth rule. Any future accuracy claim
+needs a fresh, sealed sample.
+
 On the same 152 workflows, [zizmor](https://github.com/zizmorcore/zizmor)
 1.30.0 flags 146 repositories to this tool's 77 and covers classes this tool
 does not model. This tool raises a top-severity finding on 8 repositories where

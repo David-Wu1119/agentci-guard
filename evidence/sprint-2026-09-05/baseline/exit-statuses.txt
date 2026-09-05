@@ -1,0 +1,7 @@
+1  pnpm check
+0  node scripts/audit-dependencies.mjs --level high
+0  pnpm benchmark:smoke
+0  pnpm package:smoke
+0  node scripts/verify-action-manifest.mjs
+1  pnpm check (rerun after adding evidence/ to .prettierignore and formatting the new script; first run's 1 was prettier on those two untracked files)
+0  pnpm check (rerun after 'pnpm install --frozen-lockfile --force' repaired a missing pnpm store index for commander@14.0.3; the previous 1 was ERR_PNPM_MISSING_PACKAGE_INDEX_FILE in licenses:check, a local store fault, not the tree)

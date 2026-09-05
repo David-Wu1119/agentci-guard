@@ -18622,6 +18622,7 @@ var package_default = {
     "baseline:verify": "node scripts/verify-baseline.mjs",
     "benchmark:verify": "node scripts/benchmark/verify-snapshot.mjs && node scripts/benchmark/generate-annotation-sheet.mjs --check && node scripts/benchmark/generate-review-sheet.mjs --check && node scripts/benchmark/generate-pilot-sheet.mjs --check && node scripts/benchmark/validate-labels.mjs",
     "benchmark:smoke": "node scripts/benchmark/smoke-annotation-toolchain.mjs",
+    "benchmark:behavior": "node scripts/benchmark/report-behavior.mjs --out evidence/behavior",
     "licenses:check": "node scripts/generate-third-party-licenses.mjs --check",
     "package:smoke": "node scripts/verify-standalone-package.mjs"
   },

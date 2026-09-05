@@ -1,0 +1,5 @@
+
+> agentci-guard@0.4.0 benchmark:smoke /Users/davidwu/Documents/Codex/agentci-guard
+> node scripts/benchmark/smoke-annotation-toolchain.mjs
+
+Annotation and scoring toolchain smoke passed with synthetic temporary labels; no benchmark labels or metrics were created.
