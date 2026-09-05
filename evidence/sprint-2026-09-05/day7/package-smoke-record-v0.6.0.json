@@ -1,0 +1,77 @@
+{
+  "verified_at": "2026-09-05T19:11:55.456Z",
+  "tarball": "agentci-guard-0.6.0.tgz",
+  "sha256": "e1d56ca2026655b40a05acfaf9f764c49bf55ded447937b05aefd52d0399d23e",
+  "bytes": 1922589,
+  "packed_version": "0.6.0",
+  "source_commit": "8af758a9779a46e04b3da8e557f067cb6e9d9b3b",
+  "working_tree_changes": 0,
+  "node": "v24.16.0",
+  "checks": [
+    {
+      "name": "packed CLI reports the packed package.json version",
+      "ok": true,
+      "detail": {
+        "packed": "0.6.0",
+        "reported": "0.6.0"
+      }
+    },
+    {
+      "name": "packed Action: examples/vulnerable emits the 9-finding SARIF baseline, analysis complete",
+      "ok": true
+    },
+    {
+      "name": "packed CLI: examples/hardened has 0 findings, analysis complete",
+      "ok": true
+    },
+    {
+      "name": "packed CLI: step-level actor gate suppresses pull-request-target-ai",
+      "ok": true,
+      "detail": [
+        "agentci/unpinned-ai-action",
+        "agentci/broad-write-permissions"
+      ]
+    },
+    {
+      "name": "packed CLI: the same workflow without the gate is critical",
+      "ok": true,
+      "detail": [
+        "agentci/unpinned-ai-action",
+        "agentci/pull-request-target-ai",
+        "agentci/untrusted-ai-write-token",
+        "agentci/broad-write-permissions"
+      ]
+    },
+    {
+      "name": "packed CLI: text report says the analysis is incomplete",
+      "ok": true
+    },
+    {
+      "name": "packed CLI: SARIF invocation reports executionSuccessful=false with one notification",
+      "ok": true
+    },
+    {
+      "name": "packed Action: incomplete analysis exits 0 at fail-on none, sets analysis-complete=false, prints ::warning::, writes step summary",
+      "ok": true,
+      "detail": {
+        "exit": 0
+      }
+    },
+    {
+      "name": "npm -g bin shim (a symlink) runs the CLI and reports the version",
+      "ok": true,
+      "detail": {
+        "status": 0,
+        "stdout": "0.6.0"
+      }
+    },
+    {
+      "name": "npm -g bin shim scans and prints JSON",
+      "ok": true,
+      "detail": {
+        "status": 0,
+        "bytes": 361
+      }
+    }
+  ]
+}

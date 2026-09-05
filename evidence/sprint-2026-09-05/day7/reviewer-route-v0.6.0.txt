@@ -1,0 +1,13 @@
+# reviewer route, v0.6.0, 2026-09-05T19:12:47Z
+$ npm install -g --prefix <clean> https://github.com/David-Wu1119/agentci-guard/releases/download/v0.6.0/agentci-guard-0.6.0.tgz
+exit=0
+$ agentci --version
+0.6.0
+$ agentci scan <review finding 3 fixture> --fail-on none
+AgentCI Guard scan
+Workflows: 1
+Findings: 4
+Summary: critical=1 high=1 medium=2 low=0
+Analysis: complete
+
+exit=

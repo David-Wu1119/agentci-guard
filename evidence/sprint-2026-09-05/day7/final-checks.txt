@@ -1,0 +1,41 @@
+# Final checks — 2026-09-05T19:12:34Z
+commit: 8af758a9779a46e04b3da8e557f067cb6e9d9b3b (= v0.6.0 release commit 8af758a; this branch adds only evidence/ and docs/REVIEW_READY.md)
+node v24.16.0, pnpm 10.11.0
+
+$ pnpm check
+Verified deterministic review plan with 5676/7056 units.
+Verified 6-case, 168-unit development-only annotation pilot without consulting scanner predictions or evaluation content.
+Validated schemas and blank annotation registries (7056 primary units; 5676 planned for independent review). Human labels are still absent.
+exit=0
+
+$ node scripts/audit-dependencies.mjs --level high
+audit clean at level high (attempt 1): low=1
+exit=0
+
+$ pnpm benchmark:smoke
+> agentci-guard@0.6.0 benchmark:smoke /Users/davidwu/Documents/Codex/agentci-guard
+> node scripts/benchmark/smoke-annotation-toolchain.mjs
+
+Annotation and scoring toolchain smoke passed with synthetic temporary labels; no benchmark labels or metrics were created.
+exit=0
+
+$ pnpm package:smoke
+
+npm warn Unknown env config "verify-deps-before-run". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "_jsr-registry". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+Verified packed Action and CLI run from the extracted tarball without node_modules (agentci-guard-0.6.0.tgz, sha256 c7320247f431…, 10 checks).
+exit=0
+
+$ node scripts/verify-action-manifest.mjs
+Verified action.yml uses the self-contained committed Node 24 Action bundle with the documented inputs and outputs.
+exit=0
+
+$ git status --short
+ M docs/REVIEW_READY.md
+?? evidence/sprint-2026-09-05/day7/SHA256SUMS-v0.6.0.txt
+?? evidence/sprint-2026-09-05/day7/final-checks.txt
+?? evidence/sprint-2026-09-05/day7/package-smoke-record-v0.6.0.json
+?? evidence/sprint-2026-09-05/day7/v0.6.0.md
+(untracked = this evidence directory's new files and docs/REVIEW_READY.md edits, committed next)
+$ git diff --stat origin/main -- . ':!evidence' ':!docs/REVIEW_READY.md'
+(empty = code identical to main)

@@ -1,0 +1,1 @@
+e1d56ca2026655b40a05acfaf9f764c49bf55ded447937b05aefd52d0399d23e  agentci-guard-0.6.0.tgz
