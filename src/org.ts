@@ -1,6 +1,6 @@
 import { parseWorkflowFile, scanWorkflowFiles } from "./scanner.js";
 import type { AgentciConfig } from "./config.js";
-import type { Finding, ScanResult, Severity } from "./types.js";
+import type { Diagnostic, Finding, ScanResult, Severity } from "./types.js";
 
 /**
  * Scan every repository in a GitHub organization (or user account) without
@@ -31,6 +31,20 @@ export type OrgRepositoryResult = {
   result?: ScanResult;
 };
 
+/**
+ * Every scanned repository lands in exactly one category, so the five sum to
+ * `scanned_count`. Skipped repositories (archived, fork, fetch failed) are
+ * outside all five. "No workflows" is separated because a repository with
+ * nothing to analyze is evidence of nothing, not a clean result.
+ */
+export type OrgCategories = {
+  complete_with_findings: number;
+  complete_no_findings: number;
+  incomplete_with_findings: number;
+  incomplete_no_findings: number;
+  no_workflows: number;
+};
+
 export type OrgScanResult = {
   scanned_at: string;
   org: string;
@@ -40,7 +54,10 @@ export type OrgScanResult = {
   workflow_count: number;
   repositories: OrgRepositoryResult[];
   findings: Finding[];
+  /** Every scanned repository's diagnostics, files prefixed by repository. */
+  diagnostics: Diagnostic[];
   summary: Record<Severity, number>;
+  categories: OrgCategories;
   analysis_complete: boolean;
 };
 
@@ -123,6 +140,12 @@ export async function scanOrganization(
     low: 0,
   };
   for (const finding of findings) summary[finding.severity]++;
+  const diagnostics = scanned.flatMap((entry) =>
+    (entry.result as ScanResult).diagnostics.map((diagnostic) => ({
+      ...diagnostic,
+      file: `${entry.repository}/${diagnostic.file}`,
+    })),
+  );
 
   return {
     scanned_at: new Date().toISOString(),
@@ -136,7 +159,9 @@ export async function scanOrganization(
     ),
     repositories: results,
     findings,
+    diagnostics,
     summary,
+    categories: categorize(scanned),
     analysis_complete:
       results.every(
         (entry) =>
@@ -146,6 +171,26 @@ export async function scanOrganization(
       ) &&
       scanned.every((entry) => (entry.result as ScanResult).analysis_complete),
   };
+}
+
+function categorize(scanned: OrgRepositoryResult[]): OrgCategories {
+  const categories: OrgCategories = {
+    complete_with_findings: 0,
+    complete_no_findings: 0,
+    incomplete_with_findings: 0,
+    incomplete_no_findings: 0,
+    no_workflows: 0,
+  };
+  for (const entry of scanned) {
+    const r = entry.result as ScanResult;
+    if (r.workflow_count === 0) categories.no_workflows++;
+    else if (r.analysis_complete && r.findings.length > 0)
+      categories.complete_with_findings++;
+    else if (r.analysis_complete) categories.complete_no_findings++;
+    else if (r.findings.length > 0) categories.incomplete_with_findings++;
+    else categories.incomplete_no_findings++;
+  }
+  return categories;
 }
 
 async function listRepositories(
@@ -290,15 +335,21 @@ export function renderOrgMarkdownReport(result: OrgScanResult): string {
     `| High | ${result.summary.high} |`,
     `| Medium | ${result.summary.medium} |`,
     `| Low | ${result.summary.low} |`,
-    `| Repositories with findings | ${flagged.length} |`,
-    `| Repositories clean | ${scanned.length - flagged.length} |`,
+    `| Complete, with findings | ${result.categories.complete_with_findings} |`,
+    `| Complete, no findings | ${result.categories.complete_no_findings} |`,
+    `| Incomplete, with findings | ${result.categories.incomplete_with_findings} |`,
+    `| Incomplete, no findings | ${result.categories.incomplete_no_findings} |`,
+    `| No workflows | ${result.categories.no_workflows} |`,
     `| Repositories skipped | ${skipped.length} |`,
-    `| Repositories with incomplete analysis | ${incomplete.length} |`,
     "",
-    "Findings are review hypotheses from static analysis of workflow YAML. An",
-    "incomplete analysis means the tool met a construct it could not interpret",
-    "and kept a conservative reading; it is never reported as clean. See",
-    '"What it cannot see" in the README before acting on any single line.',
+    "Findings are review hypotheses from static analysis of workflow YAML. The",
+    `five categories above sum to the ${scanned.length} scanned repositories.`,
+    '"Complete, no findings" is the only category in which the analyzer read',
+    'every construct and reported nothing. "Incomplete" means it met a construct',
+    "it could not interpret and kept a conservative reading; an incomplete scan",
+    "with no findings is not a clean result. Skipped repositories (archived,",
+    'forks, fetch failures) were not analyzed at all. See "What it cannot see"',
+    "in the README before acting on any single line.",
     "",
   ];
 

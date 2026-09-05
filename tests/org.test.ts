@@ -371,3 +371,78 @@ describe("agentci org, in process", () => {
     expect(calls.every((c) => c.auth === "Bearer env_tok")).toBe(true);
   });
 });
+
+const REMOTE_REUSABLE = `
+on: push
+jobs:
+  delegated:
+    uses: example/shared/.github/workflows/ci.yml@v1
+`;
+
+// Roadmap Day 3: an organization report must not call an incomplete
+// zero-finding repository clean. Every scanned repository lands in exactly one
+// of five categories that sum to the scanned count; skipped ones stay outside.
+describe("scanOrganization completeness categories", () => {
+  const repos: Repo[] = [
+    { full_name: "acme/clean-complete", workflows: { "ci.yml": HARDENED } },
+    {
+      full_name: "acme/clean-incomplete",
+      workflows: { "ci.yml": REMOTE_REUSABLE },
+    },
+    {
+      full_name: "acme/findings-complete",
+      workflows: { "agent.yml": VULNERABLE },
+    },
+    {
+      full_name: "acme/findings-incomplete",
+      workflows: { "agent.yml": VULNERABLE, "d.yml": REMOTE_REUSABLE },
+    },
+    { full_name: "acme/no-workflows", workflows: "404" },
+    { full_name: "acme/broken-fetch", workflows: "500" },
+    {
+      full_name: "acme/archived",
+      archived: true,
+      workflows: { "x.yml": HARDENED },
+    },
+  ];
+
+  it("puts every scanned repository in exactly one category", async () => {
+    const { fetcher } = fakeGitHub("acme", repos);
+    const result = await scanOrganization("acme", { fetch: fetcher });
+    expect(result.scanned_count).toBe(5);
+    expect(result.skipped_count).toBe(2);
+    expect(result.categories).toEqual({
+      complete_with_findings: 1,
+      complete_no_findings: 1,
+      incomplete_with_findings: 1,
+      incomplete_no_findings: 1,
+      no_workflows: 1,
+    });
+    expect(Object.values(result.categories).reduce((a, b) => a + b, 0)).toBe(
+      result.scanned_count,
+    );
+    expect(result.analysis_complete).toBe(false);
+    // Diagnostics travel with the result, prefixed like findings are.
+    expect(result.diagnostics.map((d) => d.file).sort()).toEqual([
+      "acme/clean-incomplete/.github/workflows/ci.yml",
+      "acme/findings-incomplete/.github/workflows/d.yml",
+    ]);
+  });
+
+  it("renders the categories and names the incomplete repositories", async () => {
+    const { fetcher } = fakeGitHub("acme", repos);
+    const md = renderOrgMarkdownReport(
+      await scanOrganization("acme", { fetch: fetcher }),
+    );
+    expect(md).toContain("| Complete, with findings | 1 |");
+    expect(md).toContain("| Complete, no findings | 1 |");
+    expect(md).toContain("| Incomplete, with findings | 1 |");
+    expect(md).toContain("| Incomplete, no findings | 1 |");
+    expect(md).toContain("| No workflows | 1 |");
+    expect(md).toContain("| Repositories skipped | 2 |");
+    expect(md).not.toMatch(/Repositories clean/);
+    expect(md).toMatch(
+      /acme\/clean-incomplete: agentci\/analysis-remote-reusable-workflow/,
+    );
+  });
+});

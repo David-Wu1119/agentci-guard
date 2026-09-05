@@ -49,7 +49,10 @@ What can truthfully be said today:
 `agentci org <login> --markdown report.md --sarif report.sarif --fail-on none`
 with `GITHUB_TOKEN` set is the audit deliverable: one Markdown report across
 every repository in an organization or user account, fetched through the API
-without cloning. Read the "Skipped" and "Incomplete analysis" sections before
+without cloning. The summary table places every scanned repository in one of
+five categories (complete or incomplete × with or without findings, or no
+workflows); only "Complete, no findings" means the analyzer read everything and
+reported nothing. Read the "Skipped" and "Incomplete analysis" sections before
 sending anything to a client — a skipped repository is a gap in the report, and
 the command exits 1 when one exists. Every finding remains a review hypothesis;
 hand-read each critical before it goes in front of a maintainer or a buyer, and

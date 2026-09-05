@@ -1,0 +1,9 @@
+
+ RUN  v4.1.10 /Users/davidwu/Documents/Codex/agentci-guard
+
+
+ Test Files  3 passed (3)
+      Tests  23 passed (23)
+   Start at  14:05:13
+   Duration  575ms (transform 146ms, setup 0ms, import 339ms, tests 469ms, environment 0ms)
+

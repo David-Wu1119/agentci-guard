@@ -65,6 +65,35 @@ type ScanResult = {
     diagnostics: Diagnostic[];
     analysis_complete: boolean;
 };
+/**
+ * What `toSarif` needs to describe a whole scan rather than a bare list of
+ * findings: both `ScanResult` and `OrgScanResult` satisfy it structurally.
+ */
+type SarifScanInput = {
+    findings: Finding[];
+    analysis_complete: boolean;
+    diagnostics: Diagnostic[];
+};
+type SarifNotification = {
+    descriptor: {
+        id: string;
+    };
+    level: "none" | "note" | "warning" | "error";
+    message: {
+        text: string;
+    };
+    locations?: Array<{
+        physicalLocation: {
+            artifactLocation: {
+                uri: string;
+            };
+            region?: {
+                startLine?: number;
+            };
+        };
+    }>;
+    properties?: Record<string, unknown>;
+};
 type SarifLog = {
     version: "2.1.0";
     $schema: string;
@@ -116,6 +145,12 @@ type SarifLog = {
                 };
             }>;
         }>;
+        /** Present only when the caller described a whole scan. */
+        invocations?: Array<{
+            executionSuccessful: boolean;
+            toolExecutionNotifications: SarifNotification[];
+        }>;
+        properties?: Record<string, unknown>;
     }>;
 };
 
@@ -218,6 +253,19 @@ type OrgRepositoryResult = {
     skipped?: string;
     result?: ScanResult;
 };
+/**
+ * Every scanned repository lands in exactly one category, so the five sum to
+ * `scanned_count`. Skipped repositories (archived, fork, fetch failed) are
+ * outside all five. "No workflows" is separated because a repository with
+ * nothing to analyze is evidence of nothing, not a clean result.
+ */
+type OrgCategories = {
+    complete_with_findings: number;
+    complete_no_findings: number;
+    incomplete_with_findings: number;
+    incomplete_no_findings: number;
+    no_workflows: number;
+};
 type OrgScanResult = {
     scanned_at: string;
     org: string;
@@ -227,7 +275,10 @@ type OrgScanResult = {
     workflow_count: number;
     repositories: OrgRepositoryResult[];
     findings: Finding[];
+    /** Every scanned repository's diagnostics, files prefixed by repository. */
+    diagnostics: Diagnostic[];
     summary: Record<Severity, number>;
+    categories: OrgCategories;
     analysis_complete: boolean;
 };
 type OrgScanOptions = {
@@ -264,7 +315,16 @@ type RuleDefinition = {
 declare const RULES: Record<string, RuleDefinition>;
 declare const SEVERITY_ORDER: Severity[];
 
-declare function toSarif(findings: Finding[]): SarifLog;
+/**
+ * Render findings as SARIF 2.1.0.
+ *
+ * Given a whole scan, the run also carries an `invocation` whose
+ * `executionSuccessful` is the scan's `analysis_complete` and whose
+ * `toolExecutionNotifications` are the diagnostics, so a consumer that only
+ * counts `results` cannot mistake an incomplete zero-finding scan for a clean
+ * one. Given a bare findings array, the run makes no claim about completeness.
+ */
+declare function toSarif(input: Finding[] | SarifScanInput): SarifLog;
 
 declare function scanRepository(root: string, options?: Partial<ScanOptions>): Promise<ScanResult>;
 /**
@@ -318,4 +378,4 @@ declare function narrowEvents(events: string[], rawCondition: unknown): Reachabi
  */
 declare function hasTrustedActorGate(rawCondition: unknown): boolean;
 
-export { AI_AGENT_ACTION_PATTERNS, AI_AGENT_API_PATTERNS, AI_AGENT_CLI_PATTERNS, AI_AGENT_PATTERNS, type AgentUsage, type AgentciConfig, type Diagnostic, type EffectivePermissions, type FailOn, type Finding, type OrgRepository, type OrgRepositoryResult, type OrgScanOptions, type OrgScanResult, type PermissionDefault, type PermissionLevel, RULES, type Reachability, type RuleDefinition, SELF_GATED_EVENTS, SENSITIVE_WRITE_SCOPES, SEVERITY_ORDER, type SarifLog, type ScanOptions, type ScanResult, type Severity, UNTRUSTED_EVENTS, type WorkflowFile, containsSecretReference, containsShellAccess, containsUntrustedGitHubContext, describePermissions, formatGithubOutputs, hasAgentGateBypass, hasFindingAtOrAbove, hasSensitiveWrite, hasTrustedActorGate, hasUnknownSensitivePermission, isPinnedAction, isSelfGatingAgentAction, loadConfig, loadWorkflowFiles, looksLikeAiAction, looksLikeAiCli, looksLikeAiUsage, matchesPath, mergeEnvironment, narrowEvents, normalizeTriggers, parseFailOn, parseInlineIgnores, parseWorkflowFile, permissionLevel, renderMarkdownReport, renderOrgMarkdownReport, renderTextReport, resolvePermissions, scanOrganization, scanRepository, scanWorkflow, scanWorkflowFiles, toSarif, untrustedGitHubContextEvents };
+export { AI_AGENT_ACTION_PATTERNS, AI_AGENT_API_PATTERNS, AI_AGENT_CLI_PATTERNS, AI_AGENT_PATTERNS, type AgentUsage, type AgentciConfig, type Diagnostic, type EffectivePermissions, type FailOn, type Finding, type OrgCategories, type OrgRepository, type OrgRepositoryResult, type OrgScanOptions, type OrgScanResult, type PermissionDefault, type PermissionLevel, RULES, type Reachability, type RuleDefinition, SELF_GATED_EVENTS, SENSITIVE_WRITE_SCOPES, SEVERITY_ORDER, type SarifLog, type SarifNotification, type SarifScanInput, type ScanOptions, type ScanResult, type Severity, UNTRUSTED_EVENTS, type WorkflowFile, containsSecretReference, containsShellAccess, containsUntrustedGitHubContext, describePermissions, formatGithubOutputs, hasAgentGateBypass, hasFindingAtOrAbove, hasSensitiveWrite, hasTrustedActorGate, hasUnknownSensitivePermission, isPinnedAction, isSelfGatingAgentAction, loadConfig, loadWorkflowFiles, looksLikeAiAction, looksLikeAiCli, looksLikeAiUsage, matchesPath, mergeEnvironment, narrowEvents, normalizeTriggers, parseFailOn, parseInlineIgnores, parseWorkflowFile, permissionLevel, renderMarkdownReport, renderOrgMarkdownReport, renderTextReport, resolvePermissions, scanOrganization, scanRepository, scanWorkflow, scanWorkflowFiles, toSarif, untrustedGitHubContextEvents };

@@ -54,11 +54,28 @@ export async function runAction(
     await fs.mkdir(path.dirname(resolvedSarif), { recursive: true });
     await fs.writeFile(
       resolvedSarif,
-      `${JSON.stringify(toSarif(result.findings), null, 2)}\n`,
+      `${JSON.stringify(toSarif(result), null, 2)}\n`,
       "utf8",
     );
 
     io.log(renderTextReport(result));
+
+    if (!result.analysis_complete) {
+      // A workflow command on stdout: GitHub renders it as an annotation, so a
+      // zero-finding step cannot look clean when the analysis did not finish.
+      const codes = [
+        ...new Set(result.diagnostics.map((diagnostic) => diagnostic.code)),
+      ].join(", ");
+      const warning = `AgentCI Guard analysis incomplete: ${result.diagnostics.length} diagnostic(s) (${codes}). A zero-finding result from an incomplete analysis is not a clean result.`;
+      io.log(`::warning::${escapeCommand(warning)}`);
+      if (environment.GITHUB_STEP_SUMMARY) {
+        await fs.appendFile(
+          environment.GITHUB_STEP_SUMMARY,
+          `> **Warning:** ${warning}\n`,
+          "utf8",
+        );
+      }
+    }
 
     const outputFile = environment.GITHUB_OUTPUT;
     if (outputFile) {

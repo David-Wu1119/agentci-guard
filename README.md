@@ -110,7 +110,10 @@ jobs:
 ```
 
 The Action sets `findings`, `critical`, `high`, `medium`, `low`, `sarif-path`,
-`diagnostics`, and `analysis-complete` as outputs:
+`diagnostics`, and `analysis-complete` as outputs. When the analysis is
+incomplete it also prints a `::warning::` annotation naming the diagnostic
+codes and appends the same note to the step summary, so a step with zero
+findings cannot look clean when the analyzer did not finish:
 
 ```yaml
 - uses: David-Wu1119/agentci-guard@v0.4.0
@@ -137,7 +140,10 @@ agentci explain agentci/untrusted-ai-write-token
 Exit codes: `0` nothing at or above `--fail-on` (default `high`); `2` at least
 one finding at or above it; `1` scanner error — a parse failure or a bad input.
 An incomplete analysis is never reported as a clean one: unsupported constructs
-become diagnostics and set `analysis_complete: false`.
+become diagnostics and set `analysis_complete: false`. The SARIF file carries
+the same fact — its run has an `invocation` with `executionSuccessful: false`
+and one `toolExecutionNotification` per diagnostic — so a SARIF consumer that
+only counts `results` still sees that the scan did not finish.
 
 ### Whole organization
 

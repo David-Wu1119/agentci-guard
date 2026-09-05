@@ -1,7 +1,24 @@
 import { RULES } from "./rules.js";
-import type { Finding, SarifLog } from "./types.js";
+import type {
+  Diagnostic,
+  Finding,
+  SarifLog,
+  SarifNotification,
+  SarifScanInput,
+} from "./types.js";
 
-export function toSarif(findings: Finding[]): SarifLog {
+/**
+ * Render findings as SARIF 2.1.0.
+ *
+ * Given a whole scan, the run also carries an `invocation` whose
+ * `executionSuccessful` is the scan's `analysis_complete` and whose
+ * `toolExecutionNotifications` are the diagnostics, so a consumer that only
+ * counts `results` cannot mistake an incomplete zero-finding scan for a clean
+ * one. Given a bare findings array, the run makes no claim about completeness.
+ */
+export function toSarif(input: Finding[] | SarifScanInput): SarifLog {
+  const findings = Array.isArray(input) ? input : input.findings;
+  const scan = Array.isArray(input) ? undefined : input;
   const usedRules = Object.values(RULES).filter((rule) =>
     findings.some((finding) => finding.rule_id === rule.id),
   );
@@ -50,8 +67,45 @@ export function toSarif(findings: Finding[]): SarifLog {
             },
           ],
         })),
+        ...(scan
+          ? {
+              invocations: [
+                {
+                  executionSuccessful: scan.analysis_complete,
+                  toolExecutionNotifications:
+                    scan.diagnostics.map(toNotification),
+                },
+              ],
+              properties: {
+                "agentci/analysisComplete": scan.analysis_complete,
+                "agentci/diagnosticCount": scan.diagnostics.length,
+              },
+            }
+          : {}),
       },
     ],
+  };
+}
+
+function toNotification(diagnostic: Diagnostic): SarifNotification {
+  return {
+    descriptor: { id: diagnostic.code },
+    level: diagnostic.severity,
+    message: { text: diagnostic.message },
+    locations: [
+      {
+        physicalLocation: {
+          artifactLocation: { uri: diagnostic.file },
+          ...(diagnostic.line
+            ? { region: { startLine: diagnostic.line } }
+            : {}),
+        },
+      },
+    ],
+    properties: {
+      "agentci/kind": diagnostic.kind,
+      ...(diagnostic.job ? { "agentci/job": diagnostic.job } : {}),
+    },
   };
 }
 
