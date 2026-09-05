@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { realpathSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -252,11 +253,33 @@ export async function run(
   return exitCode;
 }
 
-const invokedAsScript =
-  process.argv[1] !== undefined &&
-  import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
+/**
+ * Whether this module is the script Node was asked to run. Node resolves the
+ * main module through symlinks before setting `import.meta.url`, but leaves
+ * `process.argv[1]` as given, so the two must be compared after resolving the
+ * argv path the same way. Without that, `npm install -g` (whose bin entry is
+ * a symlink) and any symlinked directory such as macOS `/tmp` made the CLI
+ * load, do nothing, and exit 0.
+ */
+export function isInvokedAsScript(
+  moduleUrl: string,
+  argv1: string | undefined,
+): boolean {
+  if (argv1 === undefined) return false;
+  const resolved = path.resolve(argv1);
+  let real = resolved;
+  try {
+    real = realpathSync(resolved);
+  } catch {
+    // Not on disk (bundled or virtual); fall back to the plain comparison.
+  }
+  return (
+    moduleUrl === pathToFileURL(real).href ||
+    moduleUrl === pathToFileURL(resolved).href
+  );
+}
 
-if (invokedAsScript) {
+if (isInvokedAsScript(import.meta.url, process.argv[1])) {
   run(process.argv).then((code) => {
     process.exitCode = code;
   });

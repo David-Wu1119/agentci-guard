@@ -16596,6 +16596,7 @@ var require_dist = __commonJS({
 });
 
 // src/cli.ts
+import { realpathSync } from "fs";
 import fs3 from "fs/promises";
 import path3 from "path";
 import { pathToFileURL } from "url";
@@ -18647,7 +18648,7 @@ function sarifLevel(severity) {
 // package.json
 var package_default = {
   name: "agentci-guard",
-  version: "0.5.0",
+  version: "0.5.1",
   description: "Experimental linter for risky AI coding-agent usage in GitHub Actions workflows.",
   type: "module",
   bin: {
@@ -18894,13 +18895,23 @@ async function run(argv, io = DEFAULT_IO, environment = process.env, deps = {}) 
   }
   return exitCode;
 }
-var invokedAsScript = process.argv[1] !== void 0 && import.meta.url === pathToFileURL(path3.resolve(process.argv[1])).href;
-if (invokedAsScript) {
+function isInvokedAsScript(moduleUrl, argv1) {
+  if (argv1 === void 0) return false;
+  const resolved = path3.resolve(argv1);
+  let real = resolved;
+  try {
+    real = realpathSync(resolved);
+  } catch {
+  }
+  return moduleUrl === pathToFileURL(real).href || moduleUrl === pathToFileURL(resolved).href;
+}
+if (isInvokedAsScript(import.meta.url, process.argv[1])) {
   run(process.argv).then((code) => {
     process.exitCode = code;
   });
 }
 export {
+  isInvokedAsScript,
   run
 };
 /*! Bundled license information:
