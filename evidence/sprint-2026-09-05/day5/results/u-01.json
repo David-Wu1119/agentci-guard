@@ -1,0 +1,116 @@
+{
+  "scanned_at": "2026-09-05T18:21:44.075Z",
+  "root": "/Users/davidwu/Documents/Codex/agentci-guard/evidence/sprint-2026-09-05/day5/snapshots/u-01",
+  "workflow_count": 1,
+  "agent_usages": [
+    {
+      "id": ".github/workflows/claude.yml:claude:1:",
+      "file": ".github/workflows/claude.yml",
+      "job": "claude",
+      "step": "Run Claude Code",
+      "step_index": 1,
+      "kind": "action",
+      "evidence": "anthropics/claude-code-action@v1",
+      "line": 33,
+      "reachable_events": [
+        "issue_comment",
+        "pull_request_review_comment",
+        "issues",
+        "pull_request_review"
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "agentci/ai-shell-access:.github/workflows/claude.yml:claude:1:",
+      "rule_id": "agentci/ai-shell-access",
+      "title": "AI agent has shell or arbitrary command access",
+      "severity": "high",
+      "file": ".github/workflows/claude.yml",
+      "job": "claude",
+      "step": "Run Claude Code",
+      "step_index": 1,
+      "message": "AI agent has shell or arbitrary command access",
+      "why": "Shell access allows a compromised agent prompt to inspect the workspace, call network endpoints, or alter build artifacts.",
+      "fix": [
+        "Disable shell tools for untrusted events.",
+        "Run in a sandbox with no secrets.",
+        "Restrict network and filesystem access."
+      ],
+      "evidence": "{\"claude_code_oauth_token\":\"${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}\",\"additional_permissions\":\"actions: read\\n\",\"claude_args\":\"--allowedTools \\\"Read,Write,Edit,Bash,Glob,Grep,WebFetch\\\"\"}",
+      "line": 33,
+      "reachable_events": [
+        "issue_comment",
+        "pull_request_review_comment",
+        "issues",
+        "pull_request_review"
+      ]
+    },
+    {
+      "id": "agentci/unpinned-ai-action:.github/workflows/claude.yml:claude:1:",
+      "rule_id": "agentci/unpinned-ai-action",
+      "title": "AI-related action is not pinned to a commit SHA",
+      "severity": "medium",
+      "file": ".github/workflows/claude.yml",
+      "job": "claude",
+      "step": "Run Claude Code",
+      "step_index": 1,
+      "message": "AI-related action is not pinned to a commit SHA",
+      "why": "Tag-pinned third-party actions can change over time. AI-agent actions often receive privileged context, so supply-chain drift matters.",
+      "fix": [
+        "Pin third-party actions to full commit SHAs.",
+        "Review updates explicitly.",
+        "Prefer first-party or internally mirrored actions for privileged jobs."
+      ],
+      "evidence": "uses: anthropics/claude-code-action@v1",
+      "line": 33,
+      "reachable_events": [
+        "issue_comment",
+        "pull_request_review_comment",
+        "issues",
+        "pull_request_review"
+      ]
+    },
+    {
+      "id": "agentci/ai-with-secrets:.github/workflows/claude.yml:claude::",
+      "rule_id": "agentci/ai-with-secrets",
+      "title": "AI agent job has access to secrets",
+      "severity": "medium",
+      "file": ".github/workflows/claude.yml",
+      "job": "claude",
+      "message": "AI agent job has access to secrets",
+      "why": "Secrets mounted into an AI-agent job can be exfiltrated if untrusted prompt content influences tool use, shell commands, or generated output. Most AI actions require a provider key, so this is a baseline exposure to review rather than a vulnerability on its own — it becomes high-risk when combined with untrusted input or write permissions (see agentci/untrusted-ai-write-token).",
+      "fix": [
+        "Do not expose secrets to agent jobs that process untrusted content.",
+        "Use short-lived scoped tokens.",
+        "Move secret-bearing actions behind manual approval."
+      ],
+      "evidence": "AI step's effective environment or inputs reference a secret/token",
+      "line": 14,
+      "reachable_events": [
+        "issue_comment",
+        "issues",
+        "pull_request_review",
+        "pull_request_review_comment"
+      ]
+    }
+  ],
+  "summary": {
+    "low": 0,
+    "medium": 2,
+    "high": 1,
+    "critical": 0
+  },
+  "diagnostics": [
+    {
+      "code": "agentci/analysis-event-condition",
+      "kind": "analysis",
+      "severity": "warning",
+      "file": ".github/workflows/claude.yml",
+      "job": "claude",
+      "line": 14,
+      "message": "Could not fully interpret this job's github.event_name condition; event reachability was kept conservative."
+    }
+  ],
+  "analysis_complete": false
+}

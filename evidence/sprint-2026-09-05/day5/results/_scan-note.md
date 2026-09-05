@@ -1,0 +1,4 @@
+# Scan log
+
+- First invocation (18:20:23Z) ran `node /tmp/day5-candidate/package/dist/cli.js` — every case exited 0 with **empty stdout**, because `dist/cli.js` compares `import.meta.url` (symlink-resolved by Node, `/private/tmp/...`) with `process.argv[1]` (unresolved, `/tmp/...`) to decide whether it was invoked as a script, and on mismatch does nothing. The same happens through npm's `bin` symlink (`agentci --version` prints nothing). Recorded as a v0.5.0 CLI entry defect; detection code is unaffected.
+- Rerun (18:21:44Z) with the real path `/private/tmp/day5-candidate/package/dist/cli.js`, candidate `--version` 0.5.0, tarball SHA-256 `f2d0495666318ece50c9512eea1343630447f554ba2edc53d9e0bd70b7220f36` (matches `../day4/package-smoke-record.json`). All twelve exited 0; outputs are the `u-*.json` files here, unedited.

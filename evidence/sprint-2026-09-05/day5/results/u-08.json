@@ -1,0 +1,143 @@
+{
+  "scanned_at": "2026-09-05T18:21:44.428Z",
+  "root": "/Users/davidwu/Documents/Codex/agentci-guard/evidence/sprint-2026-09-05/day5/snapshots/u-08",
+  "workflow_count": 1,
+  "agent_usages": [
+    {
+      "id": ".github/workflows/codex-review.yml:codex-review:2:",
+      "file": ".github/workflows/codex-review.yml",
+      "job": "codex-review",
+      "step": "Run Codex review",
+      "step_index": 2,
+      "kind": "action",
+      "evidence": "openai/codex-action@v1",
+      "line": 41,
+      "reachable_events": [
+        "pull_request_target"
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "agentci/untrusted-input-in-prompt:.github/workflows/codex-review.yml:codex-review:2:",
+      "rule_id": "agentci/untrusted-input-in-prompt",
+      "title": "Untrusted GitHub event content is passed into an AI prompt or command",
+      "severity": "high",
+      "file": ".github/workflows/codex-review.yml",
+      "job": "codex-review",
+      "step": "Run Codex review",
+      "step_index": 2,
+      "message": "Untrusted GitHub event content is passed into an AI prompt or command",
+      "why": "PR bodies, issue bodies, comments, branch names, and commit messages are attacker-controlled in common workflows and can contain prompt-injection instructions.",
+      "fix": [
+        "Avoid inserting raw GitHub event text into prompts.",
+        "Use structured extraction and length limits.",
+        "Add prompt-injection filtering before AI execution.",
+        "Run the agent with read-only permissions."
+      ],
+      "evidence": "{\"name\":\"Run Codex review\",\"uses\":\"openai/codex-action@v1\",\"with\":{\"openai-api-key\":\"${{ secrets.OPENAI_API_KEY }}\",\"prompt\":\"You are reviewing PR #${{ github.event.pull_request.number }} for ${{ github.repository }}.\\n\\nOnly review changes introduced by this PR:\\ngit log --oneline ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}\\n\\nFocus on:\\n- correctness bugs and regressions\\n- security concerns\\n- missing tests or edge cases\\n\\nKeep feedback concise and a...",
+      "line": 41,
+      "reachable_events": [
+        "pull_request_target"
+      ]
+    },
+    {
+      "id": "agentci/unpinned-ai-action:.github/workflows/codex-review.yml:codex-review:2:",
+      "rule_id": "agentci/unpinned-ai-action",
+      "title": "AI-related action is not pinned to a commit SHA",
+      "severity": "medium",
+      "file": ".github/workflows/codex-review.yml",
+      "job": "codex-review",
+      "step": "Run Codex review",
+      "step_index": 2,
+      "message": "AI-related action is not pinned to a commit SHA",
+      "why": "Tag-pinned third-party actions can change over time. AI-agent actions often receive privileged context, so supply-chain drift matters.",
+      "fix": [
+        "Pin third-party actions to full commit SHAs.",
+        "Review updates explicitly.",
+        "Prefer first-party or internally mirrored actions for privileged jobs."
+      ],
+      "evidence": "uses: openai/codex-action@v1",
+      "line": 41,
+      "reachable_events": [
+        "pull_request_target"
+      ]
+    },
+    {
+      "id": "agentci/pull-request-target-ai:.github/workflows/codex-review.yml:codex-review::",
+      "rule_id": "agentci/pull-request-target-ai",
+      "title": "AI agent runs on pull_request_target",
+      "severity": "critical",
+      "file": ".github/workflows/codex-review.yml",
+      "job": "codex-review",
+      "message": "AI agent runs on pull_request_target",
+      "why": "pull_request_target runs in the base repository security context and can expose write tokens or secrets to workflows influenced by an untrusted pull request.",
+      "fix": [
+        "Use pull_request with read-only permissions for untrusted code.",
+        "Split analysis into a read-only job and a separate maintainer-approved write job.",
+        "Avoid checking out untrusted PR head code in pull_request_target."
+      ],
+      "evidence": "AI usage is reachable on pull_request_target",
+      "line": 21,
+      "reachable_events": [
+        "pull_request_target"
+      ]
+    },
+    {
+      "id": "agentci/ai-with-secrets:.github/workflows/codex-review.yml:codex-review::",
+      "rule_id": "agentci/ai-with-secrets",
+      "title": "AI agent job has access to secrets",
+      "severity": "medium",
+      "file": ".github/workflows/codex-review.yml",
+      "job": "codex-review",
+      "message": "AI agent job has access to secrets",
+      "why": "Secrets mounted into an AI-agent job can be exfiltrated if untrusted prompt content influences tool use, shell commands, or generated output. Most AI actions require a provider key, so this is a baseline exposure to review rather than a vulnerability on its own — it becomes high-risk when combined with untrusted input or write permissions (see agentci/untrusted-ai-write-token).",
+      "fix": [
+        "Do not expose secrets to agent jobs that process untrusted content.",
+        "Use short-lived scoped tokens.",
+        "Move secret-bearing actions behind manual approval."
+      ],
+      "evidence": "AI step's effective environment or inputs reference a secret/token",
+      "line": 21,
+      "reachable_events": [
+        "pull_request_target"
+      ]
+    }
+  ],
+  "summary": {
+    "low": 0,
+    "medium": 2,
+    "high": 1,
+    "critical": 1
+  },
+  "diagnostics": [
+    {
+      "code": "agentci/analysis-event-condition",
+      "kind": "analysis",
+      "severity": "warning",
+      "file": ".github/workflows/codex-review.yml",
+      "job": "codex-review",
+      "line": 21,
+      "message": "Could not fully interpret this job's github.event_name condition; event reachability was kept conservative."
+    },
+    {
+      "code": "agentci/analysis-checkout-protection-unknown",
+      "kind": "analysis",
+      "severity": "warning",
+      "file": ".github/workflows/codex-review.yml",
+      "job": "codex-review",
+      "line": 30,
+      "message": "The checkout step requests pull-request code, but its ref does not identify whether GitHub's built-in unsafe-PR protection is present."
+    },
+    {
+      "code": "agentci/analysis-event-condition",
+      "kind": "analysis",
+      "severity": "warning",
+      "file": ".github/workflows/codex-review.yml",
+      "job": "post-feedback",
+      "line": 68,
+      "message": "Could not fully interpret this job's github.event_name condition; event reachability was kept conservative."
+    }
+  ],
+  "analysis_complete": false
+}
