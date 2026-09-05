@@ -7,9 +7,12 @@ import type { AgentciConfig } from "./config.js";
 import {
   containsSecretReference,
   containsShellAccess,
+  hasAgentGateBypass,
   isPinnedAction,
+  isSelfGatingAgentAction,
   looksLikeAiAction,
   looksLikeAiCli,
+  SELF_GATED_EVENTS,
   untrustedGitHubContextEvents,
 } from "./detect.js";
 import { RULES, SEVERITY_ORDER } from "./rules.js";
@@ -338,8 +341,12 @@ function analyzeWorkflow(
       hasSecret: boolean;
       hasUntrustedSink: boolean;
       hasUntrustedIngestion: boolean;
+      /** anthropics/claude-code-action with its default write-access gate intact. */
+      selfGated: boolean;
       events: string[];
     }> = [];
+    /** Untrusted event text expanded into a `run:` step anywhere in the job. */
+    let untrustedInRun = false;
 
     for (const [index, rawStep] of steps.entries()) {
       if (!isRecord(rawStep)) continue;
@@ -405,6 +412,17 @@ function analyzeWorkflow(
       // Requiring a `${{ }}` expansion in the workflow misses the dominant
       // real-world shape entirely. A `run:` invocation is different: it only
       // receives what the shell hands it, so it still needs interpolation.
+      if (
+        stepRun.trim().length > 0 &&
+        contextCanReach(
+          stepReachability.events,
+          untrustedGitHubContextEvents(
+            materializeInputs(stepRun, context.inputValues),
+          ),
+        )
+      ) {
+        untrustedInRun = true;
+      }
       const hasUntrustedIngestion =
         hasUntrustedSink ||
         (stepUsesAiAction &&
@@ -450,6 +468,10 @@ function analyzeWorkflow(
           hasSecret,
           hasUntrustedSink,
           hasUntrustedIngestion,
+          selfGated:
+            isSelfGatingAgentAction(
+              materializeInputs(stepUses, context.inputValues),
+            ) && !hasAgentGateBypass(rawStep.with),
           events: stepReachability.events,
         });
         if (hasUntrustedSink) {
@@ -559,21 +581,36 @@ function analyzeWorkflow(
       );
     }
     if (jobHasWrite && untrustedAiSink) {
+      const ingesting = aiSteps.filter((step) => step.hasUntrustedIngestion);
+      const reachableUntrusted = unionEvents(
+        ingesting.flatMap((step) => step.events),
+      ).filter((event) => UNTRUSTED_EVENTS.has(event));
+      // Downgrade to high only when every ingesting step is the self-gating
+      // action with its gate intact, every reachable untrusted event is one the
+      // action's docs say it checks, and no run: step expands untrusted text
+      // (that path bypasses the agent's gate entirely).
+      const gated =
+        ingesting.every((step) => step.selfGated) &&
+        reachableUntrusted.every((event) => SELF_GATED_EVENTS.has(event)) &&
+        !untrustedInRun;
       output.findings.push(
-        makeFinding("agentci/untrusted-ai-write-token", {
-          file,
-          job: jobName,
-          evidence: untrustedViaInterpolation
-            ? "reachable untrusted event content + AI usage + effective write permission"
-            : "AI agent action reachable on an untrusted event reads that event's content through its own token + effective write permission",
-          line: jobLine,
-          events: unionEvents(
-            aiSteps
-              .filter((step) => step.hasUntrustedIngestion)
-              .flatMap((step) => step.events),
-          ),
-          callChain: context.callChain,
-        }),
+        makeFinding(
+          gated
+            ? "agentci/gated-ai-write-token"
+            : "agentci/untrusted-ai-write-token",
+          {
+            file,
+            job: jobName,
+            evidence: gated
+              ? "untrusted trigger + AI usage + effective write permission, but anthropics/claude-code-action refuses users without repository write access by default; no allowed_non_write_users / allowed_bots bypass, no pull_request_target or discussion trigger, no untrusted text in a run: step. Residual: a write-access user acting on attacker content, and any bypass in the action's own check."
+              : untrustedViaInterpolation
+                ? "reachable untrusted event content + AI usage + effective write permission"
+                : "AI agent action reachable on an untrusted event reads that event's content through its own token + effective write permission",
+            line: jobLine,
+            events: unionEvents(ingesting.flatMap((step) => step.events)),
+            callChain: context.callChain,
+          },
+        ),
       );
     }
     if (aiSteps.some((step) => step.hasSecret)) {

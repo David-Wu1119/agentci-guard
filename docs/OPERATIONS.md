@@ -26,7 +26,7 @@ precision or recall figure in any public material.
 What can truthfully be said today:
 
 - Eight rules, one threat model, documented in [`RULES.md`](../RULES.md).
-- Deterministic regression against a 36-case adversarial corpus and a frozen
+- Deterministic regression against a 38-case adversarial corpus and a frozen
   152-workflow real-world benchmark, both reproducible from the repository.
 - Every critical finding on the benchmark was hand-read during development,
   and four detection defects were found and fixed by that process; the

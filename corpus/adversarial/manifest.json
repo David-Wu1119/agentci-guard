@@ -683,8 +683,8 @@
             }
           },
           {
-            "rule_id": "agentci/untrusted-ai-write-token",
-            "severity": "critical",
+            "rule_id": "agentci/gated-ai-write-token",
+            "severity": "high",
             "location": {
               "file": ".github/workflows/reusable.yml",
               "job": "agent",
@@ -719,7 +719,7 @@
         ],
         "analysis_complete": true
       },
-      "rationale": "Caller event, permission, untrusted input, and explicit capability context must propagate through a nested local reusable-workflow call chain.",
+      "rationale": "Caller event, permission, untrusted input, and explicit capability context must propagate through a nested local reusable-workflow call chain. Contract change 2026-09-05, by owner decision after review of anthropics/claude-code-action docs/security.md: the callee is that action with its default write-access gate intact (no allowed_non_write_users or allowed_bots, no pull_request_target or discussion trigger, no untrusted text in a run: step), so the write-token finding is agentci/gated-ai-write-token at high rather than critical. See docs/analysis-model.md, 'The agent's own gate'.",
       "assumption_sources": [
         "reusable-workflows",
         "permissions",
@@ -1111,6 +1111,96 @@
       },
       "rationale": "An action input explicitly enabling Bash is direct shell-capability evidence.",
       "assumption_sources": ["project-rule-contract"]
+    },
+    {
+      "id": "gated-write",
+      "path": "cases/gated-write",
+      "targets": ["agent default write-access gate", "project-rule-contract"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["issue_comment"],
+        "findings": [
+          {
+            "rule_id": "agentci/gated-ai-write-token",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/ai-with-secrets",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/broad-write-permissions",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "Bare anthropics/claude-code-action on issue_comment with contents/issues write and no allowed_non_write_users or allowed_bots: the action's documented default refuses users without write access, so the pattern is reported at high (gated-ai-write-token), not critical. Owner-set contract, 2026-09-05; see docs/analysis-model.md 'The agent's own gate'.",
+      "assumption_sources": ["event-security", "project-rule-contract"]
+    },
+    {
+      "id": "gated-write-bypass",
+      "path": "cases/gated-write-bypass",
+      "targets": ["agent default write-access gate", "project-rule-contract"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["issue_comment"],
+        "findings": [
+          {
+            "rule_id": "agentci/untrusted-ai-write-token",
+            "severity": "critical",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/ai-with-secrets",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/broad-write-permissions",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "Identical to gated-write except allowed_non_write_users: '*', which the action's docs call a significant security risk: the default gate is disabled for every account, so the finding is critical. Pins the boundary from the other side.",
+      "assumption_sources": ["event-security", "project-rule-contract"]
     }
   ]
 }

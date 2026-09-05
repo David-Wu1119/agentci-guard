@@ -94,6 +94,46 @@ in it. Version and help invocations (`aider --version`) are likewise not
 executions, which is why a scheduled workflow that checks a published package
 version reports clean.
 
+## The agent's own gate
+
+`anthropics/claude-code-action` refuses to run for users without repository
+write access by default. Its security documentation states the check applies to
+issue, pull request, comment, and review events and that the only way to relax
+it is `allowed_non_write_users`, which the same document calls "a significant
+security risk"; `allowed_bots` entries are not permission-checked at all. The
+lower-level `claude-code-base-action` performs no such check.
+
+When the untrusted-trigger, agent, write-token pattern is present and **all** of
+the following hold, the finding is `agentci/gated-ai-write-token` at high rather
+than `agentci/untrusted-ai-write-token` at critical:
+
+- every AI step that ingests untrusted content is `anthropics/claude-code-action`
+  (not `-base-action`) with neither `allowed_non_write_users` nor `allowed_bots`
+  set to a non-empty value;
+- every reachable untrusted event is one the docs list as checked — `issues`,
+  `issue_comment`, `pull_request`, `pull_request_review`,
+  `pull_request_review_comment`; `pull_request_target` and the discussion events
+  are not listed and keep critical;
+- no `run:` step in the job expands untrusted event text, because that path
+  bypasses the agent's gate entirely.
+
+The downgrade is a statement about who can trigger the job, not about what it
+can do: `broad-write-permissions`, `unpinned-ai-action`, and `ai-with-secrets`
+are unaffected, and `untrusted-input-in-prompt` still reports an interpolation.
+Two residual risks remain and are named in the finding: a write-access user
+acting on attacker-authored content, and any bypass in the action's runtime
+check (one was disclosed in January 2026). Whether the action applies the check
+identically when a `prompt` input is supplied is not stated in its docs; this
+model assumes it does, because the docs describe the check by event rather than
+by mode.
+
+This is a severity contract set by the project owner on 2026-09-05 after
+reviewing the action's documentation. On the frozen benchmark it moves 24 of 30
+critical findings to high; the six that remain critical carry an
+`allowed_non_write_users` or `allowed_bots` bypass, run on
+`pull_request_target`, or use an agent whose default behavior has not been
+verified against its vendor's documentation.
+
 ## Untrusted content reaching an agent
 
 Untrusted content reaches an agent by two different routes, and only one of

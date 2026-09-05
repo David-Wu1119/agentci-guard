@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- New rule `agentci/gated-ai-write-token` (high). When the untrusted-trigger,
+  agent, write-token pattern is present but every ingesting step is
+  `anthropics/claude-code-action` with its default write-access gate intact —
+  no `allowed_non_write_users` or `allowed_bots`, an event the action's docs
+  list as checked, and no untrusted text expanded into a `run:` step — the
+  finding is reported at high instead of `untrusted-ai-write-token` at
+  critical. `claude-code-base-action`, `pull_request_target`, discussion
+  events, any bypass value, and any other agent keep critical. This is a
+  severity contract set by the project owner on 2026-09-05 after review of the
+  action's security documentation. Frozen benchmark: critical 30 → 6 across
+  4 repositories (each carries a bypass, runs on `pull_request_target`, or uses
+  an unverified agent — the same four a full hand-read had identified), high
+  44 → 68, medium unchanged, total unchanged. The adversarial case
+  `local-reusable` is updated to the new contract with its rationale recorded,
+  and two cases, `gated-write` and `gated-write-bypass`, pin the boundary from
+  both sides.
+
 ## [0.3.0] - 2026-09-04
 
 ### Added
