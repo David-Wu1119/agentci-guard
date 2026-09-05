@@ -101,9 +101,8 @@ three rules (not judged, not counted).
 1. Collector applied rule 4 case-insensitively; run 1 voided (`DEVIATIONS.md`).
 2. The candidate CLI produced no output when invoked through a symlinked path
    (`results/_scan-note.md`). Confirmed on npm's global bin shim. This is a
-   v0.5.0 CLI entry defect; it is fixed on `main` after this exercise with a
-   regression test, and a patch release supersedes v0.5.0 as the reviewer
-   route. Detection code did not change, so the twelve results stand.
+   v0.5.0 CLI entry defect; the fix, with a regression test, is PR #32 (v0.5.1), which supersedes v0.5.0 as
+   the reviewer route. Detection code did not change, so the twelve results stand.
 
 ## What this exercise does not license
 
