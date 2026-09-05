@@ -29,7 +29,7 @@ export function renderTextReport(result: ScanResult): string {
     `Workflows: ${result.workflow_count}`,
     `Findings: ${result.findings.length}`,
     `Summary: critical=${result.summary.critical} high=${result.summary.high} medium=${result.summary.medium} low=${result.summary.low}`,
-    `Analysis: ${result.analysis_complete ? "complete" : `partial (${result.diagnostics.length} diagnostic(s))`}`,
+    `Analysis: ${result.analysis_complete ? "complete" : `incomplete (${result.diagnostics.length} diagnostic(s))`}`,
     "",
   ];
 

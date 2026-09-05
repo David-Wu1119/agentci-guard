@@ -1,0 +1,111 @@
+
+> agentci-guard@0.4.0 check /Users/davidwu/Documents/Codex/agentci-guard
+> npm run format:check && npm run typecheck && npm run test:coverage && npm run build && npm run licenses:check && npm run baseline:verify && npm run benchmark:verify
+
+npm warn Unknown env config "verify-deps-before-run". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "_jsr-registry". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> agentci-guard@0.4.0 format:check
+> prettier "**/*.{md,json,yml,yaml,ts,mjs}" --check
+
+Checking formatting...
+All matched files use Prettier code style!
+npm warn Unknown env config "verify-deps-before-run". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "_jsr-registry". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> agentci-guard@0.4.0 typecheck
+> tsc --noEmit
+
+npm warn Unknown env config "verify-deps-before-run". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "_jsr-registry". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> agentci-guard@0.4.0 test:coverage
+> vitest run --coverage
+
+Loaded  vitest@4.1.10  and  @vitest/coverage-v8@4.1.11 .
+Running mixed versions is not supported and may lead into bugs
+Update your dependencies and make sure the versions match.
+
+ RUN  v4.1.10 /Users/davidwu/Documents/Codex/agentci-guard
+      Coverage enabled with v8
+
+
+ Test Files  26 passed (26)
+      Tests  215 passed (215)
+   Start at  14:05:35
+   Duration  1.01s (transform 861ms, setup 0ms, import 3.35s, tests 2.69s, environment 1ms)
+
+ % Coverage report from v8
+
+=============================== Coverage summary ===============================
+Statements   : 94.03% ( 978/1040 )
+Branches     : 88.06% ( 723/821 )
+Functions    : 94.94% ( 188/198 )
+Lines        : 96.59% ( 880/911 )
+================================================================================
+-------------------|---------|----------|---------|---------|--------------------------------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                          
+-------------------|---------|----------|---------|---------|--------------------------------------------
+All files          |   94.03 |    88.06 |   94.94 |   96.59 |                                            
+ action-runner.ts  |   95.55 |    96.55 |      75 |   95.23 | 20-21                                      
+ cli.ts            |   93.33 |    93.02 |      75 |    93.1 | 35-36,260-261                              
+ config.ts         |     100 |    96.87 |     100 |     100 | 36                                         
+ detect.ts         |    90.9 |    86.04 |   81.25 |   91.11 | 161,181,238-239                            
+ org.ts            |    96.4 |    86.41 |     100 |   98.34 | 216,302                                    
+ report.ts         |     100 |    86.66 |     100 |     100 | 52,80-95                                   
+ sarif.ts          |   93.33 |    80.76 |     100 |   91.66 | 115                                        
+ scanner.ts        |    91.9 |    84.24 |   98.43 |   97.49 | 828-832,851,909                            
+ workflow-model.ts |   94.18 |    91.17 |   97.91 |   96.12 | 59,153,158,212,270-271,447,454,496,600,656 
+-------------------|---------|----------|---------|---------|--------------------------------------------
+npm warn Unknown env config "verify-deps-before-run". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "_jsr-registry". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> agentci-guard@0.4.0 build
+> tsup
+
+CLI Building entry: src/action.ts, src/cli.ts, src/index.ts
+CLI Using tsconfig: tsconfig.json
+CLI tsup v8.5.1
+CLI Using tsup config: /Users/davidwu/Documents/Codex/agentci-guard/tsup.config.ts
+CLI Target: node20
+CLI Cleaning output folder
+ESM Build start
+ESM dist/index.js      534.19 KB
+ESM dist/cli.js        663.64 KB
+ESM dist/action.js     525.14 KB
+ESM dist/index.js.map  920.01 KB
+ESM dist/action.js.map 904.92 KB
+ESM dist/cli.js.map    1.09 MB
+ESM ⚡️ Build success in 77ms
+DTS Build start
+DTS ⚡️ Build success in 745ms
+DTS dist/action.d.ts 20.00 B
+DTS dist/cli.d.ts    625.00 B
+DTS dist/index.d.ts  14.90 KB
+npm warn Unknown env config "verify-deps-before-run". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "_jsr-registry". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> agentci-guard@0.4.0 licenses:check
+> node scripts/generate-third-party-licenses.mjs --check
+
+(node:44303) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Verified 21 bundled dependency licenses.
+npm warn Unknown env config "verify-deps-before-run". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "_jsr-registry". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> agentci-guard@0.4.0 baseline:verify
+> node scripts/verify-baseline.mjs
+
+Verified v0.1.0 tag cbaa29ec0ba4, baseline commit cdba825972d5, 3 historical file checksums, and frozen fixture summaries.
+npm warn Unknown env config "verify-deps-before-run". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "_jsr-registry". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> agentci-guard@0.4.0 benchmark:verify
+> node scripts/benchmark/verify-snapshot.mjs && node scripts/benchmark/generate-annotation-sheet.mjs --check && node scripts/benchmark/generate-review-sheet.mjs --check && node scripts/benchmark/generate-pilot-sheet.mjs --check && node scripts/benchmark/validate-labels.mjs
+
+Verified 152 immutable workflows from 152 repositories, including 32 targeted agent-diversity cases.
+Verified 7056 deterministic annotation units without consulting scanner predictions.
+Verified deterministic review plan with 5676/7056 units.
+Verified 6-case, 168-unit development-only annotation pilot without consulting scanner predictions or evaluation content.
+Validated schemas and blank annotation registries (7056 primary units; 5676 planned for independent review). Human labels are still absent.

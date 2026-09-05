@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- SARIF output now describes the whole scan, not only its findings. When
+  `toSarif` is given a scan result, the run carries an `invocation` whose
+  `executionSuccessful` is the scan's `analysis_complete` and whose
+  `toolExecutionNotifications` are the diagnostics (one per diagnostic, with
+  the diagnostic code as descriptor, its severity as level, and its file and
+  line as location), plus `agentci/analysisComplete` and
+  `agentci/diagnosticCount` run properties. The CLI (`scan` and `org`) and the
+  Action write this form. A consumer that only counts `results` can therefore
+  no longer mistake an incomplete zero-finding scan for a clean one. Both forms
+  validate against the vendored OASIS SARIF 2.1.0 schema. A bare findings
+  array is still accepted and then makes no claim about completeness.
+- The Action prints a `::warning::` annotation and appends a note to the step
+  summary when the analysis is incomplete, naming the diagnostic codes. Exit
+  codes are unchanged: warnings do not fail the step; error diagnostics still
+  exit 1 and findings at or above `fail-on` still exit 2.
+- Organization results carry `diagnostics` (files prefixed by repository, like
+  findings) and `categories`: every scanned repository is in exactly one of
+  complete-with-findings, complete-no-findings, incomplete-with-findings,
+  incomplete-no-findings, or no-workflows, and the five sum to
+  `scanned_count`. Skipped repositories stay outside all five.
+
+### Changed
+
+- The organization report's summary table replaces the single "Repositories
+  clean" row, which counted incomplete zero-finding repositories as clean,
+  with the five categories above and an explicit note that only
+  "Complete, no findings" means the analyzer read everything and reported
+  nothing.
+- The text report says `Analysis: incomplete (N diagnostic(s))` instead of
+  `partial`, matching the `analysis_complete` field and the organization
+  report's vocabulary.
+
 ### Fixed
 
 - `agentci/pull-request-target-ai` now honors a recognized actor/provenance

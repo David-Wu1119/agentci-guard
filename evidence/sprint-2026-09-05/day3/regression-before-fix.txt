@@ -1,0 +1,140 @@
+
+ RUN  v4.1.10 /Users/davidwu/Documents/Codex/agentci-guard
+
+ ❯ tests/completeness.test.ts (8 tests | 7 failed) 32ms
+     × marks an incomplete zero-finding scan as unsuccessful with a notification 12ms
+     × marks a completed zero-finding scan as successful with no notifications 3ms
+     × keeps findings and diagnostics distinct when both are present 6ms
+     × reports a parse failure as an error-level notification 2ms
+     × CLI text output says the analysis was incomplete for a zero-finding scan 5ms
+     × CLI --sarif writes completeness into the file 2ms
+     × Action emits a visible warning and analysis-complete=false, and exits 0 at fail-on none 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/completeness.test.ts > SARIF carries completeness and diagnostics > marks an incomplete zero-finding scan as unsuccessful with a notification
+TypeError: findings.some is not a function
+ ❯ src/sarif.ts:6:14
+      4| export function toSarif(findings: Finding[]): SarifLog {
+      5|   const usedRules = Object.values(RULES).filter((rule) =>
+      6|     findings.some((finding) => finding.rule_id === rule.id),
+       |              ^
+      7|   );
+      8|   return {
+ ❯ toSarif src/sarif.ts:5:42
+ ❯ tests/completeness.test.ts:47:19
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+ FAIL  tests/completeness.test.ts > SARIF carries completeness and diagnostics > marks a completed zero-finding scan as successful with no notifications
+TypeError: findings.some is not a function
+ ❯ src/sarif.ts:6:14
+      4| export function toSarif(findings: Finding[]): SarifLog {
+      5|   const usedRules = Object.values(RULES).filter((rule) =>
+      6|     findings.some((finding) => finding.rule_id === rule.id),
+       |              ^
+      7|   );
+      8|   return {
+ ❯ toSarif src/sarif.ts:5:42
+ ❯ tests/completeness.test.ts:63:19
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
+
+ FAIL  tests/completeness.test.ts > SARIF carries completeness and diagnostics > keeps findings and diagnostics distinct when both are present
+TypeError: findings.some is not a function
+ ❯ src/sarif.ts:6:14
+      4| export function toSarif(findings: Finding[]): SarifLog {
+      5|   const usedRules = Object.values(RULES).filter((rule) =>
+      6|     findings.some((finding) => finding.rule_id === rule.id),
+       |              ^
+      7|   );
+      8|   return {
+ ❯ toSarif src/sarif.ts:5:42
+ ❯ tests/completeness.test.ts:80:19
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
+
+ FAIL  tests/completeness.test.ts > SARIF carries completeness and diagnostics > reports a parse failure as an error-level notification
+TypeError: findings.some is not a function
+ ❯ src/sarif.ts:6:14
+      4| export function toSarif(findings: Finding[]): SarifLog {
+      5|   const usedRules = Object.values(RULES).filter((rule) =>
+      6|     findings.some((finding) => finding.rule_id === rule.id),
+       |              ^
+      7|   );
+      8|   return {
+ ❯ toSarif src/sarif.ts:5:42
+ ❯ tests/completeness.test.ts:91:19
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
+
+ FAIL  tests/completeness.test.ts > CLI and Action surface completeness > CLI text output says the analysis was incomplete for a zero-finding scan
+AssertionError: expected 'AgentCI Guard scan\nWorkflows: 1\nFin…' to match /Analysis: incomplete/
+
+- Expected:
+/Analysis: incomplete/
+
++ Received:
+"AgentCI Guard scan
+Workflows: 1
+Findings: 0
+Summary: critical=0 high=0 medium=0 low=0
+Analysis: partial (1 diagnostic(s))
+
+Diagnostics:
+- [ANALYSIS] agentci/analysis-remote-reusable-workflow .github/workflows/ci.yml:4: Remote reusable workflow cannot be resolved statically: example/shared/.github/workflows/ci.yml@v1"
+
+ ❯ tests/completeness.test.ts:121:32
+    119|     const io = captureIo();
+    120|     await run(["node", "agentci", "scan", root, "--fail-on", "none"], …
+    121|     expect(io.logs.join("\n")).toMatch(/Analysis: incomplete/);
+       |                                ^
+    122|   });
+    123|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯
+
+ FAIL  tests/completeness.test.ts > CLI and Action surface completeness > CLI --sarif writes completeness into the file
+TypeError: Cannot read properties of undefined (reading '0')
+ ❯ tests/completeness.test.ts:129:26
+    127|     await run(["node", "agentci", "scan", root, "--sarif", out, "--fai…
+    128|     const sarif = JSON.parse(await fs.readFile(out, "utf8"));
+    129|     expect(sarif.runs[0].invocations[0].executionSuccessful).toBe(fals…
+       |                          ^
+    130|   });
+    131|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/7]⎯
+
+ FAIL  tests/completeness.test.ts > CLI and Action surface completeness > Action emits a visible warning and analysis-complete=false, and exits 0 at fail-on none
+AssertionError: expected 'AgentCI Guard scan\nWorkflows: 1\nFin…' to match /::warning::.*incomplete/i
+
+- Expected:
+/::warning::.*incomplete/i
+
++ Received:
+"AgentCI Guard scan
+Workflows: 1
+Findings: 0
+Summary: critical=0 high=0 medium=0 low=0
+Analysis: partial (1 diagnostic(s))
+
+Diagnostics:
+- [ANALYSIS] agentci/analysis-remote-reusable-workflow .github/workflows/ci.yml:4: Remote reusable workflow cannot be resolved statically: example/shared/.github/workflows/ci.yml@v1"
+
+ ❯ tests/completeness.test.ts:151:32
+    149|     expect(code).toBe(0);
+    150|     expect(await fs.readFile(outputs, "utf8")).toContain("analysis-com…
+    151|     expect(io.logs.join("\n")).toMatch(/::warning::.*incomplete/i);
+       |                                ^
+    152|     expect(io.errors).toEqual([]);
+    153|     expect(await fs.readFile(summary, "utf8")).toMatch(/incomplete/i);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  7 failed | 1 passed (8)
+   Start at  14:03:34
+   Duration  250ms (transform 67ms, setup 0ms, import 139ms, tests 32ms, environment 0ms)
+

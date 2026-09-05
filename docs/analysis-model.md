@@ -274,7 +274,14 @@ content is trusted.
 YAML parse failures are parse diagnostics, not prompt-injection findings.
 Error diagnostics make the CLI/Action exit with code 1 even when `fail-on` is
 `none`. Conservative incompleteness warnings remain visible through
-`diagnostics` and `analysis-complete`.
+`diagnostics` and `analysis-complete`, through the Action's `::warning::`
+annotation and step summary, and in SARIF as the run's `invocation`
+(`executionSuccessful` mirrors `analysis_complete`; each diagnostic is a
+`toolExecutionNotification` with its code as descriptor, its severity as
+level, and its file and line as location). The organization result places
+every scanned repository in exactly one of five categories — complete or
+incomplete, with or without findings, or no workflows — that sum to the
+scanned count; skipped repositories are outside all five.
 
 Finding locations point to the relevant job or step line. This is a YAML-aware
 layout heuristic rather than a full source-map, so unusual flow-style YAML may

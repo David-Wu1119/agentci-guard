@@ -103,7 +103,7 @@ export async function run(
         });
         await fs.writeFile(
           options.sarif,
-          `${JSON.stringify(toSarif(result.findings), null, 2)}\n`,
+          `${JSON.stringify(toSarif(result), null, 2)}\n`,
           "utf8",
         );
       }
@@ -181,7 +181,7 @@ export async function run(
         });
         await fs.writeFile(
           options.sarif,
-          `${JSON.stringify(toSarif(result.findings), null, 2)}\n`,
+          `${JSON.stringify(toSarif(result), null, 2)}\n`,
           "utf8",
         );
       }

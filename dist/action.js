@@ -14759,7 +14759,7 @@ function renderTextReport(result) {
     `Workflows: ${result.workflow_count}`,
     `Findings: ${result.findings.length}`,
     `Summary: critical=${result.summary.critical} high=${result.summary.high} medium=${result.summary.medium} low=${result.summary.low}`,
-    `Analysis: ${result.analysis_complete ? "complete" : `partial (${result.diagnostics.length} diagnostic(s))`}`,
+    `Analysis: ${result.analysis_complete ? "complete" : `incomplete (${result.diagnostics.length} diagnostic(s))`}`,
     ""
   ];
   for (const finding of result.findings) {
@@ -14791,7 +14791,9 @@ function label(severity) {
 }
 
 // src/sarif.ts
-function toSarif(findings) {
+function toSarif(input2) {
+  const findings = Array.isArray(input2) ? input2 : input2.findings;
+  const scan = Array.isArray(input2) ? void 0 : input2;
   const usedRules = Object.values(RULES).filter(
     (rule) => findings.some((finding) => finding.rule_id === rule.id)
   );
@@ -14836,9 +14838,40 @@ function toSarif(findings) {
               }
             }
           ]
-        }))
+        })),
+        ...scan ? {
+          invocations: [
+            {
+              executionSuccessful: scan.analysis_complete,
+              toolExecutionNotifications: scan.diagnostics.map(toNotification)
+            }
+          ],
+          properties: {
+            "agentci/analysisComplete": scan.analysis_complete,
+            "agentci/diagnosticCount": scan.diagnostics.length
+          }
+        } : {}
       }
     ]
+  };
+}
+function toNotification(diagnostic) {
+  return {
+    descriptor: { id: diagnostic.code },
+    level: diagnostic.severity,
+    message: { text: diagnostic.message },
+    locations: [
+      {
+        physicalLocation: {
+          artifactLocation: { uri: diagnostic.file },
+          ...diagnostic.line ? { region: { startLine: diagnostic.line } } : {}
+        }
+      }
+    ],
+    properties: {
+      "agentci/kind": diagnostic.kind,
+      ...diagnostic.job ? { "agentci/job": diagnostic.job } : {}
+    }
   };
 }
 function sarifLevel(severity) {
@@ -14873,11 +14906,26 @@ async function runAction(environment = process.env, io = DEFAULT_IO) {
     await fs3.mkdir(path3.dirname(resolvedSarif), { recursive: true });
     await fs3.writeFile(
       resolvedSarif,
-      `${JSON.stringify(toSarif(result.findings), null, 2)}
+      `${JSON.stringify(toSarif(result), null, 2)}
 `,
       "utf8"
     );
     io.log(renderTextReport(result));
+    if (!result.analysis_complete) {
+      const codes = [
+        ...new Set(result.diagnostics.map((diagnostic) => diagnostic.code))
+      ].join(", ");
+      const warning = `AgentCI Guard analysis incomplete: ${result.diagnostics.length} diagnostic(s) (${codes}). A zero-finding result from an incomplete analysis is not a clean result.`;
+      io.log(`::warning::${escapeCommand(warning)}`);
+      if (environment.GITHUB_STEP_SUMMARY) {
+        await fs3.appendFile(
+          environment.GITHUB_STEP_SUMMARY,
+          `> **Warning:** ${warning}
+`,
+          "utf8"
+        );
+      }
+    }
     const outputFile = environment.GITHUB_OUTPUT;
     if (outputFile) {
       await fs3.appendFile(

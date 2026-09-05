@@ -77,6 +77,29 @@ export type ScanResult = {
   analysis_complete: boolean;
 };
 
+/**
+ * What `toSarif` needs to describe a whole scan rather than a bare list of
+ * findings: both `ScanResult` and `OrgScanResult` satisfy it structurally.
+ */
+export type SarifScanInput = {
+  findings: Finding[];
+  analysis_complete: boolean;
+  diagnostics: Diagnostic[];
+};
+
+export type SarifNotification = {
+  descriptor: { id: string };
+  level: "none" | "note" | "warning" | "error";
+  message: { text: string };
+  locations?: Array<{
+    physicalLocation: {
+      artifactLocation: { uri: string };
+      region?: { startLine?: number };
+    };
+  }>;
+  properties?: Record<string, unknown>;
+};
+
 export type SarifLog = {
   version: "2.1.0";
   $schema: string;
@@ -113,5 +136,11 @@ export type SarifLog = {
         };
       }>;
     }>;
+    /** Present only when the caller described a whole scan. */
+    invocations?: Array<{
+      executionSuccessful: boolean;
+      toolExecutionNotifications: SarifNotification[];
+    }>;
+    properties?: Record<string, unknown>;
   }>;
 };

@@ -18247,6 +18247,12 @@ async function scanOrganization(org, options = {}) {
     low: 0
   };
   for (const finding of findings) summary[finding.severity]++;
+  const diagnostics = scanned.flatMap(
+    (entry) => entry.result.diagnostics.map((diagnostic) => ({
+      ...diagnostic,
+      file: `${entry.repository}/${diagnostic.file}`
+    }))
+  );
   return {
     scanned_at: (/* @__PURE__ */ new Date()).toISOString(),
     org,
@@ -18259,11 +18265,32 @@ async function scanOrganization(org, options = {}) {
     ),
     repositories: results,
     findings,
+    diagnostics,
     summary,
+    categories: categorize(scanned),
     analysis_complete: results.every(
       (entry) => entry.skipped === void 0 || entry.skipped === "archived" || entry.skipped === "fork"
     ) && scanned.every((entry) => entry.result.analysis_complete)
   };
+}
+function categorize(scanned) {
+  const categories = {
+    complete_with_findings: 0,
+    complete_no_findings: 0,
+    incomplete_with_findings: 0,
+    incomplete_no_findings: 0,
+    no_workflows: 0
+  };
+  for (const entry of scanned) {
+    const r = entry.result;
+    if (r.workflow_count === 0) categories.no_workflows++;
+    else if (r.analysis_complete && r.findings.length > 0)
+      categories.complete_with_findings++;
+    else if (r.analysis_complete) categories.complete_no_findings++;
+    else if (r.findings.length > 0) categories.incomplete_with_findings++;
+    else categories.incomplete_no_findings++;
+  }
+  return categories;
 }
 async function listRepositories(org, api, apiBase) {
   for (const root of [`orgs/${org}`, `users/${org}`]) {
@@ -18371,15 +18398,21 @@ function renderOrgMarkdownReport(result) {
     `| High | ${result.summary.high} |`,
     `| Medium | ${result.summary.medium} |`,
     `| Low | ${result.summary.low} |`,
-    `| Repositories with findings | ${flagged.length} |`,
-    `| Repositories clean | ${scanned.length - flagged.length} |`,
+    `| Complete, with findings | ${result.categories.complete_with_findings} |`,
+    `| Complete, no findings | ${result.categories.complete_no_findings} |`,
+    `| Incomplete, with findings | ${result.categories.incomplete_with_findings} |`,
+    `| Incomplete, no findings | ${result.categories.incomplete_no_findings} |`,
+    `| No workflows | ${result.categories.no_workflows} |`,
     `| Repositories skipped | ${skipped.length} |`,
-    `| Repositories with incomplete analysis | ${incomplete.length} |`,
     "",
-    "Findings are review hypotheses from static analysis of workflow YAML. An",
-    "incomplete analysis means the tool met a construct it could not interpret",
-    "and kept a conservative reading; it is never reported as clean. See",
-    '"What it cannot see" in the README before acting on any single line.',
+    "Findings are review hypotheses from static analysis of workflow YAML. The",
+    `five categories above sum to the ${scanned.length} scanned repositories.`,
+    '"Complete, no findings" is the only category in which the analyzer read',
+    'every construct and reported nothing. "Incomplete" means it met a construct',
+    "it could not interpret and kept a conservative reading; an incomplete scan",
+    "with no findings is not a clean result. Skipped repositories (archived,",
+    'forks, fetch failures) were not analyzed at all. See "What it cannot see"',
+    "in the README before acting on any single line.",
     ""
   ];
   if (flagged.length > 0) {
@@ -18447,7 +18480,7 @@ function renderTextReport(result) {
     `Workflows: ${result.workflow_count}`,
     `Findings: ${result.findings.length}`,
     `Summary: critical=${result.summary.critical} high=${result.summary.high} medium=${result.summary.medium} low=${result.summary.low}`,
-    `Analysis: ${result.analysis_complete ? "complete" : `partial (${result.diagnostics.length} diagnostic(s))`}`,
+    `Analysis: ${result.analysis_complete ? "complete" : `incomplete (${result.diagnostics.length} diagnostic(s))`}`,
     ""
   ];
   for (const finding of result.findings) {
@@ -18522,7 +18555,9 @@ function label(severity) {
 }
 
 // src/sarif.ts
-function toSarif(findings) {
+function toSarif(input) {
+  const findings = Array.isArray(input) ? input : input.findings;
+  const scan = Array.isArray(input) ? void 0 : input;
   const usedRules = Object.values(RULES).filter(
     (rule) => findings.some((finding) => finding.rule_id === rule.id)
   );
@@ -18567,9 +18602,40 @@ function toSarif(findings) {
               }
             }
           ]
-        }))
+        })),
+        ...scan ? {
+          invocations: [
+            {
+              executionSuccessful: scan.analysis_complete,
+              toolExecutionNotifications: scan.diagnostics.map(toNotification)
+            }
+          ],
+          properties: {
+            "agentci/analysisComplete": scan.analysis_complete,
+            "agentci/diagnosticCount": scan.diagnostics.length
+          }
+        } : {}
       }
     ]
+  };
+}
+function toNotification(diagnostic) {
+  return {
+    descriptor: { id: diagnostic.code },
+    level: diagnostic.severity,
+    message: { text: diagnostic.message },
+    locations: [
+      {
+        physicalLocation: {
+          artifactLocation: { uri: diagnostic.file },
+          ...diagnostic.line ? { region: { startLine: diagnostic.line } } : {}
+        }
+      }
+    ],
+    properties: {
+      "agentci/kind": diagnostic.kind,
+      ...diagnostic.job ? { "agentci/job": diagnostic.job } : {}
+    }
   };
 }
 function sarifLevel(severity) {
@@ -18710,7 +18776,7 @@ async function run(argv, io = DEFAULT_IO, environment = process.env, deps = {}) 
       });
       await fs3.writeFile(
         options.sarif,
-        `${JSON.stringify(toSarif(result.findings), null, 2)}
+        `${JSON.stringify(toSarif(result), null, 2)}
 `,
         "utf8"
       );
@@ -18769,7 +18835,7 @@ async function run(argv, io = DEFAULT_IO, environment = process.env, deps = {}) 
       });
       await fs3.writeFile(
         options.sarif,
-        `${JSON.stringify(toSarif(result.findings), null, 2)}
+        `${JSON.stringify(toSarif(result), null, 2)}
 `,
         "utf8"
       );
