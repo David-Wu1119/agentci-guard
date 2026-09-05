@@ -18648,7 +18648,7 @@ function sarifLevel(severity) {
 // package.json
 var package_default = {
   name: "agentci-guard",
-  version: "0.5.0",
+  version: "0.5.1",
   description: "Experimental linter for risky AI coding-agent usage in GitHub Actions workflows.",
   type: "module",
   bin: {
