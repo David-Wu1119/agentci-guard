@@ -1,0 +1,507 @@
+{
+  "fetched_at": "2026-09-05T18:16:20.311Z",
+  "endpoint": "search/code?q=%22openai%2Fcodex-action%22%20path%3A.github%2Fworkflows&sort=indexed&order=desc&per_page=100",
+  "total_count": 1066,
+  "items": [
+    {
+      "repository": "openclaw/openclaw",
+      "path": ".github/workflows/dated-todo-sweep.yml",
+      "html_url": "https://github.com/openclaw/openclaw/blob/f7aa9162781ae08138b843b50323f12dfeb5d688/.github/workflows/dated-todo-sweep.yml"
+    },
+    {
+      "repository": "openclaw/openclaw",
+      "path": ".github/workflows/docs-agent.yml",
+      "html_url": "https://github.com/openclaw/openclaw/blob/f7aa9162781ae08138b843b50323f12dfeb5d688/.github/workflows/docs-agent.yml"
+    },
+    {
+      "repository": "openclaw/openclaw",
+      "path": ".github/workflows/release-validation-skill-runner.yml",
+      "html_url": "https://github.com/openclaw/openclaw/blob/f7aa9162781ae08138b843b50323f12dfeb5d688/.github/workflows/release-validation-skill-runner.yml"
+    },
+    {
+      "repository": "astral-sh/uv",
+      "path": ".github/workflows/release-prepare.yml",
+      "html_url": "https://github.com/astral-sh/uv/blob/9fe8403a8c628f9adb49e6978b8b6b9af4ec9146/.github/workflows/release-prepare.yml"
+    },
+    {
+      "repository": "astral-sh/uv",
+      "path": ".github/workflows/reproduce-bug.yml",
+      "html_url": "https://github.com/astral-sh/uv/blob/9fe8403a8c628f9adb49e6978b8b6b9af4ec9146/.github/workflows/reproduce-bug.yml"
+    },
+    {
+      "repository": "astral-sh/uv",
+      "path": ".github/workflows/pull-request-labels.yml",
+      "html_url": "https://github.com/astral-sh/uv/blob/9fe8403a8c628f9adb49e6978b8b6b9af4ec9146/.github/workflows/pull-request-labels.yml"
+    },
+    {
+      "repository": "astral-sh/uv",
+      "path": ".github/workflows/fix-bug.yml",
+      "html_url": "https://github.com/astral-sh/uv/blob/9fe8403a8c628f9adb49e6978b8b6b9af4ec9146/.github/workflows/fix-bug.yml"
+    },
+    {
+      "repository": "dbcli/pgcli",
+      "path": ".github/workflows/codex-review.yml",
+      "html_url": "https://github.com/dbcli/pgcli/blob/8e4aef4fe1bf36db25a80e1478d3952a11c839f1/.github/workflows/codex-review.yml"
+    },
+    {
+      "repository": "matomo-org/matomo",
+      "path": ".github/workflows/codex-review.yml",
+      "html_url": "https://github.com/matomo-org/matomo/blob/378d443eae7747d597ee527ee2427a803af73d5c/.github/workflows/codex-review.yml"
+    },
+    {
+      "repository": "astral-sh/uv",
+      "path": ".github/workflows/update-issue-context.yml",
+      "html_url": "https://github.com/astral-sh/uv/blob/9fe8403a8c628f9adb49e6978b8b6b9af4ec9146/.github/workflows/update-issue-context.yml"
+    },
+    {
+      "repository": "openai/openai-python",
+      "path": ".github/workflows/python-version-review.yml",
+      "html_url": "https://github.com/openai/openai-python/blob/be928151372e4b62adb4a1571cda52ad759b38be/.github/workflows/python-version-review.yml"
+    },
+    {
+      "repository": "astral-sh/uv",
+      "path": ".github/workflows/pull-request-security-review.yml",
+      "html_url": "https://github.com/astral-sh/uv/blob/9fe8403a8c628f9adb49e6978b8b6b9af4ec9146/.github/workflows/pull-request-security-review.yml"
+    },
+    {
+      "repository": "mysql/mysql-server",
+      "path": ".github/workflows/codex-pr-review.yml",
+      "html_url": "https://github.com/mysql/mysql-server/blob/e174239c5b3c2bcf164649042ab8a7fc972ce88d/.github/workflows/codex-pr-review.yml"
+    },
+    {
+      "repository": "astral-sh/uv",
+      "path": ".github/workflows/diagnose-workflow-failure.yml",
+      "html_url": "https://github.com/astral-sh/uv/blob/9fe8403a8c628f9adb49e6978b8b6b9af4ec9146/.github/workflows/diagnose-workflow-failure.yml"
+    },
+    {
+      "repository": "astral-sh/uv",
+      "path": ".github/workflows/rebase-conflicted-pull-request.yml",
+      "html_url": "https://github.com/astral-sh/uv/blob/9fe8403a8c628f9adb49e6978b8b6b9af4ec9146/.github/workflows/rebase-conflicted-pull-request.yml"
+    },
+    {
+      "repository": "openai/openai-node",
+      "path": ".github/workflows/node-version-review.yml",
+      "html_url": "https://github.com/openai/openai-node/blob/03acf94b7d76551bf4d612fe7582ddb6975c8ea3/.github/workflows/node-version-review.yml"
+    },
+    {
+      "repository": "ComposioHQ/composio",
+      "path": ".github/workflows/docs.changelog-to-docs.yml",
+      "html_url": "https://github.com/ComposioHQ/composio/blob/d4077ba41541f65c4e08366c026918162c2a1a51/.github/workflows/docs.changelog-to-docs.yml"
+    },
+    {
+      "repository": "ton-blockchain/ton",
+      "path": ".github/workflows/codex-review.yml",
+      "html_url": "https://github.com/ton-blockchain/ton/blob/3d478cbde854be03a18ab2a59f8fc3c565cf7d14/.github/workflows/codex-review.yml"
+    },
+    {
+      "repository": "block/buzz",
+      "path": ".github/workflows/codex-security-review.yml",
+      "html_url": "https://github.com/block/buzz/blob/3c7f288c60d67df78577b237e27c3dfc8831aaa1/.github/workflows/codex-security-review.yml"
+    },
+    {
+      "repository": "567-labs/instructor",
+      "path": ".github/workflows/oss-issue-tagger.yml",
+      "html_url": "https://github.com/567-labs/instructor/blob/5ea35cdb1860842622a670360d690d603cc04f36/.github/workflows/oss-issue-tagger.yml"
+    },
+    {
+      "repository": "PostHog/posthog",
+      "path": ".github/workflows/pr-autoresolve-conflicts.yml",
+      "html_url": "https://github.com/PostHog/posthog/blob/3e9d67b5eb56cbb3e1a3ec71d00dd46d24bb8f81/.github/workflows/pr-autoresolve-conflicts.yml"
+    },
+    {
+      "repository": "567-labs/instructor",
+      "path": ".github/workflows/oss-issue-deduplicator.yml",
+      "html_url": "https://github.com/567-labs/instructor/blob/5ea35cdb1860842622a670360d690d603cc04f36/.github/workflows/oss-issue-deduplicator.yml"
+    },
+    {
+      "repository": "dataplat/dbatools",
+      "path": ".github/workflows/codex.yml",
+      "html_url": "https://github.com/dataplat/dbatools/blob/63a9dee51e2459f22e40a75d2849092ec75cffe3/.github/workflows/codex.yml"
+    },
+    {
+      "repository": "Expensify/App",
+      "path": ".github/workflows/codex-review.yml",
+      "html_url": "https://github.com/Expensify/App/blob/0498f1e2062d03ec0ac243efa17eb069a31be379/.github/workflows/codex-review.yml"
+    },
+    {
+      "repository": "RediSearch/RediSearch",
+      "path": ".github/workflows/task-backport_pr-agent.yml",
+      "html_url": "https://github.com/RediSearch/RediSearch/blob/3c021835dab3282aa97ddbdf4a61a72a859df559/.github/workflows/task-backport_pr-agent.yml"
+    },
+    {
+      "repository": "openai/codex-action",
+      "path": ".github/workflows/cla.yml",
+      "html_url": "https://github.com/openai/codex-action/blob/86365089eb2b84e0a8fb0717b304f8bdcb13b20e/.github/workflows/cla.yml"
+    },
+    {
+      "repository": "RediSearch/RediSearch",
+      "path": ".github/workflows/task-backport_pr-agent-fix.yml",
+      "html_url": "https://github.com/RediSearch/RediSearch/blob/3c021835dab3282aa97ddbdf4a61a72a859df559/.github/workflows/task-backport_pr-agent-fix.yml"
+    },
+    {
+      "repository": "tiann/hapi",
+      "path": ".github/workflows/issue-auto-response.yml",
+      "html_url": "https://github.com/tiann/hapi/blob/980a921ba15665c54998a6ddb658103d467ff4cb/.github/workflows/issue-auto-response.yml"
+    },
+    {
+      "repository": "OpenCoworkAI/open-codesign",
+      "path": ".github/workflows/codex-pr-review.yml",
+      "html_url": "https://github.com/OpenCoworkAI/open-codesign/blob/b94d7156bf4aeb2c79892c91dc9934911a4e3741/.github/workflows/codex-pr-review.yml"
+    },
+    {
+      "repository": "getzep/zep",
+      "path": ".github/workflows/codex-code-review.yml",
+      "html_url": "https://github.com/getzep/zep/blob/54f63eeb58dbc2f6ac5995cd4d51b56317cf5e42/.github/workflows/codex-code-review.yml"
+    },
+    {
+      "repository": "jitsucom/jitsu",
+      "path": ".github/workflows/security-fix.yml",
+      "html_url": "https://github.com/jitsucom/jitsu/blob/4d274c0da433911e5c51ea214a350e4aa85fdcc4/.github/workflows/security-fix.yml"
+    },
+    {
+      "repository": "revolist/revogrid",
+      "path": ".github/workflows/publish.yml",
+      "html_url": "https://github.com/revolist/revogrid/blob/eab8bb4b11fd25779732f8d09f424d108c801b86/.github/workflows/publish.yml"
+    },
+    {
+      "repository": "OpenCoworkAI/open-codesign",
+      "path": ".github/workflows/issue-auto-response.yml",
+      "html_url": "https://github.com/OpenCoworkAI/open-codesign/blob/b94d7156bf4aeb2c79892c91dc9934911a4e3741/.github/workflows/issue-auto-response.yml"
+    },
+    {
+      "repository": "aipoch/open-science",
+      "path": ".github/workflows/ai-codex-review.yml",
+      "html_url": "https://github.com/aipoch/open-science/blob/f9cc79637cbd693c1ef02de7677bbd3a20ce0e97/.github/workflows/ai-codex-review.yml"
+    },
+    {
+      "repository": "flwrlabs/flower",
+      "path": ".github/workflows/framework-release-prepare.yml",
+      "html_url": "https://github.com/flwrlabs/flower/blob/9a13aa87894dbc95fe56611f15650c65ff46957e/.github/workflows/framework-release-prepare.yml"
+    },
+    {
+      "repository": "tiann/hapi",
+      "path": ".github/workflows/codex-pr-review.yml",
+      "html_url": "https://github.com/tiann/hapi/blob/980a921ba15665c54998a6ddb658103d467ff4cb/.github/workflows/codex-pr-review.yml"
+    },
+    {
+      "repository": "supabase/cli",
+      "path": ".github/workflows/ai-review.yml",
+      "html_url": "https://github.com/supabase/cli/blob/d6a376c82436c908efa142f4c17977f477c264b8/.github/workflows/ai-review.yml"
+    },
+    {
+      "repository": "sunflower-land/sunflower-land",
+      "path": ".github/workflows/codex.yml",
+      "html_url": "https://github.com/sunflower-land/sunflower-land/blob/2e82da59828ada402e7675dbc6f87f52cf6f025a/.github/workflows/codex.yml"
+    },
+    {
+      "repository": "ding113/claude-code-hub",
+      "path": ".github/workflows/codex-issue-auto-response.yml",
+      "html_url": "https://github.com/ding113/claude-code-hub/blob/dfeb14331cb350f672e92a3684adecf1052dd476/.github/workflows/codex-issue-auto-response.yml"
+    },
+    {
+      "repository": "open-gsd/gsd-pi",
+      "path": ".github/workflows/codex-code-review.yml",
+      "html_url": "https://github.com/open-gsd/gsd-pi/blob/e34e7d7d0ef27a0381d7f16619fee5a4e4a78171/.github/workflows/codex-code-review.yml"
+    },
+    {
+      "repository": "ding113/claude-code-hub",
+      "path": ".github/workflows/codex-pr-review.yml",
+      "html_url": "https://github.com/ding113/claude-code-hub/blob/dfeb14331cb350f672e92a3684adecf1052dd476/.github/workflows/codex-pr-review.yml"
+    },
+    {
+      "repository": "tiann/hapi",
+      "path": ".github/workflows/codex-mention-response.yml",
+      "html_url": "https://github.com/tiann/hapi/blob/980a921ba15665c54998a6ddb658103d467ff4cb/.github/workflows/codex-mention-response.yml"
+    },
+    {
+      "repository": "openai/openai-go",
+      "path": ".github/workflows/go-version-review.yml",
+      "html_url": "https://github.com/openai/openai-go/blob/52e95a974582ebd8d3b23f349e1bcdbbb899c0ac/.github/workflows/go-version-review.yml"
+    },
+    {
+      "repository": "apptension/saas-boilerplate",
+      "path": ".github/workflows/automated-code-review.yml",
+      "html_url": "https://github.com/apptension/saas-boilerplate/blob/d6eddd4bea539d1d7a1c8e07322b5011dccb4444/.github/workflows/automated-code-review.yml"
+    },
+    {
+      "repository": "hkjarral/AVA-AI-Voice-Agent-for-Asterisk",
+      "path": ".github/workflows/codex-review.yml",
+      "html_url": "https://github.com/hkjarral/AVA-AI-Voice-Agent-for-Asterisk/blob/d766e9c08bc3badc26796c427c6c943e6d7f926e/.github/workflows/codex-review.yml"
+    },
+    {
+      "repository": "LegadoTeam/legado",
+      "path": ".github/workflows/pr-review.yml",
+      "html_url": "https://github.com/LegadoTeam/legado/blob/ca3c753160b4d6fae70b51b97f2a8f191f4bdf03/.github/workflows/pr-review.yml"
+    },
+    {
+      "repository": "OpenCoworkAI/open-cowork",
+      "path": ".github/workflows/issue-auto-response.yml",
+      "html_url": "https://github.com/OpenCoworkAI/open-cowork/blob/ec5bd270861fd4531bda44554766b8b5bd009242/.github/workflows/issue-auto-response.yml"
+    },
+    {
+      "repository": "Ooples-Finance-LLC/OoplesFinance.StockIndicators",
+      "path": ".github/workflows/codex-autofix.yml",
+      "html_url": "https://github.com/Ooples-Finance-LLC/OoplesFinance.StockIndicators/blob/1e146fd4055c45b012eb93a1121ccdeb40d3d2ea/.github/workflows/codex-autofix.yml"
+    },
+    {
+      "repository": "videojs/v10",
+      "path": ".github/workflows/issue-sync.yml",
+      "html_url": "https://github.com/videojs/v10/blob/9ba80097f4b08ba276e327fbc2957ec476c87cf9/.github/workflows/issue-sync.yml"
+    },
+    {
+      "repository": "videojs/v10",
+      "path": ".github/workflows/issue-to-pr.yml",
+      "html_url": "https://github.com/videojs/v10/blob/9ba80097f4b08ba276e327fbc2957ec476c87cf9/.github/workflows/issue-to-pr.yml"
+    },
+    {
+      "repository": "OpenCoworkAI/open-cowork",
+      "path": ".github/workflows/codex-pr-review.yml",
+      "html_url": "https://github.com/OpenCoworkAI/open-cowork/blob/ec5bd270861fd4531bda44554766b8b5bd009242/.github/workflows/codex-pr-review.yml"
+    },
+    {
+      "repository": "pedropalau/react-bnb-gallery",
+      "path": ".github/workflows/codex-review.yml",
+      "html_url": "https://github.com/pedropalau/react-bnb-gallery/blob/d64fe13912744d2cb010256fcca4782953779ec8/.github/workflows/codex-review.yml"
+    },
+    {
+      "repository": "jabrena/plinth",
+      "path": ".github/workflows/sf/update-issue-with-codex.yaml",
+      "html_url": "https://github.com/jabrena/plinth/blob/57ff95851eb396cb8e494a239ec25a434e949f64/.github/workflows/sf/update-issue-with-codex.yaml"
+    },
+    {
+      "repository": "pathintegral-institute/mcp.science",
+      "path": ".github/workflows/codex.yml",
+      "html_url": "https://github.com/pathintegral-institute/mcp.science/blob/4dcc2cbd573de5d10214c729f400a124c90eb42b/.github/workflows/codex.yml"
+    },
+    {
+      "repository": "baimard/gestion",
+      "path": ".github/workflows/codex-issue.yml",
+      "html_url": "https://github.com/baimard/gestion/blob/68c4732184d01b53aa0298ecef7a1597cf26b881/.github/workflows/codex-issue.yml"
+    },
+    {
+      "repository": "ooples/token-optimizer-mcp",
+      "path": ".github/workflows/codex-autofix.yml",
+      "html_url": "https://github.com/ooples/token-optimizer-mcp/blob/24c0c00d98170036ae9b1d67c459a45efa0bfd27/.github/workflows/codex-autofix.yml"
+    },
+    {
+      "repository": "worldcoin/orb-software",
+      "path": ".github/workflows/codex-pr-review.yaml",
+      "html_url": "https://github.com/worldcoin/orb-software/blob/9408811c1f47d91302cbf07c6ecf60b9ba7ec4fa/.github/workflows/codex-pr-review.yaml"
+    },
+    {
+      "repository": "leslieo2/LieGraph",
+      "path": ".github/workflows/codex-pr-review.yml.disabled",
+      "html_url": "https://github.com/leslieo2/LieGraph/blob/94abe3687ce90310109a9f13fcbee2d01e2a2b9f/.github/workflows/codex-pr-review.yml.disabled"
+    },
+    {
+      "repository": "Silentely/AdBlock-Acceleration",
+      "path": ".github/workflows/codex_hub.yml",
+      "html_url": "https://github.com/Silentely/AdBlock-Acceleration/blob/f1c1962096e47e98dc85e1a784cc2eb06843f89e/.github/workflows/codex_hub.yml"
+    },
+    {
+      "repository": "videojs/v10",
+      "path": ".github/workflows/e2e-failure-triage.yml",
+      "html_url": "https://github.com/videojs/v10/blob/9ba80097f4b08ba276e327fbc2957ec476c87cf9/.github/workflows/e2e-failure-triage.yml"
+    },
+    {
+      "repository": "videojs/v10",
+      "path": ".github/workflows/issue-triage.yml",
+      "html_url": "https://github.com/videojs/v10/blob/9ba80097f4b08ba276e327fbc2957ec476c87cf9/.github/workflows/issue-triage.yml"
+    },
+    {
+      "repository": "UniClipboard/UniClipboard",
+      "path": ".github/workflows/prepare-release.yml",
+      "html_url": "https://github.com/UniClipboard/UniClipboard/blob/190e474019e930bd47d737f8f829279da4ffbc0b/.github/workflows/prepare-release.yml"
+    },
+    {
+      "repository": "joshyorko/rcc",
+      "path": ".github/workflows/codex-pr-review.txt",
+      "html_url": "https://github.com/joshyorko/rcc/blob/4148c2b71705c9d2baf0e88b48d08a79cb7bda0f/.github/workflows/codex-pr-review.txt"
+    },
+    {
+      "repository": "pr-pm/prpm",
+      "path": ".github/workflows/WORKFLOWS.md",
+      "html_url": "https://github.com/pr-pm/prpm/blob/903b956417062bd9fbbb1df7cee44ca8a8291126/.github/workflows/WORKFLOWS.md"
+    },
+    {
+      "repository": "Darkatse/TauriTavern",
+      "path": ".github/workflows/public-testflight.yml",
+      "html_url": "https://github.com/Darkatse/TauriTavern/blob/3a8c5401c859ac15ac11f3339846360615232896/.github/workflows/public-testflight.yml"
+    },
+    {
+      "repository": "Darkatse/TauriTavern",
+      "path": ".github/workflows/canary-release.yml",
+      "html_url": "https://github.com/Darkatse/TauriTavern/blob/3a8c5401c859ac15ac11f3339846360615232896/.github/workflows/canary-release.yml"
+    },
+    {
+      "repository": "RaoFoundation/subtensor",
+      "path": ".github/workflows/ai-review.yml",
+      "html_url": "https://github.com/RaoFoundation/subtensor/blob/14cde6410fe8ec81a940e290c56f94a632a0988d/.github/workflows/ai-review.yml"
+    },
+    {
+      "repository": "videojs/v10",
+      "path": ".github/workflows/changelog-prose.yml",
+      "html_url": "https://github.com/videojs/v10/blob/9ba80097f4b08ba276e327fbc2957ec476c87cf9/.github/workflows/changelog-prose.yml"
+    },
+    {
+      "repository": "Ooples-Finance-LLC/OoplesFinance.YahooFinanceAPI",
+      "path": ".github/workflows/codex-autofix.yml",
+      "html_url": "https://github.com/Ooples-Finance-LLC/OoplesFinance.YahooFinanceAPI/blob/03fdbe99811e4e42e7c1f631403b6ef05ba20bb0/.github/workflows/codex-autofix.yml"
+    },
+    {
+      "repository": "NxcoreAI/EverRoom",
+      "path": ".github/workflows/codex-review.yml",
+      "html_url": "https://github.com/NxcoreAI/EverRoom/blob/9508f8d40f8fb817ce2d509107a7cc28b9ec7320/.github/workflows/codex-review.yml"
+    },
+    {
+      "repository": "pierreaubert/sotf",
+      "path": ".github/workflows/codex-code-review.yml.to_expensive",
+      "html_url": "https://github.com/pierreaubert/sotf/blob/a8861078ee4c9bcca06a6e5c13cd231aa2fd20cb/.github/workflows/codex-code-review.yml.to_expensive"
+    },
+    {
+      "repository": "agentclientprotocol/codex-acp",
+      "path": ".github/workflows/codex-update.yml",
+      "html_url": "https://github.com/agentclientprotocol/codex-acp/blob/061f9a4a2e463a220d7a3ab2ae5e9732837085ef/.github/workflows/codex-update.yml"
+    },
+    {
+      "repository": "brunoamaral/gregory-ai",
+      "path": ".github/workflows/codex.yml",
+      "html_url": "https://github.com/brunoamaral/gregory-ai/blob/5202a68067f362cbe1b1a5fc519defbd5e7adba6/.github/workflows/codex.yml"
+    },
+    {
+      "repository": "signalfx/obstudio",
+      "path": ".github/workflows/codex-evals.yml.disabled",
+      "html_url": "https://github.com/signalfx/obstudio/blob/ee779e6fa1849c94d539e6bad46463c30e269f62/.github/workflows/codex-evals.yml.disabled"
+    },
+    {
+      "repository": "videojs/v10",
+      "path": ".github/workflows/api-reference-sync.yml",
+      "html_url": "https://github.com/videojs/v10/blob/9ba80097f4b08ba276e327fbc2957ec476c87cf9/.github/workflows/api-reference-sync.yml"
+    },
+    {
+      "repository": "joshyorko/rcc",
+      "path": ".github/workflows/README.md",
+      "html_url": "https://github.com/joshyorko/rcc/blob/4148c2b71705c9d2baf0e88b48d08a79cb7bda0f/.github/workflows/README.md"
+    },
+    {
+      "repository": "Everless321/dYm",
+      "path": ".github/workflows/issue-reply.yml",
+      "html_url": "https://github.com/Everless321/dYm/blob/2823c4ff9cb7b9c27500e199ae142d5f6a75d14e/.github/workflows/issue-reply.yml"
+    },
+    {
+      "repository": "vouchdev/vouch",
+      "path": ".github/workflows/codex.yml",
+      "html_url": "https://github.com/vouchdev/vouch/blob/0530942a91bc53858038a53903e6963f5efe758e/.github/workflows/codex.yml"
+    },
+    {
+      "repository": "HD838A/remote-mic-app",
+      "path": ".github/workflows/sayall-agent-analyze.yml",
+      "html_url": "https://github.com/HD838A/remote-mic-app/blob/83c019e636457a50527a78c25d37134d388d90f3/.github/workflows/sayall-agent-analyze.yml"
+    },
+    {
+      "repository": "griddynamics/rosetta",
+      "path": ".github/workflows/repo-analysis.yml",
+      "html_url": "https://github.com/griddynamics/rosetta/blob/785054e925aa90a56b1221879584e341eac58f72/.github/workflows/repo-analysis.yml"
+    },
+    {
+      "repository": "nenoNaninu/TypedSignalR.Client.TypeScript",
+      "path": ".github/workflows/codex-pr.yaml",
+      "html_url": "https://github.com/nenoNaninu/TypedSignalR.Client.TypeScript/blob/31cffc058d9c2eb6e481134d82cebc819f6fe1ba/.github/workflows/codex-pr.yaml"
+    },
+    {
+      "repository": "griddynamics/rosetta",
+      "path": ".github/workflows/repo-triage.yml",
+      "html_url": "https://github.com/griddynamics/rosetta/blob/785054e925aa90a56b1221879584e341eac58f72/.github/workflows/repo-triage.yml"
+    },
+    {
+      "repository": "HD838A/remote-mic-app",
+      "path": ".github/workflows/sayall-agent-develop.yml",
+      "html_url": "https://github.com/HD838A/remote-mic-app/blob/83c019e636457a50527a78c25d37134d388d90f3/.github/workflows/sayall-agent-develop.yml"
+    },
+    {
+      "repository": "im1ai-platform/im1ai-tomorrownews",
+      "path": ".github/workflows/README.md",
+      "html_url": "https://github.com/im1ai-platform/im1ai-tomorrownews/blob/9cb334d02e1c67a6b0d3c6b53cc2f6cd182145d5/.github/workflows/README.md"
+    },
+    {
+      "repository": "griddynamics/rosetta",
+      "path": ".github/workflows/repo-plan.yml",
+      "html_url": "https://github.com/griddynamics/rosetta/blob/785054e925aa90a56b1221879584e341eac58f72/.github/workflows/repo-plan.yml"
+    },
+    {
+      "repository": "thuantran/dnscrypt-asuswrt-installer",
+      "path": ".github/workflows/codex-code-improvement.yml",
+      "html_url": "https://github.com/thuantran/dnscrypt-asuswrt-installer/blob/00460ef1dfe2f9d707c650d34475579a0f08aef8/.github/workflows/codex-code-improvement.yml"
+    },
+    {
+      "repository": "PicnicSupermarket/error-prone-support",
+      "path": ".github/workflows/suggest-commit-message.yml",
+      "html_url": "https://github.com/PicnicSupermarket/error-prone-support/blob/388606837af2beed5252e84a41cc552756e4efad/.github/workflows/suggest-commit-message.yml"
+    },
+    {
+      "repository": "zigflow/zigflow",
+      "path": ".github/workflows/pr_review.yml",
+      "html_url": "https://github.com/zigflow/zigflow/blob/9b2f2ddc8f06f211e123a5235ae9605644ebe17c/.github/workflows/pr_review.yml"
+    },
+    {
+      "repository": "igerber/diff-diff",
+      "path": ".github/workflows/ai_pr_review.yml",
+      "html_url": "https://github.com/igerber/diff-diff/blob/9eb90ead0ea362c856588725f1076a3ab4722612/.github/workflows/ai_pr_review.yml"
+    },
+    {
+      "repository": "VAllens/CrawlerSamples",
+      "path": ".github/workflows/codex-review.yml",
+      "html_url": "https://github.com/VAllens/CrawlerSamples/blob/7c665ce29906cba2d5b85967778854349804893d/.github/workflows/codex-review.yml"
+    },
+    {
+      "repository": "MystenLabs/deepbookv3",
+      "path": ".github/workflows/auto-approve.yml",
+      "html_url": "https://github.com/MystenLabs/deepbookv3/blob/1c968f9cc391dc135e006ab1a8b46fd2482333a5/.github/workflows/auto-approve.yml"
+    },
+    {
+      "repository": "deonmenezes/mantishack",
+      "path": ".github/workflows/issue-labeler.yml",
+      "html_url": "https://github.com/deonmenezes/mantishack/blob/c3a2e68e57909a2fa88b2d630d2b1fc132f7aac7/.github/workflows/issue-labeler.yml"
+    },
+    {
+      "repository": "milady-ai/milady",
+      "path": ".github/workflows/agent-review.yml",
+      "html_url": "https://github.com/milady-ai/milady/blob/4e721ad04b6dae1e39d038171e8f0d1eb46d4283/.github/workflows/agent-review.yml"
+    },
+    {
+      "repository": "studie-tech/TheNinjaRPG",
+      "path": ".github/workflows/codex.yml",
+      "html_url": "https://github.com/studie-tech/TheNinjaRPG/blob/345d18accf6d8ea8d8d47ef0e61b5aff7d5a1cf9/.github/workflows/codex.yml"
+    },
+    {
+      "repository": "griddynamics/rosetta",
+      "path": ".github/workflows/repo-implement.yml",
+      "html_url": "https://github.com/griddynamics/rosetta/blob/785054e925aa90a56b1221879584e341eac58f72/.github/workflows/repo-implement.yml"
+    },
+    {
+      "repository": "LuaanNguyen/portfolio",
+      "path": ".github/workflows/codex-pr-review.yml",
+      "html_url": "https://github.com/LuaanNguyen/portfolio/blob/45a4ae554409e5f03724a725203a50a31ed9093d/.github/workflows/codex-pr-review.yml"
+    },
+    {
+      "repository": "pr-pm/prpm",
+      "path": ".github/workflows/codex-autofix.yml",
+      "html_url": "https://github.com/pr-pm/prpm/blob/903b956417062bd9fbbb1df7cee44ca8a8291126/.github/workflows/codex-autofix.yml"
+    },
+    {
+      "repository": "1lck/Lithe-IDEA",
+      "path": ".github/workflows/lithe-pr-review.yml",
+      "html_url": "https://github.com/1lck/Lithe-IDEA/blob/f4e8ea0bd037755ae15b010af6167d0259fbac99/.github/workflows/lithe-pr-review.yml"
+    },
+    {
+      "repository": "DEVtheOPS/opencode-plugin-otel",
+      "path": ".github/workflows/codex.yml",
+      "html_url": "https://github.com/DEVtheOPS/opencode-plugin-otel/blob/a051cdac72d2c4eac1f7fc49dab6d309d5f4c500/.github/workflows/codex.yml"
+    },
+    {
+      "repository": "cloudwalk/stratus",
+      "path": ".github/workflows/dependabot-auto-vet.yml",
+      "html_url": "https://github.com/cloudwalk/stratus/blob/695252f2215d8c8ef1d7d76075a814420ab2ca94/.github/workflows/dependabot-auto-vet.yml"
+    }
+  ]
+}

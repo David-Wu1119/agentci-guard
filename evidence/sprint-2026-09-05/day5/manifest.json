@@ -1,0 +1,436 @@
+{
+  "protocol": "PROTOCOL.md",
+  "started_at": "2026-09-05T18:16:15.229Z",
+  "finished_at": "2026-09-05T18:16:36.172Z",
+  "cases": [
+    {
+      "case_id": "u-01",
+      "group": "G1-claude",
+      "group_query": "G1",
+      "search_rank": 2,
+      "repository": "remotion-dev/remotion",
+      "path": ".github/workflows/claude.yml",
+      "default_branch": "main",
+      "head_commit": "cb053ab25292f8e7559dc5295f4286cde2268481",
+      "raw_url": "https://raw.githubusercontent.com/remotion-dev/remotion/cb053ab25292f8e7559dc5295f4286cde2268481/.github/workflows/claude.yml",
+      "sha256": "f51ed3a217a5ebdcec490329287cb010b3126cf498e962e2acc209315d1d49c5",
+      "bytes": 1910,
+      "collected_at": "2026-09-05T18:16:16.626Z"
+    },
+    {
+      "case_id": "u-02",
+      "group": "G1-claude",
+      "group_query": "G1",
+      "search_rank": 4,
+      "repository": "instructure/canvas-lms",
+      "path": ".github/workflows/claude.yml",
+      "default_branch": "master",
+      "head_commit": "1c9f0bb8013ed69c4f2efe11fd483025469b7e6c",
+      "raw_url": "https://raw.githubusercontent.com/instructure/canvas-lms/1c9f0bb8013ed69c4f2efe11fd483025469b7e6c/.github/workflows/claude.yml",
+      "sha256": "d8c67a50d386d644ee1c902200a22b43bb26472bffcde63c01e275cbc5c7e8dc",
+      "bytes": 1394,
+      "collected_at": "2026-09-05T18:16:17.705Z"
+    },
+    {
+      "case_id": "u-03",
+      "group": "G1-claude",
+      "group_query": "G1",
+      "search_rank": 6,
+      "repository": "shopware/shopware",
+      "path": ".github/workflows/claude.yml",
+      "default_branch": "trunk",
+      "head_commit": "2bf15434a9df102048bafd136bf48e3b2892d5c6",
+      "raw_url": "https://raw.githubusercontent.com/shopware/shopware/2bf15434a9df102048bafd136bf48e3b2892d5c6/.github/workflows/claude.yml",
+      "sha256": "513f25f830a6404b483fb3daa6eb0e17a840a200a52d5722acce97676a2baf70",
+      "bytes": 1988,
+      "collected_at": "2026-09-05T18:16:18.494Z"
+    },
+    {
+      "case_id": "u-04",
+      "group": "G1-claude",
+      "group_query": "G1",
+      "search_rank": 9,
+      "repository": "fxsound2/fxsound-app",
+      "path": ".github/workflows/claude.yml",
+      "default_branch": "main",
+      "head_commit": "c639f20c036f2c8b20d6ceadd98f4726c69c538b",
+      "raw_url": "https://raw.githubusercontent.com/fxsound2/fxsound-app/c639f20c036f2c8b20d6ceadd98f4726c69c538b/.github/workflows/claude.yml",
+      "sha256": "d2e26bc4b1a54b58870a63f16e0822c9e054cc6d516993ff653f6acb4048d9fc",
+      "bytes": 1634,
+      "collected_at": "2026-09-05T18:16:19.964Z"
+    },
+    {
+      "case_id": "u-05",
+      "group": "G2-other-agent",
+      "group_query": "G2a",
+      "search_rank": 1,
+      "repository": "openclaw/openclaw",
+      "path": ".github/workflows/dated-todo-sweep.yml",
+      "default_branch": "main",
+      "head_commit": "8c0520f928905b8e5e4493321a7876b72791373e",
+      "raw_url": "https://raw.githubusercontent.com/openclaw/openclaw/8c0520f928905b8e5e4493321a7876b72791373e/.github/workflows/dated-todo-sweep.yml",
+      "sha256": "6d5fcf86ad35696f7cc1cb60de473b83f767bba0969bf93c79839b9b36c26721",
+      "bytes": 5849,
+      "collected_at": "2026-09-05T18:16:21.251Z"
+    },
+    {
+      "case_id": "u-06",
+      "group": "G2-other-agent",
+      "group_query": "G2b",
+      "search_rank": 1,
+      "repository": "google-gemini/gemini-cli",
+      "path": ".github/workflows/docs-audit.yml",
+      "default_branch": "main",
+      "head_commit": "85aca163f6c73ac6ce380b5447359146b8adcae4",
+      "raw_url": "https://raw.githubusercontent.com/google-gemini/gemini-cli/85aca163f6c73ac6ce380b5447359146b8adcae4/.github/workflows/docs-audit.yml",
+      "sha256": "a8b62aa16c697f425ceb09d4890051429a7c66384f1d212339b0313eb742c03c",
+      "bytes": 2254,
+      "collected_at": "2026-09-05T18:16:22.349Z"
+    },
+    {
+      "case_id": "u-07",
+      "group": "G2-other-agent",
+      "group_query": "G2c",
+      "search_rank": 2,
+      "repository": "TheAgentCompany/TheAgentCompany",
+      "path": ".github/workflows/openhands-resolver.yml",
+      "default_branch": "main",
+      "head_commit": "98b68ef82a47690c316f42fddb05baafaab56851",
+      "raw_url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/.github/workflows/openhands-resolver.yml",
+      "sha256": "cfcc18614e349f6daaf24366a83a35393982d86454d2dbac24f3f85389ee696e",
+      "bytes": 567,
+      "collected_at": "2026-09-05T18:16:23.749Z"
+    },
+    {
+      "case_id": "u-08",
+      "group": "G2-other-agent",
+      "group_query": "G2a",
+      "search_rank": 8,
+      "repository": "dbcli/pgcli",
+      "path": ".github/workflows/codex-review.yml",
+      "default_branch": "main",
+      "head_commit": "8e4aef4fe1bf36db25a80e1478d3952a11c839f1",
+      "raw_url": "https://raw.githubusercontent.com/dbcli/pgcli/8e4aef4fe1bf36db25a80e1478d3952a11c839f1/.github/workflows/codex-review.yml",
+      "sha256": "846b0b43fb0c9a829fa498dd3925768eea726e59a0df65d1812f48c497738ea4",
+      "bytes": 2871,
+      "collected_at": "2026-09-05T18:16:24.443Z"
+    },
+    {
+      "case_id": "u-09",
+      "group": "G3-control",
+      "group_query": "G3",
+      "search_rank": 22,
+      "repository": "ranisalt/node-argon2",
+      "path": ".github/workflows/ci.yml",
+      "default_branch": "master",
+      "head_commit": "786de7152f95881b0683aea1d2ca60ed0d6d9e2f",
+      "raw_url": "https://raw.githubusercontent.com/ranisalt/node-argon2/786de7152f95881b0683aea1d2ca60ed0d6d9e2f/.github/workflows/ci.yml",
+      "sha256": "b1599146dcffa3ea1430765475ffa80167155a7b9057d20ee2164d907c4e4856",
+      "bytes": 3739,
+      "collected_at": "2026-09-05T18:16:32.262Z"
+    },
+    {
+      "case_id": "u-10",
+      "group": "G3-control",
+      "group_query": "G3",
+      "search_rank": 24,
+      "repository": "avishayil/react-native-restart",
+      "path": ".github/workflows/ci.yml",
+      "default_branch": "master",
+      "head_commit": "939ba3b6bc26d0c4a2473a56e9da78ed6d7f3e1c",
+      "raw_url": "https://raw.githubusercontent.com/avishayil/react-native-restart/939ba3b6bc26d0c4a2473a56e9da78ed6d7f3e1c/.github/workflows/ci.yml",
+      "sha256": "521c229c19c271e8be0098dd65360f8ae034b0ce859d3aa6a116d51d4c997705",
+      "bytes": 2800,
+      "collected_at": "2026-09-05T18:16:33.309Z"
+    },
+    {
+      "case_id": "u-11",
+      "group": "G3-control",
+      "group_query": "G3",
+      "search_rank": 28,
+      "repository": "heroku/heroku-slugs",
+      "path": ".github/workflows/ci.yml",
+      "default_branch": "main",
+      "head_commit": "a117e3a34d75c18ecae8c7c15de93a41c352f9d8",
+      "raw_url": "https://raw.githubusercontent.com/heroku/heroku-slugs/a117e3a34d75c18ecae8c7c15de93a41c352f9d8/.github/workflows/ci.yml",
+      "sha256": "b217c4b165ed84f783616becc726b050e59b1150a10fded492633c33d74ef163",
+      "bytes": 522,
+      "collected_at": "2026-09-05T18:16:35.406Z"
+    },
+    {
+      "case_id": "u-12",
+      "group": "G3-control",
+      "group_query": "G3",
+      "search_rank": 29,
+      "repository": "Rfym21/Qwen2API",
+      "path": ".github/workflows/ci.yml",
+      "default_branch": "main",
+      "head_commit": "dc2e8ec448f0ced91183c1af8e32dad87b7f97b4",
+      "raw_url": "https://raw.githubusercontent.com/Rfym21/Qwen2API/dc2e8ec448f0ced91183c1af8e32dad87b7f97b4/.github/workflows/ci.yml",
+      "sha256": "667a433b0e592d21e81d9371b25c14c0ac5b7092a7a5d77dfb4b431e892ff42b",
+      "bytes": 998,
+      "collected_at": "2026-09-05T18:16:36.172Z"
+    }
+  ],
+  "replacements": [
+    {
+      "group_query": "G1",
+      "rank": 1,
+      "repository": "FastLED/FastLED",
+      "path": ".github/workflows/README.md",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G1",
+      "rank": 3,
+      "repository": "taikoxyz/taiko-mono",
+      "path": ".github/workflows/claude-layout-review.yml.bkup",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G1",
+      "rank": 5,
+      "repository": "autobrr/qui",
+      "path": ".github/workflows/claude.yml.disabled",
+      "reason": "1: repository in benchmark/corpus/exclusion list"
+    },
+    {
+      "group_query": "G1",
+      "rank": 7,
+      "repository": "EvotecIT/PSWriteHTML",
+      "path": ".github/workflows/claude-code-review.yml.disabled",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G1",
+      "rank": 8,
+      "repository": "EvotecIT/EventViewerX",
+      "path": ".github/workflows/claude.yml.disabled",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G2c",
+      "rank": 1,
+      "repository": "OpenHands/software-agent-sdk",
+      "path": ".github/workflows/oh-update-documentation.yml.back",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G2a",
+      "rank": 2,
+      "repository": "openclaw/openclaw",
+      "path": ".github/workflows/docs-agent.yml",
+      "reason": "2: repository already selected"
+    },
+    {
+      "group_query": "G2a",
+      "rank": 3,
+      "repository": "openclaw/openclaw",
+      "path": ".github/workflows/release-validation-skill-runner.yml",
+      "reason": "2: repository already selected"
+    },
+    {
+      "group_query": "G2a",
+      "rank": 4,
+      "repository": "astral-sh/uv",
+      "path": ".github/workflows/release-prepare.yml",
+      "reason": "1: repository in benchmark/corpus/exclusion list"
+    },
+    {
+      "group_query": "G2a",
+      "rank": 5,
+      "repository": "astral-sh/uv",
+      "path": ".github/workflows/reproduce-bug.yml",
+      "reason": "1: repository in benchmark/corpus/exclusion list"
+    },
+    {
+      "group_query": "G2a",
+      "rank": 6,
+      "repository": "astral-sh/uv",
+      "path": ".github/workflows/pull-request-labels.yml",
+      "reason": "1: repository in benchmark/corpus/exclusion list"
+    },
+    {
+      "group_query": "G2a",
+      "rank": 7,
+      "repository": "astral-sh/uv",
+      "path": ".github/workflows/fix-bug.yml",
+      "reason": "1: repository in benchmark/corpus/exclusion list"
+    },
+    {
+      "group_query": "G3",
+      "rank": 1,
+      "repository": "Gitdigital-products/solana-compliance-registry",
+      "path": ".GitHub/workflows/build.yml",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G3",
+      "rank": 2,
+      "repository": "Ibraah2/LEOPARD",
+      "path": ".GitHub/workflows/continuous.yml",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G3",
+      "rank": 3,
+      "repository": "Devteam713/Porkelon-Ecosystem",
+      "path": ".GitHub/workflows/ci.yml",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G3",
+      "rank": 4,
+      "repository": "HLSV/ldea",
+      "path": ".Github/workflows/Ci.yml",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G3",
+      "rank": 5,
+      "repository": "Gitdigital-products/fraud-detection-service",
+      "path": ".GitHub/Workflows/ci.yml",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G3",
+      "rank": 6,
+      "repository": "11ranjitreddy/League",
+      "path": ".Github/workflows/ci.yml",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G3",
+      "rank": 7,
+      "repository": "Nastyc1g/PASCHAL-MD",
+      "path": ".gitHub/workflows/continuous.yml",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G3",
+      "rank": 8,
+      "repository": "VENKAT2905/Projects",
+      "path": ".Github/workflows/ci.yml",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G3",
+      "rank": 9,
+      "repository": "Mohanpappu/fsad-project1",
+      "path": ".gitHub/workflows/ci.yml",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G3",
+      "rank": 10,
+      "repository": "Sairam290/reactcicd",
+      "path": ".Github/workflows/reactci.yml",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G3",
+      "rank": 11,
+      "repository": "Marceloski1/My-First-nest-api",
+      "path": ".gitHub/workflows/ci-basic.yml",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G3",
+      "rank": 12,
+      "repository": "Skylerblu4444/InnovativeItSupport",
+      "path": ".GitHub/Workflows/.ci.yml",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G3",
+      "rank": 13,
+      "repository": "Favibit/Banking",
+      "path": ".GitHub/Workflows/Ci.yml",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G3",
+      "rank": 14,
+      "repository": "Gajulakarthikeya/filesfe",
+      "path": ".GitHub/workflows/ci.yml",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G3",
+      "rank": 15,
+      "repository": "balajireddy2480-beep/devOps--piplines",
+      "path": ".Github/Workflows/pipeline.yaml",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G3",
+      "rank": 16,
+      "repository": "xavi479/ClaseGitHubActi-n",
+      "path": ".GitHub/workflows/ci-basic-v2.yml",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G3",
+      "rank": 17,
+      "repository": "niazidev/fixorium-swap",
+      "path": ".GitHub/workflows/vercel-deploy.yml",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G3",
+      "rank": 18,
+      "repository": "A-Hem/memjit",
+      "path": ".GitHub/workflows/tests.yml",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G3",
+      "rank": 19,
+      "repository": "juicycleff/ultimate-backend",
+      "path": ".github/workflows/ci",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G3",
+      "rank": 20,
+      "repository": "juicycleff/ultimate-backend",
+      "path": ".github/workflows/ci-fix",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G3",
+      "rank": 21,
+      "repository": "Pomax/react-onclickoutside",
+      "path": ".github/workflows/node.js.yml.diabled",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G3",
+      "rank": 23,
+      "repository": "prabhuignoto/react-chrono",
+      "path": ".github/workflows/playwright.yml.disabled",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G3",
+      "rank": 25,
+      "repository": "microsoft/vscode-azuretools",
+      "path": ".github/workflows/README.md",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G3",
+      "rank": 26,
+      "repository": "netresearch/agent-rules-skill",
+      "path": ".github/workflows/AGENTS.md",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    },
+    {
+      "group_query": "G3",
+      "rank": 27,
+      "repository": "Avenx-JS/avenx-js",
+      "path": ".github/workflows/Pipelines.md",
+      "reason": "4: not directly under .github/workflows (case-sensitive) with yml/yaml suffix"
+    }
+  ]
+}
