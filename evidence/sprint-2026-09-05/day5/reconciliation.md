@@ -111,3 +111,10 @@ cannot bound false-positive or false-negative rates. The exercise did its job:
 it found one coverage gap (Gemini action), one packaging defect (entry guard),
 and reproduced the completeness-noise problem — and it did not contradict any
 of the three rules on the cases it covered.
+
+## Addendum after external review (2026-09-05, v0.6.0)
+
+- **u-06 is development material from v0.6.0 on.** The Gemini action was added to the detector in response to review finding 3 with this case's shape as the constrained variant; it can no longer count as an unseen case for that change.
+- **Terminology.** This exercise was performed by an AI operator (Codex) with judgments committed before the scan. It is an automated, predictions-hidden spot check, not a manual human review. The owner's own review of u-02, u-06, and u-08 is pending and will be appended below this line without editing the original judgments.
+- **Counts, restated so they cannot become a headline.** 36 rule slots; only 2 were judged positive (one `gated-ai-write-token`, one `pull-request-target-ai`) and none `untrusted-ai-write-token`; the agreement figure says little about missed vulnerabilities.
+- **Version range of the CLI entry defect** (incident 2): v0.2.0 through v0.5.0, not "every earlier version" — v0.1.0/v0.1.1 invoked `main()` unconditionally.

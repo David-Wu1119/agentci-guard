@@ -60,6 +60,7 @@ The following are not security findings:
 - `agentci/analysis-checkout-protection-unknown`
 - `agentci/analysis-permissions-unknown`
 - `agentci/analysis-remote-reusable-workflow`
+- `agentci/org-fetch-failed` — an organization scan could not fetch a repository's workflows (error; the repository and reason are in the message; archived and fork exclusions are not diagnostics)
 - `agentci/analysis-local-reusable-missing`
 - `agentci/analysis-reusable-cycle`
 - `agentci/analysis-reusable-without-caller`

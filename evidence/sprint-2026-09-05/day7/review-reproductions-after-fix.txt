@@ -1,0 +1,7 @@
+F1 org exit: 1 | analysis_complete: false | diag: [ 'agentci/parse-error/error' ]
+F1 org exit (default threshold): 1
+F2 skipped: [
+  'acme/down: fetch failed: GitHub API 503 listing workflows',
+  'acme/arch: archived'
+] | diagnostics: 1 | SARIF executionSuccessful: false notifications: 1
+F3 gemini fixture: agents 1 findings ['untrusted-input-in-prompt', 'untrusted-ai-write-token', 'ai-with-secrets', 'broad-write-permissions'] complete True

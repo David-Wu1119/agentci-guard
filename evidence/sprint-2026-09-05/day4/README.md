@@ -25,7 +25,9 @@ symlink, and the CLI produced no output and exited 0. Root cause: `dist/cli.js`
 compared `import.meta.url` (symlink-resolved by Node) with `process.argv[1]`
 (unresolved) to decide whether it was the main script. Every `npm install -g`
 bin entry is a symlink, so **the CLI install route README gave for v0.5.0 was a
-silent no-op** (`agentci --version` printed nothing; confirmed with
+silent no-op** (affected range: v0.2.0 through v0.5.0, the versions carrying the
+guard introduced in `bb76b6b` on 2026-09-03; v0.1.0 and v0.1.1 call `main()`
+unconditionally and are not affected — corrected after review) (`agentci --version` printed nothing; confirmed with
 `npm install -g --prefix <tmp> <tarball>`). The Action route (`dist/action.js`)
 has no such guard and was unaffected — the consumer smoke passed.
 

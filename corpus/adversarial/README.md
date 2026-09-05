@@ -1,7 +1,7 @@
 # AgentCI Guard Adversarial Corpus
 
 This corpus contains synthetic workflows designed to break specific scanner
-assumptions. All 38 cases are public, minimal, and checked in CI through
+assumptions. All 40 cases are public, minimal, and checked in CI through
 `tests/adversarial-corpus.test.ts`.
 
 This is **not an accuracy benchmark**:

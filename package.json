@@ -1,6 +1,6 @@
 {
   "name": "agentci-guard",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Experimental linter for risky AI coding-agent usage in GitHub Actions workflows.",
   "type": "module",
   "bin": {
