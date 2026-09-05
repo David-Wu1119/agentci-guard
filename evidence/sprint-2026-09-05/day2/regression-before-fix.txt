@@ -1,0 +1,39 @@
+
+ RUN  v4.1.10 /Users/davidwu/Documents/Codex/agentci-guard
+
+ ❯ tests/prt-step-gate.test.ts (8 tests | 2 failed) 14ms
+     × does not report pull-request-target-ai when the only agent step is owner-gated 8ms
+     × does not let a gate on the agent suppress an unsafe checkout in an earlier unguarded step 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/prt-step-gate.test.ts > pull_request_target with an actor gate on the agent step > does not report pull-request-target-ai when the only agent step is owner-gated
+AssertionError: expected [ 'agentci/unpinned-ai-action', …(2) ] to not include 'agentci/pull-request-target-ai'
+ ❯ tests/prt-step-gate.test.ts:41:23
+     39|   it("does not report pull-request-target-ai when the only agent step …
+     40|     const rules = rulesOf(STEP_GATED);
+     41|     expect(rules).not.toContain(PRT);
+       |                       ^
+     42|     expect(rules).not.toContain(WRITE);
+     43|     expect(rules).not.toContain(GATED);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/prt-step-gate.test.ts > pull_request_target with an actor gate on the agent step > does not let a gate on the agent suppress an unsafe checkout in an earlier unguarded step
+AssertionError: expected [ 'agentci/unsafe-checkout', …(3) ] to not include 'agentci/pull-request-target-ai'
+ ❯ tests/prt-step-gate.test.ts:121:23
+    119|     const rules = rulesOf(raw);
+    120|     expect(rules).toContain(CHECKOUT);
+    121|     expect(rules).not.toContain(PRT);
+       |                       ^
+    122|   });
+    123|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 6 passed (8)
+   Start at  13:54:54
+   Duration  238ms (transform 64ms, setup 0ms, import 134ms, tests 14ms, environment 0ms)
+

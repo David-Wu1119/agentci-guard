@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `agentci/pull-request-target-ai` now honors a recognized actor/provenance
+  gate on the agent step, not only on the job, matching the documented gate
+  contract. An agent step guarded by `github.actor == github.repository_owner`
+  on `pull_request_target` was reported critical at v0.4.0. Counterexamples
+  pinned by `tests/prt-step-gate.test.ts`: an unguarded step, a job-level gate,
+  the step-level gate, a job mixing a gated and an ungated agent (still
+  critical), an `||` condition that admits untrusted actors (still critical), a
+  runtime-output condition the analyzer cannot prove (still critical), an unsafe
+  checkout in an earlier unguarded step (still reported; the agent's gate does
+  not cover it), and a read-only job with an unguarded agent (still critical —
+  `pull_request_target` exposes secrets regardless of token scope). Frozen
+  benchmark: 0 of 152 cases changed; no benchmark workflow places an actor gate
+  on an agent step under `pull_request_target`.
+
 ## [0.4.0] - 2026-09-05
 
 ### Changed

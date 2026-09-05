@@ -185,7 +185,13 @@ unrecognized construct are treated as ungated.
 
 Actor-gated jobs and steps do not raise `agentci/untrusted-ai-write-token`,
 `agentci/untrusted-input-in-prompt`, `agentci/pull-request-target-ai`, or
-`agentci/unsafe-checkout`. Findings that do not depend on who can trigger the
+`agentci/unsafe-checkout`. Each rule consults the gate at the scope it
+evaluates: step-level rules use the step's gate (or the job's), and the
+job-level `pull-request-target-ai` fires only if some agent step is reachable
+with neither gate. Until 2026-09-05 that rule consulted only the job gate, so an
+owner-gated agent step on `pull_request_target` was still reported critical;
+`tests/prt-step-gate.test.ts` pins the corrected behavior and its
+counterexamples. Findings that do not depend on who can trigger the
 workflow — permission breadth, action pinning, and secret exposure — are
 unaffected, because a guard restricts the attacker, not the blast radius.
 
