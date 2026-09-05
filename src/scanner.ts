@@ -343,6 +343,8 @@ function analyzeWorkflow(
       hasUntrustedIngestion: boolean;
       /** anthropics/claude-code-action with its default write-access gate intact. */
       selfGated: boolean;
+      /** The job or this step carries a recognized actor/provenance gate. */
+      actorGated: boolean;
       events: string[];
     }> = [];
     /** Untrusted event text expanded into a `run:` step anywhere in the job. */
@@ -472,6 +474,7 @@ function analyzeWorkflow(
             isSelfGatingAgentAction(
               materializeInputs(stepUses, context.inputValues),
             ) && !hasAgentGateBypass(rawStep.with),
+          actorGated: stepActorGate,
           events: stepReachability.events,
         });
         if (hasUntrustedSink) {
@@ -556,9 +559,13 @@ function analyzeWorkflow(
 
     if (aiSteps.length === 0) continue;
     const jobHasWrite = hasSensitiveWrite(jobPermissions);
-    const aiOnPullRequestTarget =
-      !jobActorGate &&
-      aiSteps.some((step) => step.events.includes("pull_request_target"));
+    // Same gate contract as the other reachability rules: a recognized actor
+    // gate on the job or on the agent step itself means no untrusted actor can
+    // reach that agent, even on pull_request_target. Unguarded steps in the
+    // same job (an unsafe checkout, another agent) are judged on their own.
+    const aiOnPullRequestTarget = aiSteps.some(
+      (step) => !step.actorGated && step.events.includes("pull_request_target"),
+    );
     const untrustedAiSink = aiSteps.some(
       (step) =>
         step.hasUntrustedIngestion &&

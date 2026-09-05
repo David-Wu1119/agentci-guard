@@ -14303,6 +14303,7 @@ function analyzeWorkflow(workflow, repository, context) {
           selfGated: isSelfGatingAgentAction(
             materializeInputs(stepUses, context.inputValues)
           ) && !hasAgentGateBypass(rawStep.with),
+          actorGated: stepActorGate,
           events: stepReachability.events
         });
         if (hasUntrustedSink) {
@@ -14378,7 +14379,9 @@ function analyzeWorkflow(workflow, repository, context) {
     }
     if (aiSteps.length === 0) continue;
     const jobHasWrite = hasSensitiveWrite(jobPermissions);
-    const aiOnPullRequestTarget = !jobActorGate && aiSteps.some((step) => step.events.includes("pull_request_target"));
+    const aiOnPullRequestTarget = aiSteps.some(
+      (step) => !step.actorGated && step.events.includes("pull_request_target")
+    );
     const untrustedAiSink = aiSteps.some(
       (step) => step.hasUntrustedIngestion && step.events.some((event) => UNTRUSTED_EVENTS.has(event))
     );
