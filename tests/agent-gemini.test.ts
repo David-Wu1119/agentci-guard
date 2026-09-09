@@ -64,6 +64,39 @@ describe("google-github-actions/run-gemini-cli is an agent action", () => {
     }
   });
 
+  // Follow-up review (2026-09-09): `\b` treats the hyphen in
+  // `not-google-github-actions` as a word boundary, so a prefixed owner matched
+  // and its fixture produced a critical finding. Owner identity must be exact.
+  it("does not recognize a prefixed owner as the Gemini action", () => {
+    for (const prefixed of [
+      "not-google-github-actions/run-gemini-cli@v0",
+      "not-google-gemini/gemini-cli-action@a3bf79042542528e91937b3a3a6fbc4967ee3c31",
+      "my-google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31",
+    ]) {
+      expect(looksLikeAiAction(prefixed), prefixed).toBe(false);
+    }
+    // Legitimate references keep matching: tag, SHA, leading whitespace.
+    expect(looksLikeAiAction("google-github-actions/run-gemini-cli@v0")).toBe(
+      true,
+    );
+    expect(
+      looksLikeAiAction(
+        "  google-gemini/gemini-cli-action@a3bf79042542528e91937b3a3a6fbc4967ee3c31",
+      ),
+    ).toBe(true);
+  });
+
+  it("scans a workflow using a prefixed owner as ordinary CI (the reviewer's fixture)", () => {
+    expect(
+      scan(
+        RISKY.replace(
+          "google-github-actions/run-gemini-cli@",
+          "not-google-github-actions/run-gemini-cli@",
+        ),
+      ),
+    ).toEqual([]);
+  });
+
   it("flags untrusted comment text reaching Gemini in a write-token job (review finding 3 fixture)", () => {
     const found = rules(RISKY);
     expect(found).toContain(UAWT);

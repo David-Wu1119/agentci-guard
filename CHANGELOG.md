@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-09-09
+
+### Fixed
+
+- Action owner identity is exact. Every entry in `AI_AGENT_ACTION_PATTERNS`
+  that began with `\b` accepted a prefixed owner, because a hyphen is a word
+  boundary: `not-google-github-actions/run-gemini-cli`,
+  `fake-openai/codex-action`, and `not-anthropics/claude-code-action` all
+  matched, and the follow-up review's fixture with the first of these produced
+  a critical finding. `looksLikeAiAction` now requires the vendor match at the
+  start of the `uses:` reference, for every vendor, after reducing a
+  `docker://registry/owner/image` reference to `owner/image` so an agent
+  shipped as a container image keeps matching. Tags, SHAs, subpaths, and
+  leading whitespace still match. Tests: `tests/precision.test.ts` ("action
+  owner identity is exact"), `tests/agent-gemini.test.ts`; corpus case
+  `lookalike-prefixed-owner` (41 cases). Frozen benchmark and corpus contain
+  no `uses:` value where a pattern matched anywhere but the start, so 0 of 152
+  cases changed. Detector precision changed, so this is a new candidate
+  identity.
+
 ## [0.6.0] - 2026-09-05
 
 Corrective release for the three findings of the 2026-09-05 external review.

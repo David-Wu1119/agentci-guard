@@ -1,0 +1,5 @@
+not-google-github-actions/run-gemini-cli@v0        false
+not-google-gemini/gemini-cli-action@v0             false
+fake-openai/codex-action@v1                        false
+google-github-actions/run-gemini-cli@v0            true
+docker://ghcr.io/all-hands-ai/openhands:0.9        true
