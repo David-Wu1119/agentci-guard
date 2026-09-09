@@ -25,7 +25,7 @@ Review: `/Users/davidwu/Downloads/AgentCI-Guard-Next-2-Days-2026-09-05.md`, item
 
 ## Gates (`check.txt`)
 
-`pnpm check` exit 0 — 238 tests, coverage 94.12 / 88.32 / 95.04 / 96.65. Package smoke 10 checks; Action manifest verified. Frozen benchmark against v0.6.0: **0 of 152 cases changed** (`behavior-diff.md`) — a pre-check found no `uses:` value in the benchmark or corpus where a pattern matched anywhere but the start. Holdout audit unchanged (`holdout-audit.txt`: 14 report an agent; the 2 documented expected negatives remain).
+`pnpm check` exit 0 — 238 tests, coverage 94.12 / 88.32 / 95.04 / 96.65. Package smoke 10 checks; Action manifest verified. Frozen benchmark against v0.6.0: **0 of 152 cases changed** (`behavior-diff.md`) — a pre-check found no `uses:` value in the benchmark or corpus where a pattern matched anywhere but the start. Holdout audit unchanged (`holdout-audit.txt`): per-case agent counts are identical to v0.6.0 — 8 of 16 report an agent usage, 6 are covered by an unresolvable-reusable-workflow diagnostic, and the 2 documented expected negatives remain. (Day 7's "14 of 16 report an agent" counted the audit's OK criterion, which includes the diagnostic route; corrected here.)
 
 ## Candidate identity
 
