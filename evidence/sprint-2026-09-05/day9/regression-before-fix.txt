@@ -1,0 +1,33 @@
+
+ RUN  v4.1.10 /Users/davidwu/Documents/Codex/agentci-guard
+
+ ❯ tests/precision.test.ts (7 tests | 1 failed) 22ms
+     × keeps matching tags, SHAs, subpaths, whitespace, and agent container images 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/precision.test.ts > action owner identity is exact > keeps matching tags, SHAs, subpaths, whitespace, and agent container images
+AssertionError: docker://registry:5000/all-hands-ai/openhands:0.9: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ tests/precision.test.ts:105:57
+    103|       "docker://GHCR.IO/All-Hands-AI/openhands:0.9",
+    104|     ]) {
+    105|       expect(looksLikeAiAction(legitimate), legitimate).toBe(true);
+       |                                                         ^
+    106|     }
+    107|     expect(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 passed (7)
+   Start at  16:26:58
+   Duration  201ms (transform 54ms, setup 0ms, import 106ms, tests 22ms, environment 0ms)
+

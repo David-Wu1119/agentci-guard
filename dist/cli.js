@@ -16811,7 +16811,7 @@ var SELF_GATED_EVENTS = /* @__PURE__ */ new Set([
   "pull_request_review_comment"
 ]);
 function looksLikeAiAction(value) {
-  const reference = value.trim().replace(/^docker:\/\/(?:[\w-]+(?:\.[\w-]+)+(?::\d+)?\/)?/i, "");
+  const reference = value.trim().replace(/^docker:\/\/(?:(?:localhost|[^/]*[.:][^/]*)\/)?/i, "");
   return AI_AGENT_ACTION_PATTERNS.some(
     (pattern) => pattern.exec(reference)?.index === 0
   );
@@ -18674,7 +18674,7 @@ function sarifLevel(severity) {
 // package.json
 var package_default = {
   name: "agentci-guard",
-  version: "0.6.1",
+  version: "0.6.2",
   description: "Experimental linter for risky AI coding-agent usage in GitHub Actions workflows.",
   type: "module",
   bin: {

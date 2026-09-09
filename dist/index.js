@@ -13354,7 +13354,7 @@ function looksLikeAiUsage(value) {
   return AI_AGENT_PATTERNS.some((pattern) => pattern.test(value));
 }
 function looksLikeAiAction(value) {
-  const reference = value.trim().replace(/^docker:\/\/(?:[\w-]+(?:\.[\w-]+)+(?::\d+)?\/)?/i, "");
+  const reference = value.trim().replace(/^docker:\/\/(?:(?:localhost|[^/]*[.:][^/]*)\/)?/i, "");
   return AI_AGENT_ACTION_PATTERNS.some(
     (pattern) => pattern.exec(reference)?.index === 0
   );
