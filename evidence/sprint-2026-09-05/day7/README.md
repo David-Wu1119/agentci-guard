@@ -25,7 +25,7 @@ Gemini semantics were read from the upstream `action.yml` (main, 2026-09-05): co
 
 ## Holdout audit (`holdout-audit.txt`)
 
-`docs/OPERATIONS.md` "Adding an agent" prescribes running the 16 `holdout-*` cases. 14 report an agent; 2 do not, and both are correct and pre-date this patch (identical under the v0.5.0 tarball):
+`docs/OPERATIONS.md` "Adding an agent" prescribes running the 16 `holdout-*` cases: each must report an agent usage or an explicit unresolvable-workflow diagnostic. 14 satisfy that criterion — 8 with an agent usage, 6 via a remote/unresolvable reusable-workflow diagnostic (wording corrected 2026-09-09; an earlier sentence here said "14 report an agent"). 2 do not, and both are correct and pre-date this patch (identical under the v0.5.0 tarball):
 - `holdout-aider-003` — `pip install aider-chat` and `aider --version` only; the detector's `--version`/`--help` exclusion is deliberate (an installation check is not an execution).
 - `holdout-openhands-002` — OpenHands appears only in a YAML comment ("The OpenHands cell mounts the Docker socket"); the invocation is in a runner-side script the analyzer cannot see, a documented limit; the scan is already marked incomplete (event-condition diagnostics).
 OPERATIONS now names both as expected negatives so the audit's criterion is unambiguous.

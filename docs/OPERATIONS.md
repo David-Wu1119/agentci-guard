@@ -26,7 +26,7 @@ precision or recall figure in any public material.
 What can truthfully be said today:
 
 - Eight rules, one threat model, documented in [`RULES.md`](../RULES.md).
-- Deterministic regression against a 40-case adversarial corpus and a frozen
+- Deterministic regression against a 41-case adversarial corpus and a frozen
   152-workflow real-world benchmark, both reproducible from the repository.
   The benchmark is **development and regression evidence**: its v3 evaluation
   split was opened during detector correction on 2–5 September 2026 and may

@@ -69,3 +69,36 @@ describe("precision", () => {
     expect(rules.has("agentci/ai-with-secrets")).toBe(true);
   });
 });
+
+// The action matcher names owners exactly. A `uses:` reference starts with its
+// owner, and every pattern must match there; `\b` alone accepted any owner
+// ending in the vendor's name after a hyphen (found by the 2026-09-09 review).
+describe("action owner identity is exact", () => {
+  it("rejects prefixed owners for every vendor", () => {
+    for (const prefixed of [
+      "fake-openai/codex-action@v1",
+      "not-anthropics/claude-code-action@v1",
+      "evil-sweepai/sweep@v1",
+      "not-google-github-actions/run-gemini-cli@v0",
+      "x-block/goose@v1",
+    ]) {
+      expect(looksLikeAiAction(prefixed), prefixed).toBe(false);
+    }
+  });
+
+  it("keeps matching tags, SHAs, subpaths, whitespace, and agent container images", () => {
+    for (const legitimate of [
+      "openai/codex-action@v1",
+      "anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567",
+      "OpenHands/extensions/plugins/pr-review@main",
+      "  google-github-actions/run-gemini-cli@v0 ",
+      "docker://ghcr.io/all-hands-ai/openhands:0.9",
+      "docker://all-hands-ai/openhands:0.9",
+    ]) {
+      expect(looksLikeAiAction(legitimate), legitimate).toBe(true);
+    }
+    expect(
+      looksLikeAiAction("docker://oskarstark/php-cs-fixer-ga:2.18.6"),
+    ).toBe(false);
+  });
+});

@@ -1279,6 +1279,24 @@
       },
       "rationale": "google-github-actions publishes auth, setup-gcloud, and deploy actions that are not agents. Matching the organization instead of the exact repository would flag ordinary deployment workflows; this case pins that they stay silent even on an untrusted event with a write token.",
       "assumption_sources": ["project-rule-contract"]
+    },
+    {
+      "id": "lookalike-prefixed-owner",
+      "path": "cases/lookalike-prefixed-owner",
+      "targets": ["agent detection precision: owner identity is exact"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["issue_comment"],
+        "findings": [],
+        "agent_usages": [],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "Follow-up review (2026-09-09): an owner such as not-google-github-actions matched the Gemini pattern because a hyphen is a word boundary, and this exact fixture produced a critical finding. A uses: reference names its owner first; the matcher now requires the vendor match at the start of the reference, for every vendor. The same shape with the real owner is the gemini-write case.",
+      "assumption_sources": ["project-rule-contract"]
     }
   ]
 }

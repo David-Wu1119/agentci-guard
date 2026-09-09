@@ -13356,7 +13356,10 @@ var SELF_GATED_EVENTS = /* @__PURE__ */ new Set([
   "pull_request_review_comment"
 ]);
 function looksLikeAiAction(value) {
-  return AI_AGENT_ACTION_PATTERNS.some((pattern) => pattern.test(value));
+  const reference = value.trim().replace(/^docker:\/\/(?:[\w-]+(?:\.[\w-]+)+(?::\d+)?\/)?/i, "");
+  return AI_AGENT_ACTION_PATTERNS.some(
+    (pattern) => pattern.exec(reference)?.index === 0
+  );
 }
 function looksLikeAiCli(value) {
   return [...AI_AGENT_CLI_PATTERNS, ...AI_AGENT_API_PATTERNS].some(

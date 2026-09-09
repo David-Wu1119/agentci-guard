@@ -1,0 +1,16 @@
+holdout-aider-001 agents 0 complete False
+holdout-aider-002 agents 0 complete False
+holdout-aider-003 agents 0 complete True
+holdout-aider-004 agents 0 complete False
+holdout-codex-001 agents 1 complete False
+holdout-codex-002 agents 4 complete False
+holdout-codex-003 agents 1 complete False
+holdout-codex-004 agents 1 complete False
+holdout-cursor-001 agents 1 complete False
+holdout-cursor-002 agents 1 complete False
+holdout-cursor-003 agents 3 complete False
+holdout-cursor-004 agents 1 complete False
+holdout-openhands-001 agents 0 complete False
+holdout-openhands-002 agents 0 complete False
+holdout-openhands-003 agents 0 complete False
+holdout-openhands-004 agents 0 complete False

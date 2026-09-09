@@ -1,0 +1,169 @@
+
+ RUN  v4.1.10 /Users/davidwu/Documents/Codex/agentci-guard
+
+ ❯ tests/agent-gemini.test.ts (9 tests | 2 failed) 16ms
+     × does not recognize a prefixed owner as the Gemini action 3ms
+     × scans a workflow using a prefixed owner as ordinary CI (the reviewer's fixture) 6ms
+ ❯ tests/precision.test.ts (7 tests | 1 failed) 24ms
+     × rejects prefixed owners for every vendor 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/agent-gemini.test.ts > google-github-actions/run-gemini-cli is an agent action > does not recognize a prefixed owner as the Gemini action
+AssertionError: not-google-github-actions/run-gemini-cli@v0: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ tests/agent-gemini.test.ts:76:53
+     74|       "my-google-github-actions/run-gemini-cli@a3bf79042542528e91937b3…
+     75|     ]) {
+     76|       expect(looksLikeAiAction(prefixed), prefixed).toBe(false);
+       |                                                     ^
+     77|     }
+     78|     // Legitimate references keep matching: tag, SHA, leading whitespa…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  tests/agent-gemini.test.ts > google-github-actions/run-gemini-cli is an agent action > scans a workflow using a prefixed owner as ordinary CI (the reviewer's fixture)
+AssertionError: expected [ { …(15) }, { …(15) }, …(2) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "call_chain": undefined,
++     "evidence": "{\"uses\":\"not-google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31\",\"with\":{\"gemini_api_key\":\"${{ secrets.GEMINI_API_KEY }}\",\"prompt\":\"${{ github.event.comment.body }}\"},\"env\":{}}",
++     "file": ".github/workflows/gemini.yml",
++     "fix": [
++       "Avoid inserting raw GitHub event text into prompts.",
++       "Use structured extraction and length limits.",
++       "Add prompt-injection filtering before AI execution.",
++       "Run the agent with read-only permissions.",
++     ],
++     "id": "agentci/untrusted-input-in-prompt:.github/workflows/gemini.yml:gemini:0:",
++     "job": "gemini",
++     "line": 9,
++     "message": "Untrusted GitHub event content is passed into an AI prompt or command",
++     "reachable_events": [
++       "issue_comment",
++     ],
++     "rule_id": "agentci/untrusted-input-in-prompt",
++     "severity": "high",
++     "step": "step 1",
++     "step_index": 0,
++     "title": "Untrusted GitHub event content is passed into an AI prompt or command",
++     "why": "PR bodies, issue bodies, comments, branch names, and commit messages are attacker-controlled in common workflows and can contain prompt-injection instructions.",
++   },
++   {
++     "call_chain": undefined,
++     "evidence": "reachable untrusted event content + AI usage + effective write permission",
++     "file": ".github/workflows/gemini.yml",
++     "fix": [
++       "Do not run privileged AI agents on untrusted triggers.",
++       "Use read-only GITHUB_TOKEN permissions for untrusted events.",
++       "Require maintainer approval before running the agent.",
++       "Sanitize and summarize untrusted content before passing it to an agent.",
++     ],
++     "id": "agentci/untrusted-ai-write-token:.github/workflows/gemini.yml:gemini::",
++     "job": "gemini",
++     "line": 6,
++     "message": "Untrusted event content can reach an AI agent with write permissions",
++     "reachable_events": [
++       "issue_comment",
++     ],
++     "rule_id": "agentci/untrusted-ai-write-token",
++     "severity": "critical",
++     "step": undefined,
++     "step_index": undefined,
++     "title": "Untrusted event content can reach an AI agent with write permissions",
++     "why": "An attacker can place prompt-injection text in a PR, issue, or comment. If that text reaches an AI agent with repository write permissions, the agent can be induced to modify code, comments, workflows, or releases.",
++   },
++   {
++     "call_chain": undefined,
++     "evidence": "AI step's effective environment or inputs reference a secret/token",
++     "file": ".github/workflows/gemini.yml",
++     "fix": [
++       "Do not expose secrets to agent jobs that process untrusted content.",
++       "Use short-lived scoped tokens.",
++       "Move secret-bearing actions behind manual approval.",
++     ],
++     "id": "agentci/ai-with-secrets:.github/workflows/gemini.yml:gemini::",
++     "job": "gemini",
++     "line": 6,
++     "message": "AI agent job has access to secrets",
++     "reachable_events": [
++       "issue_comment",
++     ],
++     "rule_id": "agentci/ai-with-secrets",
++     "severity": "medium",
++     "step": undefined,
++     "step_index": undefined,
++     "title": "AI agent job has access to secrets",
++     "why": "Secrets mounted into an AI-agent job can be exfiltrated if untrusted prompt content influences tool use, shell commands, or generated output. Most AI actions require a provider key, so this is a baseline exposure to review rather than a vulnerability on its own — it becomes high-risk when combined with untrusted input or write permissions (see agentci/untrusted-ai-write-token).",
++   },
++   {
++     "call_chain": undefined,
++     "evidence": "effective permissions: {\"source\":\"workflow\",\"default\":\"none\",\"scopes\":{\"contents\":\"write\"}}",
++     "file": ".github/workflows/gemini.yml",
++     "fix": [
++       "Set default permissions to read-only.",
++       "Grant write scopes only in narrowly scoped jobs.",
++       "Prefer job-level permissions over workflow-level write permissions.",
++     ],
++     "id": "agentci/broad-write-permissions:.github/workflows/gemini.yml:gemini::",
++     "job": "gemini",
++     "line": 6,
++     "message": "Workflow grants broad write permissions near AI usage",
++     "reachable_events": [
++       "issue_comment",
++     ],
++     "rule_id": "agentci/broad-write-permissions",
++     "severity": "medium",
++     "step": undefined,
++     "step_index": undefined,
++     "title": "Workflow grants broad write permissions near AI usage",
++     "why": "Broad write scopes increase blast radius if an AI-agent step is influenced by untrusted input.",
++   },
++ ]
+
+ ❯ tests/agent-gemini.test.ts:97:7
+     95|         ),
+     96|       ),
+     97|     ).toEqual([]);
+       |       ^
+     98|   });
+     99|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  tests/precision.test.ts > action owner identity is exact > rejects prefixed owners for every vendor
+AssertionError: fake-openai/codex-action@v1: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ tests/precision.test.ts:85:53
+     83|       "x-block/goose@v1",
+     84|     ]) {
+     85|       expect(looksLikeAiAction(prefixed), prefixed).toBe(false);
+       |                                                     ^
+     86|     }
+     87|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  3 failed | 13 passed (16)
+   Start at  15:27:57
+   Duration  232ms (transform 102ms, setup 0ms, import 239ms, tests 40ms, environment 0ms)
+
