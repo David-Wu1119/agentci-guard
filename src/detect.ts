@@ -176,12 +176,15 @@ export function looksLikeAiUsage(value: string): boolean {
  * `not-google-github-actions/run-gemini-cli`, because a hyphen is a word
  * boundary (found by the 2026-09-09 review). A `docker://` reference is
  * reduced to its `owner/image` first so an agent shipped as a container image
- * keeps matching; the registry host, when present, has a dot or a port.
+ * keeps matching. Docker's rule for the registry component: the first path
+ * segment is a registry when it contains a dot or a colon or is `localhost`
+ * (docs.docker.com, image tag reference); v0.6.1 required a dot and dropped
+ * `registry:5000` and `localhost` (2026-09-09 follow-up review).
  */
 export function looksLikeAiAction(value: string): boolean {
   const reference = value
     .trim()
-    .replace(/^docker:\/\/(?:[\w-]+(?:\.[\w-]+)+(?::\d+)?\/)?/i, "");
+    .replace(/^docker:\/\/(?:(?:localhost|[^/]*[.:][^/]*)\/)?/i, "");
   return AI_AGENT_ACTION_PATTERNS.some(
     (pattern) => pattern.exec(reference)?.index === 0,
   );

@@ -94,11 +94,26 @@ describe("action owner identity is exact", () => {
       "  google-github-actions/run-gemini-cli@v0 ",
       "docker://ghcr.io/all-hands-ai/openhands:0.9",
       "docker://all-hands-ai/openhands:0.9",
+      // Docker's rule: the first path component is a registry when it contains
+      // a dot or a colon or is `localhost` (docs.docker.com, image tag). v0.6.1
+      // required a dot and lost these (2026-09-09 follow-up review).
+      "docker://registry:5000/all-hands-ai/openhands:0.9",
+      "docker://localhost:5000/all-hands-ai/openhands:0.9",
+      "docker://localhost/all-hands-ai/openhands",
+      "docker://GHCR.IO/All-Hands-AI/openhands:0.9",
     ]) {
       expect(looksLikeAiAction(legitimate), legitimate).toBe(true);
     }
     expect(
       looksLikeAiAction("docker://oskarstark/php-cs-fixer-ga:2.18.6"),
     ).toBe(false);
+    // Owner identity stays exact behind any registry form.
+    for (const prefixed of [
+      "docker://ghcr.io/not-all-hands-ai/openhands:0.9",
+      "docker://registry:5000/not-all-hands-ai/openhands:0.9",
+      "docker://localhost/not-openai/codex-action:1",
+    ]) {
+      expect(looksLikeAiAction(prefixed), prefixed).toBe(false);
+    }
   });
 });

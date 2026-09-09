@@ -1,0 +1,8 @@
+docker://registry:5000/all-hands-ai/openhands:0.9          true
+docker://localhost:5000/all-hands-ai/openhands:0.9         true
+docker://localhost/all-hands-ai/openhands                  true
+docker://ghcr.io/all-hands-ai/openhands:0.9                true
+docker://all-hands-ai/openhands:0.9                        true
+docker://registry:5000/not-all-hands-ai/openhands:0.9      false
+not-google-github-actions/run-gemini-cli@v0                false
+docker://oskarstark/php-cs-fixer-ga:2.18.6                 false

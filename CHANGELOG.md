@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-09-09
+
+### Fixed
+
+- v0.6.1 regressed detection of agents run as container images from a
+  registry named without a dot: its registry-stripping expression required a
+  dot in the host, so `docker://registry:5000/all-hands-ai/openhands:0.9`,
+  `docker://localhost:5000/…`, and `docker://localhost/…` were no longer
+  recognized (v0.6.0 recognized them). Found by the 2026-09-09 follow-up
+  review's live comparison of the two published tarballs. The registry
+  component now follows Docker's rule — the first path segment is a registry
+  when it contains a dot or a colon or is `localhost` — and owner identity
+  stays exact behind any registry form. Tests in `tests/precision.test.ts`.
+  Frozen benchmark: 0 of 152 cases changed (no snapshot uses a `docker://`
+  agent image).
+
+### Changed
+
+- `scripts/benchmark/report-behavior.mjs` records the SHA-256 of the
+  `dist/cli.js` that scanned, in each report's metadata and in the
+  comparison header, so a report identifies the implementation even when the
+  working tree was dirty (the Day 8 report had recorded a commit plus 21
+  uncommitted changes).
+
 ## [0.6.1] - 2026-09-09
 
 ### Fixed

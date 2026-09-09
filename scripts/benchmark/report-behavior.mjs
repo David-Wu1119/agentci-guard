@@ -15,6 +15,7 @@
 //   node scripts/benchmark/report-behavior.mjs --compare before/cases.json after/cases.json
 
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
@@ -114,6 +115,11 @@ function report(outDir) {
     benchmark_id: manifest.benchmark_id,
     manifest_case_count: manifest.cases.length,
     scanner_version: JSON.parse(readFileSync("package.json", "utf8")).version,
+    // The bundle that actually scanned. A commit plus a dirty tree does not
+    // identify an implementation; this hash does (2026-09-09 review).
+    dist_cli_sha256: createHash("sha256")
+      .update(readFileSync("dist/cli.js"))
+      .digest("hex"),
   };
   writeFileSync(
     path.join(outDir, "cases.json"),
@@ -150,7 +156,7 @@ function summarize(meta, records) {
   const lines = [
     `# Benchmark behavioral report`,
     ``,
-    `Generated ${meta.generated_at} at commit \`${meta.commit.slice(0, 7)}\` (scanner ${meta.scanner_version}, working tree changes: ${meta.working_tree_changes}). Benchmark \`${meta.benchmark_id}\`, ${meta.manifest_case_count} manifest cases.`,
+    `Generated ${meta.generated_at} at commit \`${meta.commit.slice(0, 7)}\` (scanner ${meta.scanner_version}, working tree changes: ${meta.working_tree_changes}, dist/cli.js sha256 \`${meta.dist_cli_sha256}\`). Benchmark \`${meta.benchmark_id}\`, ${meta.manifest_case_count} manifest cases.`,
     ``,
     `This is a behavioral report. Alert counts are not precision, recall, or exploit confirmations.`,
     ``,
@@ -244,7 +250,7 @@ function compare(beforePath, afterPath) {
       : { scanned: false };
   let changed = 0;
   console.log(
-    `# Behavioral diff\n\nbefore: \`${before.meta.commit.slice(0, 7)}\` → after: \`${after.meta.commit.slice(0, 7)}\`\n`,
+    `# Behavioral diff\n\nbefore: \`${before.meta.commit.slice(0, 7)}\` (scanner ${before.meta.scanner_version}, dist/cli.js \`${before.meta.dist_cli_sha256 ?? "not recorded"}\`) → after: \`${after.meta.commit.slice(0, 7)}\` (scanner ${after.meta.scanner_version}, dist/cli.js \`${after.meta.dist_cli_sha256 ?? "not recorded"}\`)\n`,
   );
   for (const id of ids) {
     const x = sig(a.get(id));
