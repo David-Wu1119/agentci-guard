@@ -31,7 +31,7 @@ Artifact hashes for the comparison the reviewer made independently (their eviden
 | `agentci-guard-0.6.0.tgz` | `e1d56ca2026655b40a05acfaf9f764c49bf55ded447937b05aefd52d0399d23e` |
 | `agentci-guard-0.6.1.tgz` | `2a54e4222ada56dde128a21e852b15c2d5c96ec3c3e599a381d53c74a91a5f81` |
 | `dist/cli.js` at the v0.6.2 patch commit | `8fb4ed58d60670ef4b52bd968b96373cf1302c970bda56e5ce710ee0aa480edc` |
-| `agentci-guard-0.6.2.tgz` | in `v0.6.2.md` once released |
+| `agentci-guard-0.6.2.tgz` | `ca28b0e2f6ac02324817564c860fa571cede8e70413cf56f860b22e3447cbcf2` |
 
 ## Gates (`check.txt`)
 
