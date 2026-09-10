@@ -35,7 +35,7 @@ Artifact hashes for the comparison the reviewer made independently (their eviden
 
 ## Gates (`check.txt`)
 
-`pnpm check` exit 0 — 238 tests, coverage 94.12 / 88.32 / 95.04 / 96.65. Package smoke 10 checks. Holdout audit identical to v0.6.1 (`holdout-audit.txt`: 8 agent usages, 6 reusable-workflow diagnostics, 2 expected negatives). Benchmark 0 of 152 (no snapshot uses a `docker://` agent image, so the benchmark could not have caught this regression; the regression test is the evidence).
+`pnpm check` exit 0 — 238 tests, coverage 94.12 / 88.32 / 95.04 / 96.65. Package smoke 10 checks. Holdout audit identical to v0.6.1 (`holdout-audit.txt`: 8 workflows containing 13 agent usages, 6 covered by an unresolvable reusable-workflow diagnostic, 2 expected negatives; corrected 2026-09-09 after review — the earlier sentence said "8 agent usages"). Benchmark 0 of 152 (no snapshot uses a `docker://` agent image, so the benchmark could not have caught this regression; the regression test is the evidence).
 
 ## Candidate identity
 
