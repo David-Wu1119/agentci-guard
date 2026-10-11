@@ -43,29 +43,19 @@ The explanation must identify the decisive code path and workflow evidence.
 
 ## Classification workflow
 
-```bash
-eval_tmp="$(mktemp -d)"
-AGENTCI_BENCHMARK_SPLIT=eval \
-  AGENTCI_BENCHMARK_OUTPUT_DIR="$eval_tmp" \
-  node scripts/benchmark/score.mjs benchmark/labels/adjudicated.jsonl
+The former v3 procedure generated `errors-eval.csv`, filled
+`benchmark/labels/error-analysis-eval.csv`, and reran the scorer with that file.
+It is **inoperative**: `scripts/benchmark/score.mjs` rejects v3 `eval` and
+`all` runs because that split was inspected during detector tuning. Do not
+change the v3 manifest or use its old commands to bypass the rejection.
 
-cp "$eval_tmp/errors-eval.csv" \
-  benchmark/labels/error-analysis-eval.csv
-
-# Fill error_type, explanation, and reviewer. Review it, set manifest status to
-# evaluated, commit both, and start the final run from that clean commit:
-final_eval_tmp="$(mktemp -d)"
-AGENTCI_BENCHMARK_SPLIT=eval \
-  AGENTCI_BENCHMARK_OUTPUT_DIR="$final_eval_tmp" \
-  node scripts/benchmark/score.mjs \
-  benchmark/labels/adjudicated.jsonl \
-  benchmark/labels/error-analysis-eval.csv
-```
-
-The generated JSON and Markdown aggregate the completed taxonomy. If the file
-is absent, `error_analysis.status` is pending; if a supplied row is
-unclassified or stale, scoring fails. In either case the calibration gate
-cannot pass.
+For a future formal evaluation, follow the [v4 and sole-human requirements in
+`BENCHMARK.md`](BENCHMARK.md#human-review-protocol): freeze a fresh
+repository-disjoint sample, all nine rule units, the human resolution protocol,
+the scanner commit, and the scorer before opening predictions. Then classify
+every generated v4 error using the taxonomy above. Retain the error IDs,
+explanations, and review provenance. The v4 paths and commands do not exist yet.
+Missing, unclassified, or stale error analysis must prevent a calibration claim.
 
 ## Known pre-benchmark defect examples
 

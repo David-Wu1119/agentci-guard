@@ -1,14 +1,19 @@
 # Human Label Package
 
-No label files exist yet. Accuracy must remain unreported until the following
-three files are published together:
+No formal human label files exist yet. The v3 corpus is development data, and
+its scorer rejects `eval` and `all` runs even if labels are added or the
+manifest status changes. The following three-file package describes the
+**inactive v3 two-human protocol**, not a current accuracy requirement or an
+instruction for the sole available annotator:
 
 - `annotator-a.jsonl`: all 7,056 primary units.
 - `annotator-b.jsonl`: the 5,676-unit independent-review plan.
 - `adjudicated.jsonl`: all primary units with source-review provenance.
 
-Each JSONL line follows
-`../schemas/annotation-record.schema.json`. Example:
+Each historical v3 JSONL line follows
+`../schemas/annotation-record.schema.json`. The example below illustrates that
+schema; its `eval` split and `independent` review status are not instructions to
+produce such a record now:
 
 ```json
 {
@@ -60,17 +65,23 @@ Each JSONL line follows
 }
 ```
 
-Development-pilot source records are not part of this formal label package.
-They use `test-retest-pass-1` or `test-retest-pass-2` so the raw JSONL cannot be
-mistaken for independent human review.
+Development-pilot source records are not part of this historical formal label
+package. They use `test-retest-pass-1` or `test-retest-pass-2` so the raw JSONL
+cannot be mistaken for independent human review. Two aliases for the same
+person do not create a second annotator.
 
-The final file uses `annotator: "adjudicated"`, preserves abbreviated source
-annotations, and names a stable human `adjudicator` pseudonym on disputed
-records. `review_status` is one of:
+In that historical package, the final file uses `annotator: "adjudicated"`,
+preserves abbreviated source annotations, and names a stable human
+`adjudicator` pseudonym on disputed records. `review_status` is one of:
 
 - `single-pass`
 - `independently-reviewed`
 - `adjudicated`
 
-After the first sealed evaluation, `error-analysis-eval.csv` must classify
-every generated error according to `../../ERROR_ANALYSIS.md`.
+For formal accuracy, follow the [v4 and sole-human protocol requirements in
+`../../BENCHMARK.md`](../../BENCHMARK.md#human-review-protocol). A fresh
+repository-disjoint sample, nine-rule registry, versioned human resolution
+protocol, and compatible scorer are still needed. The candidate micro-pilot
+remains development-only and cannot supply v4 accuracy labels. After a valid
+sealed v4 evaluation, classify every generated error according to
+`../../ERROR_ANALYSIS.md`; no v4 error-analysis path exists yet.

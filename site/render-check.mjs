@@ -137,14 +137,20 @@ const setAndScan = (raw) =>
     const input = document.getElementById("workflow-yaml");
     input.value = ${JSON.stringify(raw)};
     input.dispatchEvent(new Event("input", { bubbles: true }));
-    document.getElementById("scan-button").click();
+    const button = document.getElementById("scan-button");
+    button.focus();
+    button.click();
     return {
       heading: document.getElementById("scan-results-heading").textContent,
       complete: document.getElementById("scan-completeness").textContent,
       error: document.getElementById("scan-error").textContent,
       outputHidden: document.getElementById("scan-output").hidden,
       findingText: document.getElementById("scan-findings").textContent,
-      diagnostics: document.querySelectorAll("#scan-diagnostics li").length
+      diagnostics: document.querySelectorAll("#scan-diagnostics li").length,
+      focus: document.activeElement.id,
+      errorTop: document.getElementById("scan-error").getBoundingClientRect().top,
+      errorBottom: document.getElementById("scan-error").getBoundingClientRect().bottom,
+      viewportHeight: innerHeight
     };
   })()`);
 const malformed = await setAndScan("on: [\njobs: {");
@@ -160,9 +166,20 @@ const clean = await setAndScan(
 assert.equal(clean.heading, "0 findings");
 assert.match(clean.findingText, /not proof of safety/i);
 assert.equal(clean.error, "");
+await send("Emulation.setDeviceMetricsOverride", {
+  width: 390,
+  height: 700,
+  deviceScaleFactor: 1,
+  mobile: true,
+});
 const empty = await setAndScan("  ");
 assert.match(empty.error, /Paste workflow YAML/);
 assert.equal(empty.outputHidden, true);
+assert.equal(empty.focus, "scan-results-heading");
+assert.ok(
+  empty.errorTop >= 0 && empty.errorBottom <= empty.viewportHeight,
+  JSON.stringify(empty),
+);
 const oversized = await evaluate(`(() => {
   const input = document.getElementById("workflow-yaml");
   input.value = "x".repeat(window.agentciScanWorkflow.maxChars + 1);
@@ -184,15 +201,18 @@ const filePick = await evaluate(`(async () => {
   transfer.items.add(selected);
   const input = document.getElementById("workflow-file");
   input.files = transfer.files;
+  input.focus();
   input.dispatchEvent(new Event("change"));
   await new Promise((resolve) => setTimeout(resolve, 50));
   return { loaded: document.getElementById("workflow-yaml").value === sample,
     status: document.getElementById("scan-status").textContent,
-    injectedImageCount: document.querySelectorAll("img").length };
+    injectedImageCount: document.querySelectorAll("img").length,
+    focus: document.activeElement.id };
 })()`);
 assert.equal(filePick.loaded, true);
 assert.match(filePick.status, /loaded locally/);
 assert.equal(filePick.injectedImageCount, 0);
+assert.equal(filePick.focus, "workflow-file");
 checks.push({ filePick });
 const oversizeFile = await evaluate(`(async () => {
   const pasted = "on: push";

@@ -24,11 +24,15 @@ function resetResults(message) {
   diagnostics.replaceChildren();
 }
 
-function showError(message) {
+function showError(message, focusHeading = true) {
   resetResults('The scan did not run.');
   heading.textContent = 'Scan not completed';
   error.textContent = message;
   error.hidden = false;
+  if (focusHeading) {
+    heading.focus();
+    heading.scrollIntoView({ behavior: 'instant', block: 'center' });
+  }
 }
 
 function addDetail(item, label, value) {
@@ -109,6 +113,7 @@ fileInput.addEventListener('change', async () => {
   const file = fileInput.files?.[0];
   if (!file) return;
   const revision = ++inputRevision;
+  const restoreFileFocus = document.activeElement === fileInput;
   scanButton.disabled = true;
   fileInput.disabled = true;
   resetResults('Reading the selected file locally.');
@@ -132,6 +137,7 @@ fileInput.addEventListener('change', async () => {
   } finally {
     scanButton.disabled = false;
     fileInput.disabled = false;
+    if (restoreFileFocus && revision === inputRevision && error.hidden && document.activeElement === document.body) fileInput.focus();
   }
 });
 
@@ -147,7 +153,7 @@ scanButton.addEventListener('click', () => {
   }
 });
 
-if (typeof scanWorkflow !== 'function') showError('The scanner did not load. Use the CLI or GitHub Action instead.');
+if (typeof scanWorkflow !== 'function') showError('The scanner did not load. Use the CLI or GitHub Action instead.', false);
 
 const examples = {
   unknown: ['UNREVIEWED VERSION', 'Verify the gate before reducing risk.', 'A mutable tag or an unreviewed commit does not establish the Action’s authorization behavior. The scanner reports action pinning separately; inspect the deployed version before relying on its gate.'],
