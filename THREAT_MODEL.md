@@ -65,6 +65,8 @@ finding list with a diagnostic is not a closed analysis.
 - Complex conditions can reduce decision coverage through abstention.
 - Static permission and environment resolution can disagree with runtime
   policy or generated configuration.
+- Vendor Action event compatibility is not modeled; an event the Action cannot
+  handle may still produce a finding.
 - A matched pattern can be mitigated by author checks, approval gates, output
   allowlists, or isolation the scanner does not model.
 - A dangerous workflow can use a source, sink, capability, or permission not
