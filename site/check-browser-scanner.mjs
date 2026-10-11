@@ -24,6 +24,11 @@ assert.ok(
   html.includes(`<code id="scanner-digest">${digest.toString("hex")}</code>`),
 );
 assert.match(
+  html,
+  /<p class="evidence-status"><strong>Accuracy unmeasured\.<\/strong> No sealed human-labeled evaluation\./,
+);
+assert.match(html, /<a href="#boundaries">Read the limits\.<\/a>/);
+assert.match(
   await fs.readFile(new URL("./dist/_headers", import.meta.url), "utf8"),
   /connect-src 'none'/,
 );
