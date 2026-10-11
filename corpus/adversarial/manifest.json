@@ -51,6 +51,36 @@
       "url": "https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/github/token.ts",
       "claim": "Without a supplied github_token, the Action can exchange an OIDC token for an App token with default contents, pull-requests, and issues write permissions."
     },
+    "anthropic-agent-prompt-787": {
+      "type": "primary",
+      "title": "Claude Code Action agent mode at the fixture's immutable revision",
+      "url": "https://github.com/anthropics/claude-code-action/blob/787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251/src/modes/agent/index.ts",
+      "claim": "Agent mode uses the configured prompt directly and forwards configured Claude tool arguments; it does not automatically append the Issue body."
+    },
+    "anthropic-agent-token-787": {
+      "type": "primary",
+      "title": "Claude Code Action token setup at the fixture's immutable revision",
+      "url": "https://github.com/anthropics/claude-code-action/blob/787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251/src/entrypoints/run.ts",
+      "claim": "The Action exports its acquired GitHub token as GH_TOKEN before starting Claude; exact issued App-token scope and tool invocation remain unobserved."
+    },
+    "anthropic-agent-oidc-787": {
+      "type": "primary",
+      "title": "Claude Code Action OIDC exchange at the fixture's immutable revision",
+      "url": "https://github.com/anthropics/claude-code-action/blob/787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251/src/github/token.ts",
+      "claim": "Without github_token, the Action attempts an OIDC-to-App token exchange; success and actual issued scope are external runtime facts."
+    },
+    "anthropic-agent-mcp-787": {
+      "type": "primary",
+      "title": "Claude Code Action MCP setup at the fixture's immutable revision",
+      "url": "https://github.com/anthropics/claude-code-action/blob/787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251/src/mcp/install-mcp-server.ts",
+      "claim": "Agent mode does not install GitHub MCP tools unless they are explicitly allowed."
+    },
+    "gh-issue-view": {
+      "type": "primary",
+      "title": "GitHub CLI issue view manual",
+      "url": "https://cli.github.com/manual/gh_issue_view",
+      "claim": "gh issue view displays an Issue's title, body, and other information."
+    },
     "checkout-protection": {
       "type": "primary",
       "title": "Safer pull_request_target defaults for GitHub Actions checkout",
@@ -1454,6 +1484,122 @@
       "assumption_sources": [
         "event-security",
         "anthropic-action-modes",
+        "project-rule-contract"
+      ]
+    },
+    {
+      "id": "issue-tool-fetch",
+      "path": "cases/issue-tool-fetch",
+      "targets": ["Issue body read through an explicitly permitted agent tool"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["issues"],
+        "findings": [
+          {
+            "rule_id": "agentci/ai-shell-access",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "step": "Plan issue",
+              "line_min": 11
+            }
+          },
+          {
+            "rule_id": "agentci/ai-with-secrets",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 8
+            }
+          },
+          {
+            "rule_id": "agentci/broad-write-permissions",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 8
+            }
+          }
+        ],
+        "diagnostics": [
+          {
+            "code": "agentci/analysis-agent-tool-fetch-unknown",
+            "severity": "warning",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 11
+            }
+          }
+        ],
+        "analysis_complete": false
+      },
+      "rationale": "The pinned Action receives a static prompt with the Issue number and a Bash allowlist for gh issue view. A write-authorized labeler may trigger it on an outsider-authored Issue. The tool could read that body, but the workflow alone cannot prove Claude invoked the tool or that the App token had a particular issued scope; the write-token path abstains rather than claiming a critical finding.",
+      "assumption_sources": [
+        "event-security",
+        "permissions",
+        "anthropic-agent-prompt-787",
+        "anthropic-agent-token-787",
+        "anthropic-agent-oidc-787",
+        "gh-issue-view",
+        "project-rule-contract"
+      ]
+    },
+    {
+      "id": "issue-tool-no-read",
+      "path": "cases/issue-tool-no-read",
+      "targets": ["Issue number without a permitted gh issue read tool"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["issues"],
+        "findings": [
+          {
+            "rule_id": "agentci/ai-shell-access",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "step": "Plan issue",
+              "line_min": 11
+            }
+          },
+          {
+            "rule_id": "agentci/ai-with-secrets",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 8
+            }
+          },
+          {
+            "rule_id": "agentci/broad-write-permissions",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 8
+            }
+          }
+        ],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "The prompt passes only an Issue number, not the body. This pinned Action's agent mode does not automatically fetch the body, and its configured Bash allowlist lacks gh issue view. No supported Issue-body ingestion path is established by this fixture; the unrelated shell, secret, and write-permission observations remain.",
+      "assumption_sources": [
+        "event-security",
+        "anthropic-agent-prompt-787",
+        "anthropic-agent-mcp-787",
+        "gh-issue-view",
         "project-rule-contract"
       ]
     },

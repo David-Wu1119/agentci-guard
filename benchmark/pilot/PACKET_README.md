@@ -21,6 +21,11 @@ repeatability. It is not an accuracy benchmark or an inter-rater study.
 8. If this is pass 2, begin only after seven full days have elapsed since the
    latest pass-1 completion timestamp.
 
+For this v0.1.1 pilot, the rule-predicate table in `RULES.md` is the label
+contract. `analysis-model.md` also describes an unreleased scanner candidate;
+use it for general YAML semantics only where it agrees with that table. Do not
+apply its newer source-provenance or Action self-fetch rules to pilot labels.
+
 The generic guide names repository paths. In this packet, use
 `annotation-sheet.csv`, `manifest.json`, and
 `workflows/<case-id>/<original-workflow-path>` instead of its `benchmark/`

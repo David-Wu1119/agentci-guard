@@ -8338,6 +8338,10 @@ var EMPTY_REUSABLE_CONTEXT = {
   callChain: []
 };
 var ANTHROPIC_ACTION_WITHOUT_DISCUSSION = "1d6de8cb0c237e7c15e9e1bdf973826ebae490cc";
+var VERIFIED_ANTHROPIC_WRITE_GATES = /* @__PURE__ */ new Set([
+  "787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251",
+  ANTHROPIC_ACTION_WITHOUT_DISCUSSION
+]);
 async function scanRepository(root, options = {}) {
   const cwd = options.cwd ?? process.cwd();
   const scanRoot = path2.resolve(cwd, root);
@@ -8551,14 +8555,12 @@ function analyzeWorkflow(workflow, repository, context) {
       if (stepReachability.events.length === 0) continue;
       const stepUses = typeof rawStep.uses === "string" ? rawStep.uses : "";
       const actionReference = materializeInputs(stepUses, context.inputValues);
+      const pinnedAnthropicRef = /^anthropics\/claude-code-action@([0-9a-f]{40})$/i.exec(actionReference)?.[1]?.toLowerCase();
       const discussionEvents = isSelfGatingAgentAction(actionReference) ? stepReachability.events.filter(
         (event) => event === "discussion" || event === "discussion_comment"
       ) : [];
       if (discussionEvents.length > 0) {
-        const pinnedRef = /^anthropics\/claude-code-action@([0-9a-f]{40})$/i.exec(
-          actionReference
-        )?.[1];
-        const knownUnsupported = pinnedRef?.toLowerCase() === ANTHROPIC_ACTION_WITHOUT_DISCUSSION;
+        const knownUnsupported = pinnedAnthropicRef === ANTHROPIC_ACTION_WITHOUT_DISCUSSION;
         output.diagnostics.push({
           code: knownUnsupported ? "agentci/analysis-agent-event-unsupported" : "agentci/analysis-agent-event-unknown",
           kind: "analysis",
@@ -8638,6 +8640,9 @@ function analyzeWorkflow(workflow, repository, context) {
         untrustedInRun = true;
       }
       const hasUntrustedIngestion = hasUntrustedSink || fetchedMatches.length > 0;
+      const potentialAppWrite = isSelfGatingAgentAction(actionReference) && permissionLevel(jobPermissions, "id-token") === "write" && (!isRecord2(effectiveWith) || String(effectiveWith.github_token ?? "").trim().length === 0);
+      const selfGated = isSelfGatingAgentAction(actionReference) && !hasAgentGateBypass(rawStep.with);
+      const verifiedSelfGate = selfGated && VERIFIED_ANTHROPIC_WRITE_GATES.has(pinnedAnthropicRef ?? "");
       const ingestionEvents = unionEvents(
         [...sinkMatches, ...fetchedMatches].flatMap(
           (match) => match.event === "*" ? stepReachability.events : [match.event]
@@ -8664,6 +8669,27 @@ function analyzeWorkflow(workflow, repository, context) {
         )
       );
       if (stepUsesAi) {
+        if (!hasUntrustedIngestion && ["issues", "issue_comment"].some(
+          (event) => stepReachability.events.includes(event) && !sourceTrustedByGate(
+            "issue",
+            event,
+            stepActorGate || verifiedSelfGate,
+            stepPrGate,
+            creationOnlyEvents
+          )
+        ) && (hasSensitiveWrite(jobPermissions) || potentialAppWrite) && (potentialAppWrite || ["GH_TOKEN", "GITHUB_TOKEN"].some(
+          (name) => String(effectiveEnvironment[name] ?? "").trim()
+        ) || isRecord2(effectiveWith) && String(effectiveWith.github_token ?? "").trim()) && mayFetchIssueViaTool(actionReference, effectiveWith)) {
+          output.diagnostics.push({
+            code: "agentci/analysis-agent-tool-fetch-unknown",
+            kind: "analysis",
+            severity: "warning",
+            file,
+            job: jobName,
+            line: stepLine,
+            message: "The agent may read an untrusted Issue body with its permitted gh issue tool and a token, but static analysis cannot prove the tool was called."
+          });
+        }
         output.agentUsages.push({
           id: [file, jobName, index, context.callChain.join(">")].join(":"),
           file,
@@ -8682,12 +8708,8 @@ function analyzeWorkflow(workflow, repository, context) {
           hasUntrustedIngestion,
           sourceMayDifferFromTrigger,
           ingestionEvents,
-          potentialAppWrite: isSelfGatingAgentAction(
-            materializeInputs(stepUses, context.inputValues)
-          ) && permissionLevel(jobPermissions, "id-token") === "write" && (!isRecord2(effectiveWith) || String(effectiveWith.github_token ?? "").trim().length === 0),
-          selfGated: isSelfGatingAgentAction(
-            materializeInputs(stepUses, context.inputValues)
-          ) && !hasAgentGateBypass(rawStep.with),
+          potentialAppWrite,
+          selfGated,
           actorGated: stepActorGate,
           events: stepReachability.events
         });
@@ -9010,6 +9032,14 @@ function selfFetchedSources(uses, withBlock, events, creationOnlyEvents) {
       }
       return [];
     }
+  );
+}
+function mayFetchIssueViaTool(uses, withBlock) {
+  if (!isSelfGatingAgentAction(uses) || !isRecord2(withBlock)) return false;
+  return /\$\{\{\s*github\.event\.issue\.number\b/i.test(
+    String(withBlock.prompt ?? "")
+  ) && /--allowedTools?[^\n]*Bash\(gh issue(?: view)?:\*\)/i.test(
+    String(withBlock.claude_args ?? "")
   );
 }
 function assessPullRequestTargetCheckout(step) {

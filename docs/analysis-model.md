@@ -194,6 +194,28 @@ write-token rule covers either supported route. A static `prompt` with no event
 expression is not treated as ingesting an event merely because the Action uses
 an event trigger.
 
+A third, narrower route is an explicit agent tool read. One pinned public
+[Action workflow](https://github.com/dshakes/lantern/blob/73a6e17c8f3ce81cd3e8fa72dc26f8d95e6de6c1/.github/workflows/sdlc-plan.yml#L5-L46)
+passes `github.event.issue.number` in a prompt and permits
+`Bash(gh issue view:*)`; [GitHub CLI](https://cli.github.com/manual/gh_issue_view)
+documents that this command displays the Issue body. At that revision, the
+[mode detector](https://github.com/anthropics/claude-code-action/blob/787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251/src/modes/detector.ts)
+selects agent mode for the explicit prompt, and the
+[agent-mode implementation](https://github.com/anthropics/claude-code-action/blob/787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251/src/modes/agent/index.ts)
+does not automatically fetch that body. A write-authorized labeler may invoke
+the Action on an Issue written by someone else, so an actor gate does not
+authenticate the parent text; the same distinction applies to a trusted
+commenter on someone else's Issue. With a literal Issue-number pointer, a literal
+`gh issue` Bash allowlist, a configured token path, and write capability, the
+candidate emits `analysis-agent-tool-fetch-unknown` and marks analysis
+incomplete. The pinned Action's [token setup](https://github.com/anthropics/claude-code-action/blob/787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251/src/github/token.ts)
+supports an OIDC-to-App path, but this does not prove the external exchange
+succeeded. It does not call this a critical finding: the token exchange,
+issued scope, actual Claude tool choice, and any exploit are unobserved. This
+check is intentionally narrower than all possible tool-mediated reads.
+Because `issue_comment` can also target a PR, that event's diagnostic may be
+conservative when `gh issue view` would not return the PR body.
+
 ## Actor and provenance guards
 
 An untrusted trigger does not by itself mean an untrusted actor can reach a job.

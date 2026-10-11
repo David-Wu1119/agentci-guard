@@ -90,6 +90,23 @@ vendor-mode model. See the pinned
 [tag-mode fetch](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/modes/tag/index.ts),
 and [agent-mode prompt](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/modes/agent/index.ts).
 
+An explicit agent-mode prompt can still tell Claude to read an Issue by number
+with `gh issue view`. At [Anthropic Action `787c5a0`](https://github.com/anthropics/claude-code-action/blob/787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251/src/modes/agent/index.ts),
+the prompt is passed directly; a configured `Bash(gh issue view:*)` allowlist
+permits, but does not prove, that tool call. For reachable `issues` or
+`issue_comment` events with an untrusted parent, effective write capability,
+and a configured token path, the
+candidate emits `analysis-agent-tool-fetch-unknown` instead of inventing a
+write-token finding. The detector recognizes literal `github.event.issue.number`
+in the prompt and literal `Bash(gh issue view:*)` or `Bash(gh issue:*)` in
+`--allowedTools`; other tool-mediated paths remain outside this narrow check.
+For `issues:opened`, an intact write-access gate at an inspected immutable
+Action revision covers the Issue's creator; an explicit non-write allowlist
+removes that protection. Mutable or unverified refs keep the diagnostic. For
+`issues:labeled`, even an authorized labeler need not have written the Issue.
+An `issue_comment` can also target a PR; the scanner does not disambiguate its
+parent here, so this diagnostic can be conservative.
+
 Tag mode on a PR includes changed-file paths in its prompt. An owner-opened
 PR can point to a fork branch they did not author, so an actor gate alone
 cannot dismiss that source. An `issue_comment` may target a PR and is
@@ -152,6 +169,7 @@ The following are not security findings:
 - `agentci/analysis-event-condition`
 - `agentci/analysis-checkout-protection-unknown`
 - `agentci/analysis-permissions-unknown`
+- `agentci/analysis-agent-tool-fetch-unknown`
 - `agentci/analysis-remote-reusable-workflow`
 - `agentci/org-fetch-failed` — an organization scan could not fetch a repository's workflows (error; the repository and reason are in the message; archived and fork exclusions are not diagnostics)
 - `agentci/analysis-local-reusable-missing`

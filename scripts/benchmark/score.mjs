@@ -300,6 +300,15 @@ function relevantDiagnostics(annotation, result) {
     ) {
       return false;
     }
+    if (
+      diagnostic.code === "agentci/analysis-agent-tool-fetch-unknown" &&
+      ![
+        "agentci/untrusted-ai-write-token",
+        "agentci/gated-ai-write-token",
+      ].includes(annotation.rule_id)
+    ) {
+      return false;
+    }
     return true;
   });
 }

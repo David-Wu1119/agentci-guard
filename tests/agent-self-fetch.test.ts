@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import YAML from "yaml";
 import { scanWorkflow, type WorkflowFile } from "../src/index.js";
+import { parseWorkflowFile, scanWorkflowFiles } from "../src/scanner.js";
 
 function ruleIds(raw: string): Set<string> {
   return new Set(
@@ -116,6 +117,92 @@ jobs:
     expect(rules).not.toContain("agentci/gated-ai-write-token");
     expect(rules).not.toContain("agentci/untrusted-input-in-prompt");
   });
+
+  it.each([
+    ["issues", "labeled", "Bash(gh issue view:*)", true],
+    ["issues", "labeled", "Bash(git log:*)", false],
+    ["issue_comment", "created", "Bash(gh issue view:*)", true],
+  ])(
+    "keeps explicit Issue-tool ingestion uncertain on %s with %s",
+    (event, activity, tool, mayReadIssue) => {
+      const raw = `
+on:
+  ${event}:
+    types: [${activity}]
+permissions:
+  issues: write
+  id-token: write
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          claude_code_oauth_token: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: "Read issue #\${{ github.event.issue.number }} with gh issue view"
+          claude_args: '--allowedTools "${tool}"'
+`;
+      const result = scanWorkflowFiles(
+        [parseWorkflowFile(".github/workflows/agent.yml", raw)],
+        ".",
+        { ignore: [], ignorePaths: [] },
+      );
+      expect(
+        result.findings.some(
+          (finding) => finding.rule_id === "agentci/untrusted-ai-write-token",
+        ),
+      ).toBe(false);
+      expect(
+        result.diagnostics.some(
+          (diagnostic) =>
+            diagnostic.code === "agentci/analysis-agent-tool-fetch-unknown",
+        ),
+      ).toBe(mayReadIssue);
+      expect(result.analysis_complete).toBe(!mayReadIssue);
+    },
+  );
+
+  it.each([
+    ["787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251", "", false],
+    [
+      "787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251",
+      "allowed_non_write_users: '*'",
+      true,
+    ],
+    ["v1", "", true],
+  ])(
+    "uses only a verified %s actor gate on a newly opened Issue (%s)",
+    (actionRef, bypass, uncertain) => {
+      const raw = `
+on:
+  issues:
+    types: [opened]
+permissions:
+  issues: write
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@${actionRef}
+        with:
+          github_token: \${{ secrets.GITHUB_TOKEN }}
+          prompt: "Read issue #\${{ github.event.issue.number }} with gh issue view"
+          claude_args: '--allowedTools "Bash(gh issue view:*)"'
+          ${bypass}
+`;
+      const result = scanWorkflowFiles(
+        [parseWorkflowFile(".github/workflows/agent.yml", raw)],
+        ".",
+        { ignore: [], ignorePaths: [] },
+      );
+      expect(
+        result.diagnostics.some(
+          (diagnostic) =>
+            diagnostic.code === "agentci/analysis-agent-tool-fetch-unknown",
+        ),
+      ).toBe(uncertain);
+    },
+  );
 
   it("keeps tag-mode ingestion possible when a dynamic prompt can resolve empty", () => {
     const rules = ruleIds(`

@@ -52,7 +52,8 @@ adversary can change trusted base-branch workflow YAML before the run.
 - Non-GitHub CI systems.
 
 Unsupported event expressions, ambiguous checkout protection, permission
-defaults, vendor event compatibility, reusable-workflow boundaries,
+defaults, vendor event compatibility, an explicitly configured Issue-tool read,
+reusable-workflow boundaries,
 and parse failures produce diagnostics and `analysis_complete=false`. A diagnostic is not a finding, but a clean-looking
 finding list with a diagnostic is not a closed analysis.
 `analysis_complete=true` only means that no _recognized_ unsupported construct

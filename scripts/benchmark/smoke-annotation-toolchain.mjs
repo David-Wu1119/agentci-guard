@@ -220,6 +220,45 @@ try {
   ) {
     throw new Error("Development scores did not disclose the v3 rule gap.");
   }
+  const [errorHeader, ...errorRows] = parseCsv(
+    fs.readFileSync(path.join(resultDirectory, "errors-dev.csv"), "utf8"),
+  );
+  const errorColumn = Object.fromEntries(
+    errorHeader.map((name, index) => [name, index]),
+  );
+  const errorsByUnit = new Map(
+    errorRows.map((row) => [row[errorColumn.unit_id], row]),
+  );
+  for (const [unitId, kind, prediction, diagnostic] of [
+    [
+      "ai-027|job|check-duplicates|-|agentci%2Funtrusted-ai-write-token",
+      "abstained-positive",
+      "unknown",
+      "agentci/analysis-agent-tool-fetch-unknown",
+    ],
+    [
+      "ai-027|job|check-duplicates|-|agentci%2Fpull-request-target-ai",
+      "false-negative",
+      "negative",
+      "",
+    ],
+    [
+      "ai-027|step|check-duplicates|1|agentci%2Funtrusted-input-in-prompt",
+      "false-negative",
+      "negative",
+      "",
+    ],
+  ]) {
+    const row = errorsByUnit.get(unitId);
+    if (
+      !row ||
+      row[errorColumn.error_kind] !== kind ||
+      row[errorColumn.prediction] !== prediction ||
+      row[errorColumn.diagnostic_codes] !== diagnostic
+    ) {
+      throw new Error(`Issue-tool diagnostic was misattributed at ${unitId}.`);
+    }
+  }
   console.log(
     "Annotation and scoring toolchain smoke passed with synthetic temporary labels; no benchmark labels or metrics were created.",
   );
@@ -241,6 +280,18 @@ function fillSynthetic(source, destination) {
     row[column.mitigation_status] = "absent";
     row[column.explanation] =
       "Synthetic smoke label used only to test the annotation scripts.";
+    if (
+      row[column.case_id] === "ai-027" &&
+      [
+        "agentci/untrusted-ai-write-token",
+        "agentci/pull-request-target-ai",
+        "agentci/untrusted-input-in-prompt",
+      ].includes(row[column.rule_id]) &&
+      (row[column.scope] === "job" || row[column.step_index] === "1")
+    ) {
+      row[column.ground_truth] = "positive";
+      row[column.evidence_lines] = "23";
+    }
   }
   fs.writeFileSync(destination, renderCsv([header, ...rows]));
 }
