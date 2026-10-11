@@ -12,15 +12,18 @@ const bundle = await fs.readFile(
   new URL("./dist/scanner-browser.js", import.meta.url),
   "utf8",
 );
-const digest = createHash("sha256").update(bundle).digest();
+const digest = createHash("sha256").update(bundle).digest("hex");
 const html = await fs.readFile(
   new URL("./dist/index.html", import.meta.url),
   "utf8",
 );
 assert.ok(
-  html.includes(
-    `<script src="scanner-browser.js?v=${digest.toString("hex")}" integrity="sha256-${digest.toString("base64")}" defer></script>`,
-  ),
+  html.includes(`<script src="scanner-browser.js?v=${digest}" defer></script>`),
+);
+assert.doesNotMatch(
+  html,
+  /<script[^>]*scanner-browser\.js[^>]*\bintegrity=/,
+  "A mutable scanner URL must not use SRI across deployments",
 );
 for (const [name, tag] of [
   ["styles.css", "link"],
@@ -38,9 +41,8 @@ for (const [name, tag] of [
     `${name} must use its content hash in the page URL`,
   );
 }
-assert.ok(
-  html.includes(`<code id="scanner-digest">${digest.toString("hex")}</code>`),
-);
+assert.ok(html.includes(`<code id="scanner-digest">${digest}</code>`));
+assert.match(html, /Expected scanner bundle SHA-256 at page build/);
 let sourceCommit = "";
 let sourceDirty = true;
 try {
