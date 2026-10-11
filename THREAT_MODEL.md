@@ -52,8 +52,8 @@ adversary can change trusted base-branch workflow YAML before the run.
 - Non-GitHub CI systems.
 
 Unsupported event expressions, ambiguous checkout protection, permission
-defaults, reusable-workflow boundaries, and parse failures produce diagnostics and
-`analysis_complete=false`. A diagnostic is not a finding, but a clean-looking
+defaults, vendor event compatibility, reusable-workflow boundaries,
+and parse failures produce diagnostics and `analysis_complete=false`. A diagnostic is not a finding, but a clean-looking
 finding list with a diagnostic is not a closed analysis.
 
 ## Expected failure modes
@@ -65,8 +65,8 @@ finding list with a diagnostic is not a closed analysis.
 - Complex conditions can reduce decision coverage through abstention.
 - Static permission and environment resolution can disagree with runtime
   policy or generated configuration.
-- Vendor Action event compatibility is not modeled; an event the Action cannot
-  handle may still produce a finding.
+- Vendor Action event compatibility is modeled only for one verified immutable
+  Anthropic revision; other refs can still produce potential findings.
 - A matched pattern can be mitigated by author checks, approval gates, output
   allowlists, or isolation the scanner does not model.
 - A dangerous workflow can use a source, sink, capability, or permission not

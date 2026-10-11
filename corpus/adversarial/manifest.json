@@ -33,6 +33,12 @@
       "url": "https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/docs/security.md",
       "claim": "The action checks trigger-user write access by default, but this does not authenticate the author of separately fetched parent content."
     },
+    "anthropic-action-event-support": {
+      "type": "primary",
+      "title": "Claude Code Action event parsing at an immutable revision",
+      "url": "https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/github/context.ts#L250-L251",
+      "claim": "This revision throws on discussion and discussion_comment before the agent can start. Other refs are not assumed to share that behavior."
+    },
     "anthropic-tag-pr-paths": {
       "type": "primary",
       "title": "Claude Code Action tag-mode PR prompt",
@@ -484,51 +490,33 @@
     {
       "id": "discussion-write",
       "path": "cases/discussion-write",
-      "targets": ["discussion event", "discussions permission"],
+      "targets": ["discussion event", "verified Action event incompatibility"],
       "subject": {
         "file": ".github/workflows/agent.yml",
         "job": "agent"
       },
       "expected": {
         "reachable_events": ["discussion"],
-        "findings": [
+        "findings": [],
+        "agent_usages": [],
+        "diagnostics": [
           {
-            "rule_id": "agentci/broad-write-permissions",
-            "severity": "medium",
+            "code": "agentci/analysis-agent-event-unsupported",
+            "severity": "warning",
             "location": {
               "file": ".github/workflows/agent.yml",
               "job": "agent",
-              "line_min": 2
-            }
-          },
-          {
-            "rule_id": "agentci/untrusted-ai-write-token",
-            "severity": "critical",
-            "location": {
-              "file": ".github/workflows/agent.yml",
-              "job": "agent",
-              "line_min": 2
-            }
-          },
-          {
-            "rule_id": "agentci/untrusted-input-in-prompt",
-            "severity": "high",
-            "location": {
-              "file": ".github/workflows/agent.yml",
-              "job": "agent",
-              "step": "step 1",
               "line_min": 2
             }
           }
         ],
-        "diagnostics": [],
-        "analysis_complete": true
+        "analysis_complete": false
       },
-      "rationale": "Discussion body content is untrusted and the discussions write scope gives the influenced agent a relevant write capability.",
+      "rationale": "GitHub can trigger this workflow, but the verified Anthropic Action revision rejects discussion before Claude starts. No agent-mediated write path is claimed.",
       "assumption_sources": [
         "event-security",
-        "permissions",
-        "project-rule-contract"
+        "anthropic-action-event-support",
+        "project-analysis-contract"
       ]
     },
     {
@@ -571,14 +559,25 @@
             }
           }
         ],
-        "diagnostics": [],
-        "analysis_complete": true
+        "diagnostics": [
+          {
+            "code": "agentci/analysis-agent-event-unknown",
+            "severity": "warning",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          }
+        ],
+        "analysis_complete": false
       },
-      "rationale": "Discussion comment content is attacker-controlled input and discussions write enables an agent-side effect.",
+      "rationale": "This synthetic Action ref has unverified discussion_comment support. The untrusted comment and write scope justify potential findings, not a confirmed agent-side effect.",
       "assumption_sources": [
         "event-security",
         "permissions",
-        "project-rule-contract"
+        "project-rule-contract",
+        "project-analysis-contract"
       ]
     },
     {
@@ -604,14 +603,25 @@
             }
           }
         ],
-        "diagnostics": [],
-        "analysis_complete": true
+        "diagnostics": [
+          {
+            "code": "agentci/analysis-agent-event-unknown",
+            "severity": "warning",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          }
+        ],
+        "analysis_complete": false
       },
-      "rationale": "Discussion comment content remains untrusted, but an explicit discussions read scope must not create write-permission findings.",
+      "rationale": "This synthetic Action ref has unverified discussion_comment support. If it runs, comment content is untrusted; explicit discussions read must not create write-permission findings.",
       "assumption_sources": [
         "event-security",
         "permissions",
-        "project-rule-contract"
+        "project-rule-contract",
+        "project-analysis-contract"
       ]
     },
     {
@@ -637,14 +647,25 @@
             }
           }
         ],
-        "diagnostics": [],
-        "analysis_complete": true
+        "diagnostics": [
+          {
+            "code": "agentci/analysis-agent-event-unknown",
+            "severity": "warning",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          }
+        ],
+        "analysis_complete": false
       },
-      "rationale": "A discussion title is untrusted event content even when an explicit discussions read scope prevents token-write findings.",
+      "rationale": "This synthetic Action ref has unverified discussion support. If it runs, title content is untrusted; explicit discussions read prevents token-write findings.",
       "assumption_sources": [
         "event-security",
         "permissions",
-        "project-rule-contract"
+        "project-rule-contract",
+        "project-analysis-contract"
       ]
     },
     {

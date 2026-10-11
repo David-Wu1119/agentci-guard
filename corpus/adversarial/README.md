@@ -11,6 +11,10 @@ This is **not an accuracy benchmark**:
 - labels are rule-regression expectations, not independent human judgments;
 - multiple cases are variants of the same semantic edge.
 
+Synthetic 40-hex Action references are syntax stand-ins, not evidence that a
+vendor Action actually runs on the fixture's event. The discussion cases
+distinguish a verified incompatible revision from unverified references.
+
 The corpus answers “did a known bug return?” It cannot answer “how accurate is
 AgentCI Guard on real workflows?” The frozen human-labeled benchmark under
 `benchmark/` serves that separate purpose.

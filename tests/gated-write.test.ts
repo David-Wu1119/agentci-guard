@@ -138,7 +138,7 @@ jobs:
     expect(rules).not.toContain(GATED);
   });
 
-  it("stays critical on discussion events, which the docs do not list as checked", () => {
+  it("keeps a potential critical finding for an unverified mutable discussion ref", () => {
     const rules = rulesOf(
       BARE(
         '\n          prompt: "${{ github.event.discussion.body }}"',

@@ -40,6 +40,16 @@ evaluation before any accuracy claim.
 | `agentci/unpinned-ai-action`        | Step        | Medium   | A detected AI step uses a nonlocal, nondocker third-party Action whose ref is not a full 40-hex commit SHA.                                                                                                                                                                                                                                                                                                                                                                              |
 | `agentci/unsafe-checkout`           | Step        | High     | A step reachable on `pull_request_target` asks `actions/checkout` for the PR head/fork and either explicitly sets `allow-unsafe-pr-checkout: true` or uses known-unprotected v1. A currently protected floating v2-v7 major is negative; an immutable or otherwise ambiguous Action ref is unknown.                                                                                                                                                                                      |
 
+## Unreleased vendor-event compatibility candidate
+
+Vendor event reachability is version-aware for one verified immutable Action
+revision: `anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc`
+[rejects](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/github/context.ts#L250-L251)
+`discussion` and `discussion_comment` before Claude starts. Those event paths
+produce an analysis diagnostic, not AI findings. Mutable or unverified refs
+retain potential findings and a compatibility diagnostic; this does not remove
+discussion sources from CLI agents or other Actions.
+
 ## Unreleased source-provenance candidate
 
 The local scanner keeps each supported event expression's source class through

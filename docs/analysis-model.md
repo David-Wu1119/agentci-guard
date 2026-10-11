@@ -127,7 +127,8 @@ than `agentci/untrusted-ai-write-token` at critical:
 - every reachable untrusted event is one the docs list as checked — `issues`,
   `issue_comment`, `pull_request`, `pull_request_review`,
   `pull_request_review_comment`; `pull_request_target` and the discussion events
-  are not listed and keep critical;
+  are not listed and keep potential critical findings when Action event support
+  is unverified;
 - every **modeled** ingested source belongs to the actor checked by that gate. Parent Issue,
   PR, or discussion content may have a different author on comment, review, or
   label activity and therefore prevents the downgrade;
@@ -278,6 +279,12 @@ introduce.
 
 GitHub's [`discussion` and `discussion_comment` events](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#discussion)
 are included. GitHub currently documents those events as public preview.
+The verified Anthropic Action revision
+[`1d6de8c`](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/github/context.ts#L250-L251)
+rejects both events before Claude starts. The scanner excludes only those event
+paths for that immutable ref and emits an incomplete-analysis diagnostic. A
+mutable or unverified ref retains potential findings with a separate
+compatibility diagnostic; CLI agents and other Actions remain in scope.
 
 ## Permissions
 

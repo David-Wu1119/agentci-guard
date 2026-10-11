@@ -198,7 +198,8 @@ export function hasAgentGateBypass(withBlock: unknown): boolean {
 /**
  * Events on which the action's docs state the write-access check applies.
  * `discussion`, `discussion_comment`, and `pull_request_target` are not listed;
- * a job reachable on any of those keeps its full severity.
+ * paths that can reach the Action on those events keep full severity. The
+ * scanner separately excludes events rejected by a verified pinned revision.
  */
 export const SELF_GATED_EVENTS = new Set([
   "issues",

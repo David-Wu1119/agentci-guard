@@ -81,6 +81,11 @@ const EMPTY_REUSABLE_CONTEXT: ReusableContext = {
   callChain: [],
 };
 
+// This immutable revision throws on discussion events before Claude starts.
+// Source: https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/github/context.ts#L250-L251
+const ANTHROPIC_ACTION_WITHOUT_DISCUSSION =
+  "1d6de8cb0c237e7c15e9e1bdf973826ebae490cc";
+
 export async function scanRepository(
   root: string,
   options: Partial<ScanOptions> = {},
@@ -371,7 +376,7 @@ function analyzeWorkflow(
       const stepName =
         typeof rawStep.name === "string" ? rawStep.name : `step ${index + 1}`;
       const stepLine = locateStepLine(workflow.raw, jobName, index);
-      const stepReachability = narrowEvents(jobReachability.events, rawStep.if);
+      let stepReachability = narrowEvents(jobReachability.events, rawStep.if);
       if (!stepReachability.complete) {
         output.diagnostics.push({
           code: "agentci/analysis-event-condition",
@@ -385,6 +390,45 @@ function analyzeWorkflow(
         });
       }
       if (stepReachability.events.length === 0) continue;
+
+      const stepUses = typeof rawStep.uses === "string" ? rawStep.uses : "";
+      const actionReference = materializeInputs(stepUses, context.inputValues);
+      const discussionEvents = isSelfGatingAgentAction(actionReference)
+        ? stepReachability.events.filter(
+            (event) => event === "discussion" || event === "discussion_comment",
+          )
+        : [];
+      if (discussionEvents.length > 0) {
+        const pinnedRef =
+          /^anthropics\/claude-code-action@([0-9a-f]{40})$/i.exec(
+            actionReference,
+          )?.[1];
+        const knownUnsupported =
+          pinnedRef?.toLowerCase() === ANTHROPIC_ACTION_WITHOUT_DISCUSSION;
+        output.diagnostics.push({
+          code: knownUnsupported
+            ? "agentci/analysis-agent-event-unsupported"
+            : "agentci/analysis-agent-event-unknown",
+          kind: "analysis",
+          severity: "warning",
+          file,
+          job: jobName,
+          line: stepLine,
+          message: knownUnsupported
+            ? "This verified Anthropic Action revision rejects discussion events before Claude starts; those paths were excluded from AI findings."
+            : "This Anthropic Action ref's discussion-event support is unverified; findings on those paths are potential, not confirmed execution.",
+        });
+        if (knownUnsupported) {
+          stepReachability = {
+            ...stepReachability,
+            events: stepReachability.events.filter(
+              (event) =>
+                event !== "discussion" && event !== "discussion_comment",
+            ),
+          };
+          if (stepReachability.events.length === 0) continue;
+        }
+      }
 
       const effectiveEnvironment = mergeEnvironment(
         jobEnvironment,
@@ -400,15 +444,12 @@ function analyzeWorkflow(
         }),
         context.inputValues,
       );
-      const stepUses = typeof rawStep.uses === "string" ? rawStep.uses : "";
       const stepRun = typeof rawStep.run === "string" ? rawStep.run : "";
       const effectiveWith = materializeStructure(
         rawStep.with,
         context.inputValues,
       );
-      const stepUsesAiAction = looksLikeAiAction(
-        materializeInputs(stepUses, context.inputValues),
-      );
+      const stepUsesAiAction = looksLikeAiAction(actionReference);
       const stepUsesAi =
         stepUsesAiAction ||
         looksLikeAiCli(materializeInputs(stepRun, context.inputValues));
