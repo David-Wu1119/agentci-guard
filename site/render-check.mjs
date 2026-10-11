@@ -63,9 +63,8 @@ assert.equal(research.robots, false);
 assert.equal(research.pinned, true);
 assert.equal(research.localPreview, false);
 assert.deepEqual(research.caseRows, [
-  ["agentci/untrusted-ai-write-token", "critical", "critical"],
-  ["agentci/ai-with-secrets", "medium", "medium"],
-  ["agentci/broad-write-permissions", "medium", "medium"],
+  ["agentci/pull-request-target-ai", "critical", "critical"],
+  ["agentci/untrusted-input-in-prompt", "high", "high"],
 ]);
 checks.push({ research });
 const scanner = await evaluate(
@@ -78,7 +77,7 @@ await evaluate('document.getElementById("scan-button").click()');
 const sample = await evaluate(
   '({heading:document.getElementById("scan-results-heading").textContent,complete:document.getElementById("scan-completeness").textContent,rules:Array.from(document.querySelectorAll("#scan-findings li")).map(li=>li.textContent),diagnostics:document.querySelectorAll("#scan-diagnostics li").length,errorHidden:document.getElementById("scan-error").hidden})',
 );
-assert.equal(sample.heading, "3 findings");
+assert.equal(sample.heading, "2 findings");
 assert.match(sample.complete, /analysis_complete: true/);
 assert.match(
   sample.complete,
@@ -90,7 +89,7 @@ assert.equal(
   ),
   true,
 );
-assert.equal(sample.rules.length, 3);
+assert.equal(sample.rules.length, 2);
 for (const [rule] of research.caseRows)
   assert.ok(
     sample.rules.some((row) => row.includes(rule)),

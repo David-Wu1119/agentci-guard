@@ -61,6 +61,47 @@ const manifest = JSON.parse(
     "utf8",
   ),
 );
+const featured = manifest.cases.find(
+  (testCase) => testCase.id === "event-gated-prt",
+);
+assert.ok(featured);
+const embedded = html.match(
+  /<pre><code>(name: event-gated-prt[\s\S]*?)<\/code><\/pre>/,
+)?.[1];
+assert.ok(embedded);
+const displayedSample = embedded.replaceAll("&#36;", "$");
+assert.equal(
+  displayedSample,
+  (
+    await fs.readFile(
+      new URL(
+        "../corpus/adversarial/cases/event-gated-prt/.github/workflows/agent.yml",
+        import.meta.url,
+      ),
+      "utf8",
+    )
+  ).trimEnd(),
+);
+const featuredResult = scan(displayedSample);
+assert.deepEqual(
+  Array.from(featuredResult.findings, ({ rule_id, severity }) => [
+    rule_id,
+    severity,
+  ]).sort(),
+  featured.expected.findings
+    .map(({ rule_id, severity }) => [rule_id, severity])
+    .sort(),
+);
+assert.equal(featuredResult.analysis_complete, true);
+assert.equal(featuredResult.diagnostics.length, 0);
+assert.match(
+  await fs.readFile(new URL("./dist/app.js", import.meta.url), "utf8"),
+  /allowed_non_write_users requires an explicit github_token/,
+);
+assert.doesNotMatch(
+  html,
+  /broad allowlist removes the Action's default write-access gate/i,
+);
 let checked = 0;
 for (const testCase of manifest.cases) {
   const directory = new URL(

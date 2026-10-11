@@ -33,48 +33,46 @@
 <p id="scan-error" role="alert" hidden></p>
 <div id="scan-output" hidden><p id="scan-completeness"></p><h4>Findings</h4><ul id="scan-findings"></ul><h4>Diagnostics</h4><ul id="scan-diagnostics"></ul></div>
 </section></div></section>
-<section id="example" class="example-section"><div class="shell example-inner"><div><p class="eyebrow">03 / A SMALL CHANGE, A DIFFERENT REVIEW</p><h2>Authorization is context.<br>It is not content trust.</h2><p class="example-lede">Compare three illustrative configurations. The reproduced case below is separate from these examples; this page does not scan your repository.</p><div class="example-controls" role="group" aria-label="Choose an illustrative configuration"><button data-case="unknown" aria-pressed="true">Unreviewed ref</button><button data-case="default" aria-pressed="false">Reviewed default</button><button data-case="bypass" aria-pressed="false">Broad allowlist</button></div></div><article class="example-result" aria-live="polite"><p id="case-label" class="eyebrow">UNREVIEWED VERSION</p><h3 id="case-title">Keep the write-token finding critical.</h3><p id="case-copy">A mutable tag or an unreviewed commit does not establish the action’s authorization behavior. Verify its runtime checks; do not infer unrestricted access from the label.</p><div class="residual"><strong>In every case</strong><p>A maintainer can act on attacker-authored content. Read-only execution does not eliminate token availability or secret disclosure through output.</p></div></article></div></section>
+<section id="example" class="example-section"><div class="shell example-inner"><div><p class="eyebrow">03 / A SMALL CHANGE, A DIFFERENT REVIEW</p><h2>Authorization is context.<br>It is not content trust.</h2><p class="example-lede">Compare three illustrative configurations. The reproduced case below is separate from these examples; this page does not scan your repository.</p><div class="example-controls" role="group" aria-label="Choose an illustrative configuration"><button data-case="unknown" aria-pressed="true">Unreviewed ref</button><button data-case="default" aria-pressed="false">Reviewed default</button><button data-case="bypass" aria-pressed="false">Broad allowlist</button></div></div><article class="example-result" aria-live="polite"><p id="case-label" class="eyebrow">UNREVIEWED VERSION</p><h3 id="case-title">Verify the gate before reducing risk.</h3><p id="case-copy">A mutable tag or an unreviewed commit does not establish the Action’s authorization behavior. The scanner reports action pinning separately; inspect the deployed version before relying on its gate.</p><div class="residual"><strong>In every case</strong><p>A maintainer can act on attacker-authored content. Read-only workflow permissions do not rule out separately minted tokens or secret exposure. <a href="https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/docs/security.md">Pinned Action security documentation ↗</a></p></div></article></div></section>
 <section id="research" class="shell section research">
 <div class="section-intro">
 <p class="eyebrow">04 / REPRODUCIBLE REGRESSION CASE</p>
 <h2>One workflow.<br>A checkable result.</h2>
 <p>This is a developer-authored synthetic fixture. Its expected results come from the checked-in corpus manifest, not independent human labels. It checks a known rule boundary; it does not measure precision or recall on real workflows.</p>
-<p class="case-links"><a href="https://github.com/David-Wu1119/agentci-guard/blob/5c045e0469f412aecd0f9d5f32876bf10c7fc66b/corpus/adversarial/cases/gated-write-bypass/.github/workflows/agent.yml">Pinned YAML fixture ↗</a> · <a href="https://github.com/David-Wu1119/agentci-guard/blob/5c045e0469f412aecd0f9d5f32876bf10c7fc66b/corpus/adversarial/manifest.json">Expected-results manifest ↗</a></p>
+<p class="case-links"><a href="https://github.com/David-Wu1119/agentci-guard/blob/5c045e0469f412aecd0f9d5f32876bf10c7fc66b/corpus/adversarial/cases/event-gated-prt/.github/workflows/agent.yml">Pinned YAML fixture ↗</a> · <a href="https://github.com/David-Wu1119/agentci-guard/blob/5c045e0469f412aecd0f9d5f32876bf10c7fc66b/corpus/adversarial/manifest.json">Expected-results manifest ↗</a></p>
 </div>
 <div class="case-details">
-<p class="eyebrow">PUBLIC SOURCE COMMIT · 5c045e0 · FIXTURE gated-write-bypass</p>
-<h3>Issue comment with a broad allowlist</h3>
-<pre><code>name: gated-write-bypass
+<p class="eyebrow">PUBLIC SOURCE COMMIT · 5c045e0 · FIXTURE event-gated-prt</p>
+<h3>Only the PR-target event selects this agent job</h3>
+<pre><code>name: event-gated-prt
 on:
-  issue_comment:
-    types: [created]
+  push:
+  pull_request_target:
 permissions:
-  contents: write
-  issues: write
+  contents: read
 jobs:
   agent:
+    if: github.event_name == 'pull_request_target'
     runs-on: ubuntu-latest
     steps:
       - uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567
         with:
-          claude_code_oauth_token: &#36;{{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          allowed_non_write_users: "*"</code></pre>
+          prompt: &#36;{{ github.event.pull_request.body }}</code></pre>
 <p class="case-note">The 40-character Action ref is a synthetic placeholder for static analysis. It does not identify a verified vendor release; do not run this fixture as a workflow.</p>
 <h3>Expected versus observed</h3>
 <table><thead><tr><th scope="col">Rule</th><th scope="col">Expected</th><th scope="col">Observed</th></tr></thead><tbody>
-<tr><td>agentci/untrusted-ai-write-token</td><td>critical</td><td>critical</td></tr>
-<tr><td>agentci/ai-with-secrets</td><td>medium</td><td>medium</td></tr>
-<tr><td>agentci/broad-write-permissions</td><td>medium</td><td>medium</td></tr>
+<tr><td>agentci/pull-request-target-ai</td><td>critical</td><td>critical</td></tr>
+<tr><td>agentci/untrusted-input-in-prompt</td><td>high</td><td>high</td></tr>
 </tbody></table>
-<p class="case-note">The source-linked CLI at commit <code>5c045e0</code> returned these three findings at <code>.github/workflows/agent.yml:9</code>, with no diagnostics and <code>analysis_complete: true</code>. All three rule/severity pairs match the manifest.</p>
-<p class="case-note">Why: <code>issue_comment</code> can carry untrusted text; the broad allowlist removes the Action's default write-access gate; <code>contents</code> and <code>issues</code> allow writes; line 14 passes a secret to the Action. These are static configuration findings, not a demonstrated exploit.</p>
+<p class="case-note">The pinned public manifest expects these two rule/severity pairs. The bundled browser scanner reproduces them with no diagnostics and <code>analysis_complete: true</code>. This is a regression check, not an independent accuracy result.</p>
+<p class="case-note">Why: the job condition excludes <code>push</code> and selects <code>pull_request_target</code>; its prompt includes a PR body. The fixture does not execute the Action or establish whether its runtime actor gate would admit a particular PR author. These are static findings, not a demonstrated exploit.</p>
 <details><summary>Reproduce from the pinned public commit</summary><pre><code>git clone https://github.com/David-Wu1119/agentci-guard.git
 cd agentci-guard
 git checkout 5c045e0469f412aecd0f9d5f32876bf10c7fc66b
-node dist/cli.js scan corpus/adversarial/cases/gated-write-bypass --json --fail-on none</code></pre></details>
+node dist/cli.js scan corpus/adversarial/cases/event-gated-prt --json --fail-on none</code></pre></details>
 </div>
 </section>
-<section id="boundaries" class="shell section boundaries"><div class="section-intro"><p class="eyebrow">05 / KNOW THE BOUNDARY</p><h2>Useful signals.<br>Explicit limits.</h2><p>Use Guard alongside source review and runtime controls. A supported clean scan is not proof of security.</p></div><div class="boundary-grid"><article><h3>Possible paths, not exploits</h3><p>Severity reflects review priority over supported static semantics. It does not prove an attacker can execute a path.</p></article><article><h3>Coverage has edges</h3><p>Dynamic expressions, scripts and remote reusable workflow bodies can exceed the model. Read diagnostics before interpreting a result.</p></article><article><h3>Accuracy is unmeasured</h3><p>The 152-workflow development corpus supports reproducibility. Sealed human-labeled evaluation and measured precision/recall are not established.</p></article><article><h3>Version matters</h3><p>The reproduced case is pinned to a public scanner commit. Later source changes can alter findings; compare results against the same version.</p></article></div></section>
+<section id="boundaries" class="shell section boundaries"><div class="section-intro"><p class="eyebrow">05 / KNOW THE BOUNDARY</p><h2>Useful signals.<br>Explicit limits.</h2><p>Use Guard alongside source review and runtime controls. A supported clean scan is not proof of security.</p></div><div class="boundary-grid"><article><h3>Possible paths, not exploits</h3><p>Severity reflects review priority over supported static semantics. It does not prove an attacker can execute a path.</p></article><article><h3>Coverage has edges</h3><p>Dynamic expressions, scripts and remote reusable workflow bodies can exceed the model. Read diagnostics before interpreting a result.</p></article><article><h3>Accuracy is unmeasured</h3><p>The 152-workflow development corpus supports reproducibility. Sealed human-labeled evaluation and measured precision/recall are not established.</p></article><article><h3>Version matters</h3><p>The fixture and expected results are pinned to a public commit; this page's browser scanner is a separate build. Compare versions before treating a mismatch as a regression.</p></article></div></section>
 <section class="shell closing"><p class="eyebrow">START WITH ONE WORKFLOW</p><h2>Less guesswork.<br>A more focused review.</h2><a class="button primary" href="#try">Try the scanner <span aria-hidden="true">↑</span></a><p class="fine">Browser-only scan for one workflow. No account connection.</p></section>
 </main><footer class="shell"><span class="brand">AgentCI <strong>Guard</strong></span><p>Experimental workflow analysis. Built for review.</p><a href="THIRD_PARTY_LICENSES.txt">Third-party notices</a><a href="#main">Back to top ↑</a></footer>
 </body></html>

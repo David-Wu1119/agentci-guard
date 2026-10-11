@@ -150,9 +150,9 @@ scanButton.addEventListener('click', () => {
 if (typeof scanWorkflow !== 'function') showError('The scanner did not load. Use the CLI or GitHub Action instead.');
 
 const examples = {
-  unknown: ['UNREVIEWED VERSION', 'Keep the write-token finding critical.', 'A mutable tag or an unreviewed commit does not establish the action’s authorization behavior. Verify its runtime checks; do not infer unrestricted access from the label.'],
-  default: ['REVIEWED IMMUTABLE DEFAULT', 'Reduce the finding to high. Keep the review.', 'At a reviewed immutable action version, the supported default actor check reduces direct stranger-triggered exposure. Prompt, secret and permission findings still matter.'],
-  bypass: ['EXPLICIT BROAD ALLOWLIST', 'The actor-gate reduction no longer applies.', 'A broad user or bot allowlist can bypass the reviewed default check. The write-token finding stays critical—even with read-only execution.']
+  unknown: ['UNREVIEWED VERSION', 'Verify the gate before reducing risk.', 'A mutable tag or an unreviewed commit does not establish the Action’s authorization behavior. The scanner reports action pinning separately; inspect the deployed version before relying on its gate.'],
+  default: ['REVIEWED DEFAULT', 'The actor gate has a narrow effect.', 'A reviewed Action can reduce exposure only when its default check covers the trigger and every modeled input belongs to that checked actor. Parent Issue or PR content may have another author.'],
+  bypass: ['EXPLICIT BROAD ALLOWLIST', 'The actor-gate reduction no longer applies.', 'allowed_non_write_users requires an explicit github_token to admit non-write users; allowed_bots can also bypass the default check. Review the actual token and input source.']
 };
 for (const button of document.querySelectorAll('[data-case]')) {
   button.addEventListener('click', () => {

@@ -68,7 +68,7 @@ finding list with a diagnostic is not a closed analysis.
 - A matched pattern can be mitigated by author checks, approval gates, output
   allowlists, or isolation the scanner does not model.
 - A dangerous workflow can use a source, sink, capability, or permission not
-  represented by the eight rules.
+  represented by the nine rules.
 
 ## Interpretation
 
@@ -76,7 +76,9 @@ Use “finding,” “pattern match,” “scanner rating,” “supported seman
 “analysis incomplete.” Do not describe a finding as a confirmed exploit or a
 clean result as a secure workflow.
 
-No precision or recall claim is valid until the frozen benchmark has public
-human labels, independent review, adjudication, and generated error analysis.
+No precision or recall claim is valid until a fresh, repository-disjoint
+evaluation sample has public human labels under a frozen single-annotator
+protocol and generated error analysis. The v3 corpus is development-only, and
+single-annotator test-retest checks cannot substitute for independent review.
 The qualification targets in the benchmark are wording gates for “calibrated
 experimental linter,” not safety guarantees.

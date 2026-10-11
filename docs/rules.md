@@ -11,7 +11,14 @@ diagnostics—not forced into a security rule.
 
 ## `agentci/untrusted-ai-write-token`
 
-Untrusted trigger content reaches an AI agent with repository write permissions.
+Untrusted content reaches an AI agent with modeled sensitive write capability
+without qualifying for the documented actor-gate downgrade.
+
+## `agentci/gated-ai-write-token`
+
+Untrusted content reaches a write-capable Claude Code Action whose default
+actor write-access gate is modeled as intact. The unreleased candidate narrows
+this rating to content attributable to the actor that gate checks.
 
 ## `agentci/pull-request-target-ai`
 
