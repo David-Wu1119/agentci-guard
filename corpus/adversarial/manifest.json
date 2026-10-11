@@ -21,6 +21,12 @@
       "url": "https://docs.github.com/en/actions/reference/events-that-trigger-workflows",
       "claim": "Event payloads and pull_request_target execution context determine attacker influence and privilege."
     },
+    "env-command": {
+      "type": "primary",
+      "title": "GNU Coreutils env invocation",
+      "url": "https://www.gnu.org/s/coreutils/manual/html_node/env-invocation.html",
+      "claim": "env executes the command following its options and NAME=VALUE assignments in a modified environment."
+    },
     "anthropic-action-modes": {
       "type": "primary",
       "title": "Claude Code Action tag and agent modes",
@@ -264,6 +270,78 @@
       },
       "rationale": "An AI CLI invoked in run already executes through a shell and therefore has command capability.",
       "assumption_sources": ["project-rule-contract"]
+    },
+    {
+      "id": "run-env-cli",
+      "path": "cases/run-env-cli",
+      "targets": ["env launcher around a direct AI CLI"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent",
+        "step": "Run Claude through env"
+      },
+      "expected": {
+        "reachable_events": ["issue_comment"],
+        "findings": [
+          {
+            "rule_id": "agentci/untrusted-ai-write-token",
+            "severity": "critical",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/untrusted-input-in-prompt",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "step": "Run Claude through env",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/ai-shell-access",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "step": "Run Claude through env",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/broad-write-permissions",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [],
+        "agent_usages": [
+          {
+            "file": ".github/workflows/agent.yml",
+            "job": "agent",
+            "step": "Run Claude through env",
+            "kind": "cli",
+            "line_min": 2,
+            "reachable_events": ["issue_comment"]
+          }
+        ],
+        "analysis_complete": true
+      },
+      "rationale": "GNU env runs Claude after a constant CI assignment; the comment body is a direct prompt argument in a writable AI job.",
+      "assumption_sources": [
+        "env-command",
+        "event-security",
+        "permissions",
+        "project-rule-contract"
+      ]
     },
     {
       "id": "action-prose-no-shell",

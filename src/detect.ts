@@ -247,7 +247,9 @@ export function looksLikeAiCli(value: string): boolean {
   // A command substitution executes too, but scanner.ts treats its dataflow
   // as opaque rather than claiming a proven direct CLI sink.
   return (
-    aiCliInvocations(value).length > 0 || hasOpaqueAiCliSubstitution(value)
+    aiCliInvocations(value).length > 0 ||
+    hasOpaqueAiCliSubstitution(value) ||
+    hasOpaqueAiCliShellCommand(value)
   );
 }
 
@@ -255,7 +257,7 @@ export function looksLikeAiHttpDispatch(value: string): boolean {
   return aiHttpDispatches(value).length > 0;
 }
 
-type ShellWord = { text: string; expandableText: string };
+type ShellWord = { text: string; expandableText: string; raw?: string };
 export type AiCliInvocation = {
   command: string;
   expandableCommand: string;
@@ -277,13 +279,16 @@ function shellWords(value: string): ShellWord[] {
   let quote = "";
   let started = false;
   let escaped = false;
-  const push = () => {
-    if (started) words.push({ text, expandableText });
+  let wordStart = 0;
+  const push = (end: number) => {
+    if (started)
+      words.push({ text, expandableText, raw: value.slice(wordStart, end) });
     text = "";
     expandableText = "";
     started = false;
   };
   for (let index = 0; index < value.length; index++) {
+    if (!started) wordStart = index;
     const character = value[index];
     if (escaped) {
       text += character;
@@ -317,7 +322,7 @@ function shellWords(value: string): ShellWord[] {
     } else if (character === "#" && !started) {
       break;
     } else if (/\s/.test(character)) {
-      push();
+      push(index);
       continue;
     } else {
       text += character;
@@ -325,7 +330,7 @@ function shellWords(value: string): ShellWord[] {
     }
     started = true;
   }
-  push();
+  push(value.length);
   return words;
 }
 
@@ -536,6 +541,55 @@ function firstUnquotedRedirection(command: string): number {
   return -1;
 }
 
+function envLaunchedCommand(words: ShellWord[]): {
+  commandWords: ShellWord[];
+  prefixWords: ShellWord[];
+} {
+  let index = 0;
+  while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[index]?.raw ?? "")) index++;
+  const assignmentEnd = index;
+  while (["sudo", "command", "exec"].includes(words[index]?.text)) index++;
+  if (!["env", "/usr/bin/env"].includes(words[index]?.text)) {
+    return {
+      commandWords: words.slice(assignmentEnd),
+      prefixWords: words.slice(0, assignmentEnd),
+    };
+  }
+  index++;
+  // shortcut: model literal env options; extend for -S if a measured miss warrants it.
+  while (true) {
+    const option = words[index]?.text;
+    if (option === "--") {
+      index++;
+      break;
+    }
+    if (["-i", "--ignore-environment"].includes(option)) {
+      index++;
+      continue;
+    }
+    if (
+      ["-u", "--unset"].includes(option) &&
+      /^[A-Za-z_][A-Za-z0-9_]*$/.test(words[index + 1]?.text ?? "")
+    ) {
+      index += 2;
+      continue;
+    }
+    if (/^--unset=[A-Za-z_][A-Za-z0-9_]*$/.test(option ?? "")) {
+      index++;
+      continue;
+    }
+    break;
+  }
+  while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[index]?.text ?? "")) index++;
+  if (["exec", "command"].includes(words[index]?.text)) {
+    return { commandWords: [], prefixWords: words };
+  }
+  return {
+    commandWords: words.slice(index),
+    prefixWords: words.slice(0, index),
+  };
+}
+
 /** Direct local CLI commands, excluding sibling commands and shell comments. */
 export function aiCliInvocations(value: string): AiCliInvocation[] {
   const invocations: AiCliInvocation[] = [];
@@ -545,8 +599,10 @@ export function aiCliInvocations(value: string): AiCliInvocation[] {
       redirection >= 0
         ? segment.command.slice(0, redirection)
         : segment.command;
-    const words = shellWords(command);
-    const executable = words.map((word) => word.text).join(" ");
+    const { commandWords, prefixWords } = envLaunchedCommand(
+      shellWords(command),
+    );
+    const executable = commandWords.map((word) => word.text).join(" ");
     if (
       !AI_AGENT_CLI_PATTERNS.some(
         (pattern) => pattern.exec(executable)?.index === 0,
@@ -558,10 +614,14 @@ export function aiCliInvocations(value: string): AiCliInvocation[] {
     // exclude the redirect tail from proven prompt material, but cannot call
     // the command complete without parsing that tail's remaining arguments.
     const opaqueInput =
-      redirection >= 0 || words.some((word) => /\$\(|`/.test(word.text));
+      redirection >= 0 ||
+      commandWords.some((word) => /\$\(|`/.test(word.text)) ||
+      prefixWords.some((word) => /\$/.test(word.expandableText));
     invocations.push({
-      command: words.map((word) => word.text).join(" "),
-      expandableCommand: words.map((word) => word.expandableText).join(" "),
+      command: executable,
+      expandableCommand: commandWords
+        .map((word) => word.expandableText)
+        .join(" "),
       pipedInput: segment.pipedInput,
       opaqueInput,
     });
@@ -596,11 +656,25 @@ export function hasOpaqueAiCliSubstitution(value: string): boolean {
     if (quote !== "'" && character === "$" && script[index + 1] === "(") {
       const end = commandSubstitutionEnd(script, index);
       const body = script.slice(index + 2, end >= 0 ? end - 1 : undefined);
-      if (AI_AGENT_CLI_PATTERNS.some((pattern) => pattern.test(body)))
-        return true;
+      if (aiCliInvocations(body).length > 0) return true;
     }
   }
   return false;
+}
+
+/** A shell -c string may execute an agent, but its nested dataflow is opaque. */
+export function hasOpaqueAiCliShellCommand(value: string): boolean {
+  // shortcut: one literal shell -c layer only; extend after measured misses.
+  return shellCommandSegments(value).some((segment) => {
+    const { commandWords } = envLaunchedCommand(shellWords(segment.command));
+    return (
+      ["sh", "bash", "/bin/sh", "/bin/bash"].includes(
+        commandWords[0]?.text ?? "",
+      ) &&
+      commandWords[1]?.text === "-c" &&
+      aiCliInvocations(commandWords[2]?.text ?? "").length > 0
+    );
+  });
 }
 
 export function aiHttpDispatches(value: string): AiHttpDispatch[] {

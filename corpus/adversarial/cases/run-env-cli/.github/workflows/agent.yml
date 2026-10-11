@@ -1,0 +1,12 @@
+name: env-launched-agent
+on:
+  issue_comment:
+    types: [created]
+permissions:
+  contents: write
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Claude through env
+        run: env CI=1 claude -p "${{ github.event.comment.body }}"

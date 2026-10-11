@@ -7645,7 +7645,7 @@ function looksLikeAiAction(value) {
   );
 }
 function looksLikeAiCli(value) {
-  return aiCliInvocations(value).length > 0 || hasOpaqueAiCliSubstitution(value);
+  return aiCliInvocations(value).length > 0 || hasOpaqueAiCliSubstitution(value) || hasOpaqueAiCliShellCommand(value);
 }
 function looksLikeAiHttpDispatch(value) {
   return aiHttpDispatches(value).length > 0;
@@ -7657,13 +7657,16 @@ function shellWords(value) {
   let quote = "";
   let started = false;
   let escaped = false;
-  const push = () => {
-    if (started) words.push({ text, expandableText });
+  let wordStart = 0;
+  const push = (end) => {
+    if (started)
+      words.push({ text, expandableText, raw: value.slice(wordStart, end) });
     text = "";
     expandableText = "";
     started = false;
   };
   for (let index = 0; index < value.length; index++) {
+    if (!started) wordStart = index;
     const character = value[index];
     if (escaped) {
       text += character;
@@ -7693,7 +7696,7 @@ function shellWords(value) {
     } else if (character === "#" && !started) {
       break;
     } else if (/\s/.test(character)) {
-      push();
+      push(index);
       continue;
     } else {
       text += character;
@@ -7701,7 +7704,7 @@ function shellWords(value) {
     }
     started = true;
   }
-  push();
+  push(value.length);
   return words;
 }
 function heredocDelimiter(line) {
@@ -7882,22 +7885,65 @@ function firstUnquotedRedirection(command) {
   }
   return -1;
 }
+function envLaunchedCommand(words) {
+  let index = 0;
+  while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[index]?.raw ?? "")) index++;
+  const assignmentEnd = index;
+  while (["sudo", "command", "exec"].includes(words[index]?.text)) index++;
+  if (!["env", "/usr/bin/env"].includes(words[index]?.text)) {
+    return {
+      commandWords: words.slice(assignmentEnd),
+      prefixWords: words.slice(0, assignmentEnd)
+    };
+  }
+  index++;
+  while (true) {
+    const option = words[index]?.text;
+    if (option === "--") {
+      index++;
+      break;
+    }
+    if (["-i", "--ignore-environment"].includes(option)) {
+      index++;
+      continue;
+    }
+    if (["-u", "--unset"].includes(option) && /^[A-Za-z_][A-Za-z0-9_]*$/.test(words[index + 1]?.text ?? "")) {
+      index += 2;
+      continue;
+    }
+    if (/^--unset=[A-Za-z_][A-Za-z0-9_]*$/.test(option ?? "")) {
+      index++;
+      continue;
+    }
+    break;
+  }
+  while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[index]?.text ?? "")) index++;
+  if (["exec", "command"].includes(words[index]?.text)) {
+    return { commandWords: [], prefixWords: words };
+  }
+  return {
+    commandWords: words.slice(index),
+    prefixWords: words.slice(0, index)
+  };
+}
 function aiCliInvocations(value) {
   const invocations = [];
   for (const segment of shellCommandSegments(value)) {
     const redirection = firstUnquotedRedirection(segment.command);
     const command = redirection >= 0 ? segment.command.slice(0, redirection) : segment.command;
-    const words = shellWords(command);
-    const executable = words.map((word) => word.text).join(" ");
+    const { commandWords, prefixWords } = envLaunchedCommand(
+      shellWords(command)
+    );
+    const executable = commandWords.map((word) => word.text).join(" ");
     if (!AI_AGENT_CLI_PATTERNS.some(
       (pattern) => pattern.exec(executable)?.index === 0
     )) {
       continue;
     }
-    const opaqueInput = redirection >= 0 || words.some((word) => /\$\(|`/.test(word.text));
+    const opaqueInput = redirection >= 0 || commandWords.some((word) => /\$\(|`/.test(word.text)) || prefixWords.some((word) => /\$/.test(word.expandableText));
     invocations.push({
-      command: words.map((word) => word.text).join(" "),
-      expandableCommand: words.map((word) => word.expandableText).join(" "),
+      command: executable,
+      expandableCommand: commandWords.map((word) => word.expandableText).join(" "),
       pipedInput: segment.pipedInput,
       opaqueInput
     });
@@ -7926,11 +7972,18 @@ function hasOpaqueAiCliSubstitution(value) {
     if (quote !== "'" && character === "$" && script[index + 1] === "(") {
       const end = commandSubstitutionEnd(script, index);
       const body = script.slice(index + 2, end >= 0 ? end - 1 : void 0);
-      if (AI_AGENT_CLI_PATTERNS.some((pattern) => pattern.test(body)))
-        return true;
+      if (aiCliInvocations(body).length > 0) return true;
     }
   }
   return false;
+}
+function hasOpaqueAiCliShellCommand(value) {
+  return shellCommandSegments(value).some((segment) => {
+    const { commandWords } = envLaunchedCommand(shellWords(segment.command));
+    return ["sh", "bash", "/bin/sh", "/bin/bash"].includes(
+      commandWords[0]?.text ?? ""
+    ) && commandWords[1]?.text === "-c" && aiCliInvocations(commandWords[2]?.text ?? "").length > 0;
+  });
 }
 function aiHttpDispatches(value) {
   const dispatches = [];
@@ -8988,7 +9041,7 @@ function analyzeWorkflow(workflow, repository, context) {
       const stepUsesAiCli = cliInvocations.length > 0;
       const httpDispatches = aiHttpDispatches(materializedRun);
       const stepUsesAi = stepUsesAiAction || stepUsesAiCli || httpDispatches.length > 0;
-      if (hasOpaqueAiCliSubstitution(materializedRun)) {
+      if (hasOpaqueAiCliSubstitution(materializedRun) || hasOpaqueAiCliShellCommand(materializedRun)) {
         output.diagnostics.push({
           code: "agentci/analysis-run-dataflow-unknown",
           kind: "analysis",
@@ -8996,7 +9049,7 @@ function analyzeWorkflow(workflow, repository, context) {
           file,
           job: jobName,
           line: stepLine,
-          message: "A possible AI CLI inside command substitution could not be attributed to an executable command."
+          message: "A possible AI CLI inside command substitution or shell -c could not be attributed to a direct executable command."
         });
       }
       const httpOnly = httpDispatches.length > 0 && !stepUsesAiCli && !stepUsesAiAction;
@@ -10196,6 +10249,7 @@ export {
   formatGithubOutputs,
   hasAgentGateBypass,
   hasFindingAtOrAbove,
+  hasOpaqueAiCliShellCommand,
   hasOpaqueAiCliSubstitution,
   hasSensitiveWrite,
   hasTrustedActorGate,

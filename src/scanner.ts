@@ -9,6 +9,7 @@ import {
   containsSecretReference,
   containsShellAccess,
   hasAgentGateBypass,
+  hasOpaqueAiCliShellCommand,
   hasOpaqueAiCliSubstitution,
   isPinnedAction,
   isSelfGatingAgentAction,
@@ -466,7 +467,10 @@ function analyzeWorkflow(
       const httpDispatches = aiHttpDispatches(materializedRun);
       const stepUsesAi =
         stepUsesAiAction || stepUsesAiCli || httpDispatches.length > 0;
-      if (hasOpaqueAiCliSubstitution(materializedRun)) {
+      if (
+        hasOpaqueAiCliSubstitution(materializedRun) ||
+        hasOpaqueAiCliShellCommand(materializedRun)
+      ) {
         output.diagnostics.push({
           code: "agentci/analysis-run-dataflow-unknown",
           kind: "analysis",
@@ -475,7 +479,7 @@ function analyzeWorkflow(
           job: jobName,
           line: stepLine,
           message:
-            "A possible AI CLI inside command substitution could not be attributed to an executable command.",
+            "A possible AI CLI inside command substitution or shell -c could not be attributed to a direct executable command.",
         });
       }
       const httpOnly =

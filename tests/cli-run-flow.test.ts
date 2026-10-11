@@ -31,6 +31,106 @@ function rules(result: ReturnType<typeof scan>) {
 }
 
 describe("local CLI run-step input flow", () => {
+  it("recognizes an env-launched agent without treating env-only input as its prompt", () => {
+    const direct = scan('env CI=1 claude -p "\${{ github.event.issue.body }}"');
+    expect(direct.agent_usages).toHaveLength(1);
+    expect(rules(direct)).toContain("agentci/untrusted-input-in-prompt");
+    expect(rules(direct)).toContain("agentci/untrusted-ai-write-token");
+    expect(rules(direct)).toContain("agentci/ai-shell-access");
+    expect(direct.analysis_complete).toBe(true);
+
+    const envOnly = scan(
+      'env REQUEST="\${{ github.event.issue.body }}" claude -p fixed',
+    );
+    expect(envOnly.agent_usages).toHaveLength(1);
+    expect(rules(envOnly)).not.toContain("agentci/untrusted-input-in-prompt");
+    expect(rules(envOnly)).not.toContain("agentci/untrusted-ai-write-token");
+    expect(envOnly.diagnostics.map((item) => item.code)).toContain(
+      "agentci/analysis-run-dataflow-unknown",
+    );
+  });
+
+  it("does not promote env prose or nested CLI execution to a proven sink", () => {
+    for (const run of [
+      'env CI=1 echo claude -p "\${{ github.event.issue.body }}"',
+      "env CI=1 claude --help",
+    ]) {
+      const result = scan(run);
+      expect(result.agent_usages).toEqual([]);
+      expect(result.findings).toEqual([]);
+    }
+    const nested = scan('echo "$(env CI=1 claude -p fixed)"');
+    expect(nested.agent_usages).toEqual([]);
+    expect(nested.diagnostics.map((item) => item.code)).toContain(
+      "agentci/analysis-run-dataflow-unknown",
+    );
+  });
+
+  it("respects env's option terminator and executable boundary", () => {
+    for (const run of [
+      "env -- -i claude -p fixed",
+      "env exec claude -p fixed",
+      "env command claude -p fixed",
+    ]) {
+      const result = scan(run);
+      expect(result.agent_usages).toEqual([]);
+      expect(result.findings).toEqual([]);
+    }
+    for (const run of [
+      "env -i -- claude -p fixed",
+      "env -u REQUEST claude -p fixed",
+      "env --unset=REQUEST claude -p fixed",
+    ]) {
+      expect(scan(run).agent_usages).toHaveLength(1);
+    }
+  });
+
+  it("recognizes a literal shell assignment before a direct or env-launched CLI", () => {
+    for (const run of [
+      'CI=1 claude -p "\${{ github.event.issue.body }}"',
+      'CI=1 env claude -p "\${{ github.event.issue.body }}"',
+    ]) {
+      const result = scan(run);
+      expect(result.agent_usages).toHaveLength(1);
+      expect(rules(result)).toContain("agentci/untrusted-input-in-prompt");
+      expect(result.analysis_complete).toBe(true);
+    }
+    for (const run of [
+      "CI=1 echo claude -p fixed",
+      '"CI=1" claude -p fixed',
+      "CI\\=1 claude -p fixed",
+    ]) {
+      const notAgent = scan(run);
+      expect(notAgent.agent_usages).toEqual([]);
+      expect(notAgent.findings).toEqual([]);
+    }
+    const envOnly = scan(
+      'CI="\${{ github.event.issue.body }}" claude -p fixed',
+    );
+    expect(envOnly.agent_usages).toHaveLength(1);
+    expect(rules(envOnly)).not.toContain("agentci/untrusted-input-in-prompt");
+    expect(envOnly.diagnostics.map((item) => item.code)).toContain(
+      "agentci/analysis-run-dataflow-unknown",
+    );
+  });
+
+  it("marks an env-launched shell -c agent as unresolved, not a proven direct sink", () => {
+    for (const shell of ["sh", "bash", "/bin/sh", "/bin/bash"]) {
+      const nested = scan(
+        `env CI=1 ${shell} -c "claude -p \${{ github.event.issue.body }}"`,
+      );
+      expect(nested.agent_usages).toEqual([]);
+      expect(nested.findings).toEqual([]);
+      expect(nested.diagnostics.map((item) => item.code)).toContain(
+        "agentci/analysis-run-dataflow-unknown",
+      );
+      expect(nested.analysis_complete).toBe(false);
+    }
+    const prose = scan('env CI=1 sh -c "echo claude -p fixed"');
+    expect(prose.agent_usages).toEqual([]);
+    expect(prose.diagnostics).toEqual([]);
+  });
+
   it("does not attribute a sibling echo to a fixed CLI prompt", () => {
     const result = scan(
       `claude -p fixed\necho "\${{ github.event.issue.body }}"`,

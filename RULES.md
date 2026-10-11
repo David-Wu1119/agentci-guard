@@ -91,6 +91,12 @@ not proven HTTP prompt input. Opaque or unresolved shell flow emits
 `analysis-run-dataflow-unknown`; this bounded parser is not a general shell
 dataflow analysis.
 
+A direct AI CLI may be preceded by literal shell `NAME=VALUE` assignments or
+launched through `env`. Assignment values are not prompt arguments: dynamic
+values produce `analysis-run-dataflow-unknown` unless the CLI command itself
+proves the source reaches its prompt. A nested `sh -c`/`bash -c` agent command
+is unresolved, not a proven direct sink.
+
 The candidate recognizes documented hosted-agent creation/follow-up routes
 only when a direct `curl` command sends POST. GET list/status calls and URL
 mentions are not agent usage. A hosted HTTP dispatch does not receive
