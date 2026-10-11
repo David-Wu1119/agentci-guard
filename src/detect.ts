@@ -464,6 +464,14 @@ function shellCommandSegments(
   let separatorBefore = "";
   const push = (end: number, separator: string) => {
     const command = script.slice(start, end).trim();
+    if (
+      !command &&
+      separator === "\n" &&
+      ["&&", "||", "|", "|&"].includes(separatorBefore)
+    ) {
+      start = end + 1;
+      return;
+    }
     if (command)
       segments.push({ command, pipedInput: pipeline, separatorBefore });
     pipeline =
@@ -510,7 +518,9 @@ function shellCommandSegments(
       (index === 0 || /[\s;&|()]/.test(script[index - 1]))
     ) {
       const newline = script.indexOf("\n", index);
-      index = newline >= 0 ? newline - 1 : script.length;
+      push(index, newline >= 0 ? "\n" : "");
+      start = newline >= 0 ? newline + 1 : script.length;
+      index = newline >= 0 ? newline : script.length;
       continue;
     }
     // `2>&1` duplicates a file descriptor; its `&` is not a command boundary.
@@ -1024,21 +1034,55 @@ export function hasOpaqueAiShellFunction(value: string): boolean {
   );
 }
 
-/** A shell -c string may execute an agent, but its nested dataflow is opaque. */
+/** Shell-evaluated strings may execute an agent, but their dataflow is opaque. */
 function hasOpaqueAiShellCommand(
   value: string,
   matches: (body: string) => boolean,
 ): boolean {
-  // shortcut: one literal shell -c layer only; extend after measured misses.
+  // shortcut: common literal shell strings only, extend for measured dynamic misses.
   return shellExecutableSegments(value).some((segment) => {
     if (segment.reach === false) return false;
     const { commandWords } = envLaunchedCommand(shellWords(segment.command));
+    const evalWords =
+      commandWords[0]?.text === "builtin"
+        ? commandWords.slice(1)
+        : commandWords;
+    if (evalWords[0]?.text === "eval")
+      return matches(
+        evalWords
+          .slice(1)
+          .map((word) => word.text)
+          .join(" "),
+      );
+    if (
+      ![
+        "sh",
+        "bash",
+        "/bin/sh",
+        "/bin/bash",
+        "/usr/bin/sh",
+        "/usr/bin/bash",
+      ].includes(commandWords[0]?.text ?? "")
+    )
+      return false;
+    const args = commandWords.slice(1);
+    const commandIndex = args.findIndex((word) =>
+      /^-[A-Za-z]*c[A-Za-z]*$/.test(word.text),
+    );
+    if (commandIndex >= 0) return matches(args[commandIndex + 1]?.text ?? "");
+    const stdinIndex = args.findIndex((word) => word.text.startsWith("<<<"));
+    if (
+      stdinIndex >= 0 &&
+      args.slice(0, stdinIndex).every((word) => word.text.startsWith("-"))
+    )
+      return matches(
+        args[stdinIndex].text.slice(3) || args[stdinIndex + 1]?.text || "",
+      );
+    if (!args.every((word) => word.text.startsWith("-"))) return false;
+    const inputWords = shellWords(segment.pipedInput);
     return (
-      ["sh", "bash", "/bin/sh", "/bin/bash"].includes(
-        commandWords[0]?.text ?? "",
-      ) &&
-      commandWords[1]?.text === "-c" &&
-      matches(commandWords[2]?.text ?? "")
+      ["printf", "echo"].includes(inputWords[0]?.text ?? "") &&
+      inputWords.slice(1).some((word) => matches(word.text))
     );
   });
 }

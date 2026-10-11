@@ -168,9 +168,11 @@ agentci explain agentci/untrusted-ai-write-token
 
 Exit codes: `0` nothing at or above `--fail-on` (default `high`); `2` at least
 one finding at or above it; `1` scanner error — a parse failure or a bad input.
-An incomplete analysis is never reported as a clean one: unsupported constructs
-become diagnostics and set `analysis_complete: false`. The SARIF file carries
-the same fact — its run has an `invocation` with `executionSuccessful: false`
+Recognized unsupported constructs become diagnostics and set
+`analysis_complete: false`; the bounded shell matcher can still miss dynamically
+constructed commands, so `analysis_complete: true` is not proof of safety. When
+analysis is marked incomplete, SARIF carries that status: its run has an
+`invocation` with `executionSuccessful: false`
 and one `toolExecutionNotification` per diagnostic — so a SARIF consumer that
 only counts `results` still sees that the scan did not finish.
 

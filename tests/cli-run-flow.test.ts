@@ -281,6 +281,65 @@ describe("local CLI run-step input flow", () => {
     );
   });
 
+  it("preserves short-circuit gates and pipeline input across newlines", () => {
+    const dispatch = "claude -p fixed";
+    for (const run of [
+      `false &&\n${dispatch}`,
+      `true ||\n${dispatch}`,
+      `false && # skipped\n${dispatch}`,
+    ]) {
+      const result = scan(run);
+      expect(result.agent_usages).toEqual([]);
+      expect(result.findings).toEqual([]);
+      expect(result.analysis_complete).toBe(true);
+    }
+
+    for (const pipe of ["|", "|&"]) {
+      const piped = scan(
+        `printf "\${{ github.event.issue.body }}" ${pipe}\nclaude -p fixed`,
+      );
+      expect(piped.agent_usages).toHaveLength(1);
+      expect(piped.diagnostics.map((item) => item.code)).toContain(
+        "agentci/analysis-run-dataflow-unknown",
+      );
+      expect(piped.analysis_complete).toBe(false);
+    }
+  });
+
+  it("abstains on literal eval and shell-stdin agent execution", () => {
+    for (const run of [
+      'eval "claude -p fixed"',
+      'builtin eval "claude -p fixed"',
+      'bash <<< "claude -p fixed"',
+      'bash -s <<< "claude -p fixed"',
+      'bash -e <<< "claude -p fixed"',
+      'sh -s <<< "claude -p fixed"',
+      'bash -s -e <<< "claude -p fixed"',
+      'bash -lc "claude -p fixed"',
+      'bash --noprofile -c "claude -p fixed"',
+      String.raw`printf 'claude -p fixed\n' | bash`,
+      String.raw`printf 'claude -p fixed\n' | /usr/bin/bash`,
+    ]) {
+      const result = scan(run);
+      expect(result.agent_usages).toEqual([]);
+      expect(result.findings).toEqual([]);
+      expect(result.diagnostics.map((item) => item.code)).toContain(
+        "agentci/analysis-run-dataflow-unknown",
+      );
+      expect(result.analysis_complete).toBe(false);
+    }
+    for (const run of [
+      'eval "echo claude -p fixed"',
+      'bash <<< "echo claude -p fixed"',
+      String.raw`printf 'claude -p fixed\n' | cat`,
+    ]) {
+      const result = scan(run);
+      expect(result.agent_usages).toEqual([]);
+      expect(result.diagnostics).toEqual([]);
+      expect(result.analysis_complete).toBe(true);
+    }
+  });
+
   it("does not assert prompt input from an unused inherited environment value", () => {
     const result = scan(
       "claude -p fixed",

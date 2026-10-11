@@ -503,7 +503,7 @@ function analyzeWorkflow(
           job: jobName,
           line: stepLine,
           message:
-            "A possible AI call inside command substitution, shell -c, or a shell function could not be attributed to a direct executable command.",
+            "A possible AI call inside command substitution, a shell-evaluated string, or a shell function could not be attributed to a direct executable command.",
         });
       }
       const httpOnly =

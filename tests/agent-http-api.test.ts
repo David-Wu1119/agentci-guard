@@ -229,6 +229,19 @@ jobs:
     expect(nestedShell.diagnostics.map((item) => item.code)).toContain(
       "agentci/analysis-run-dataflow-unknown",
     );
+    for (const run of [
+      `eval '${dispatch}'`,
+      `bash <<< '${dispatch}'`,
+      String.raw`printf '%s\n' '${dispatch}' | bash`,
+    ]) {
+      const result = scanRun(run);
+      expect(result.agent_usages).toEqual([]);
+      expect(result.findings).toEqual([]);
+      expect(result.analysis_complete).toBe(false);
+      expect(result.diagnostics.map((item) => item.code)).toContain(
+        "agentci/analysis-run-dataflow-unknown",
+      );
+    }
     const nestedSubstitution = scanRun(`result=$(bash -c '${dispatch}')`);
     expect(nestedSubstitution.agent_usages).toEqual([]);
     expect(nestedSubstitution.analysis_complete).toBe(false);

@@ -7804,6 +7804,10 @@ function shellCommandSegments(value) {
   let separatorBefore = "";
   const push = (end, separator) => {
     const command = script.slice(start, end).trim();
+    if (!command && separator === "\n" && ["&&", "||", "|", "|&"].includes(separatorBefore)) {
+      start = end + 1;
+      return;
+    }
     if (command)
       segments.push({ command, pipedInput: pipeline, separatorBefore });
     pipeline = separator === "|" || separator === "|&" ? [pipeline, command].filter(Boolean).join("\n") : "";
@@ -7842,7 +7846,9 @@ function shellCommandSegments(value) {
     }
     if (character === "#" && (index === 0 || /[\s;&|()]/.test(script[index - 1]))) {
       const newline = script.indexOf("\n", index);
-      index = newline >= 0 ? newline - 1 : script.length;
+      push(index, newline >= 0 ? "\n" : "");
+      start = newline >= 0 ? newline + 1 : script.length;
+      index = newline >= 0 ? newline : script.length;
       continue;
     }
     if (character === "&" && script[index - 1] === ">") continue;
@@ -8215,9 +8221,33 @@ function hasOpaqueAiShellCommand(value, matches) {
   return shellExecutableSegments(value).some((segment) => {
     if (segment.reach === false) return false;
     const { commandWords } = envLaunchedCommand(shellWords(segment.command));
-    return ["sh", "bash", "/bin/sh", "/bin/bash"].includes(
-      commandWords[0]?.text ?? ""
-    ) && commandWords[1]?.text === "-c" && matches(commandWords[2]?.text ?? "");
+    const evalWords = commandWords[0]?.text === "builtin" ? commandWords.slice(1) : commandWords;
+    if (evalWords[0]?.text === "eval")
+      return matches(
+        evalWords.slice(1).map((word) => word.text).join(" ")
+      );
+    if (![
+      "sh",
+      "bash",
+      "/bin/sh",
+      "/bin/bash",
+      "/usr/bin/sh",
+      "/usr/bin/bash"
+    ].includes(commandWords[0]?.text ?? ""))
+      return false;
+    const args = commandWords.slice(1);
+    const commandIndex = args.findIndex(
+      (word) => /^-[A-Za-z]*c[A-Za-z]*$/.test(word.text)
+    );
+    if (commandIndex >= 0) return matches(args[commandIndex + 1]?.text ?? "");
+    const stdinIndex = args.findIndex((word) => word.text.startsWith("<<<"));
+    if (stdinIndex >= 0 && args.slice(0, stdinIndex).every((word) => word.text.startsWith("-")))
+      return matches(
+        args[stdinIndex].text.slice(3) || args[stdinIndex + 1]?.text || ""
+      );
+    if (!args.every((word) => word.text.startsWith("-"))) return false;
+    const inputWords = shellWords(segment.pipedInput);
+    return ["printf", "echo"].includes(inputWords[0]?.text ?? "") && inputWords.slice(1).some((word) => matches(word.text));
   });
 }
 function hasOpaqueAiCliShellCommand(value) {
@@ -9287,7 +9317,7 @@ function analyzeWorkflow(workflow, repository, context) {
           file,
           job: jobName,
           line: stepLine,
-          message: "A possible AI call inside command substitution, shell -c, or a shell function could not be attributed to a direct executable command."
+          message: "A possible AI call inside command substitution, a shell-evaluated string, or a shell function could not be attributed to a direct executable command."
         });
       }
       const httpOnly = httpDispatches.length > 0 && !stepUsesAiCli && !stepUsesAiAction;
