@@ -109,7 +109,13 @@ for (const [index, packet] of packets.entries()) {
   const rows = csvObjects(csvText);
   if (rows.length !== context.registry.size)
     throw new Error(`Pass ${index + 1} has incomplete annotation CSV.`);
+  const seenUnits = new Set();
   for (const row of rows) {
+    if (seenUnits.has(row.unit_id))
+      throw new Error(
+        `Pass ${index + 1} CSV contains duplicate unit ${row.unit_id}.`,
+      );
+    seenUnits.add(row.unit_id);
     const registry = context.registry.get(row.unit_id);
     if (!registry) throw new Error(`Unknown candidate unit ${row.unit_id}.`);
     for (const field of [
