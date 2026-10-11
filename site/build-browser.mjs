@@ -18,15 +18,13 @@ await build({
         build.onResolve({ filter: /^node:path$/ }, () => ({
           path: browserPath,
         }));
-        build.onResolve(
-          { filter: /^(node:fs\/promises|fast-glob)$/ },
-          ({ path }) => ({ path, namespace: "node-only" }),
-        );
-        build.onLoad({ filter: /.*/, namespace: "node-only" }, ({ path }) => ({
+        build.onResolve({ filter: /^node:fs\/promises$/ }, ({ path }) => ({
+          path,
+          namespace: "node-only",
+        }));
+        build.onLoad({ filter: /.*/, namespace: "node-only" }, () => ({
           contents:
-            path === "fast-glob"
-              ? 'export default async function () { throw new Error("Browser filesystem unavailable"); }'
-              : 'export default new Proxy({}, { get() { throw new Error("Browser filesystem unavailable"); } });',
+            'export default new Proxy({}, { get() { throw new Error("Browser filesystem unavailable"); } });',
           loader: "js",
         }));
       },

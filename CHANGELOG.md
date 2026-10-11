@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Replaced the scanner's fixed `fast-glob` pattern with direct workflow-directory
+  enumeration, removing the vulnerable `braces` dependency chain without
+  changing the intended one-level `.yml`/`.yaml` discovery contract. Pinned
+  patched `source-map-js` and `fast-uri` releases and aligned Vitest with its
+  coverage plugin. Directory and symlink behavior is covered by a regression
+  test.
+
 ## [0.6.2] - 2026-09-09
 
 ### Fixed

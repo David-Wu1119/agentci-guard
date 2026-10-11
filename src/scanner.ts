@@ -1,6 +1,5 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import fg from "fast-glob";
 import YAML from "yaml";
 import { loadConfig, matchesPath, parseInlineIgnores } from "./config.js";
 import type { AgentciConfig } from "./config.js";
@@ -186,15 +185,17 @@ export function scanWorkflowFiles(
 }
 
 export async function loadWorkflowFiles(root: string): Promise<WorkflowFile[]> {
-  const entries = await fg([".github/workflows/*.{yml,yaml}"], {
-    cwd: root,
-    dot: true,
-    absolute: true,
-    followSymbolicLinks: false,
-    onlyFiles: true,
-  });
+  const directory = path.resolve(root, ".github/workflows");
+  let entries: string[];
+  try {
+    entries = await fs.readdir(directory);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw error;
+  }
   const workflows: WorkflowFile[] = [];
-  for (const file of entries.sort()) {
+  for (const name of entries.filter((name) => /\.ya?ml$/.test(name)).sort()) {
+    const file = path.join(directory, name);
     const metadata = await fs.lstat(file);
     if (!metadata.isFile() || metadata.isSymbolicLink()) continue;
     const raw = await fs.readFile(file, "utf8");

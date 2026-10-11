@@ -74,14 +74,14 @@
   "packageManager": "pnpm@10.11.0",
   "pnpm": {
     "overrides": {
-      "fast-uri": "^3.1.5",
+      "fast-uri": "^3.1.8",
       "postcss": "8.5.26",
+      "source-map-js": "1.2.2",
       "vite": "8.1.5"
     }
   },
   "dependencies": {
     "commander": "^14.0.2",
-    "fast-glob": "^3.3.3",
     "picocolors": "^1.1.1",
     "yaml": "^2.8.2"
   },
@@ -98,6 +98,6 @@
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vite": "8.1.5",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   }
 }

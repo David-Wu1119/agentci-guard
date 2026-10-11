@@ -1,6 +1,10 @@
+import fs from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import YAML from "yaml";
 import {
+  loadWorkflowFiles,
   scanRepository,
   scanWorkflow,
   toSarif,
@@ -8,6 +12,50 @@ import {
 } from "../src/index.js";
 
 describe("scanRepository", () => {
+  it("loads direct regular workflow files in order, excluding file symlinks", async () => {
+    const root = await fs.mkdtemp(path.join(tmpdir(), "agentci-workflows-"));
+    try {
+      expect(await loadWorkflowFiles(root)).toEqual([]);
+      const directory = path.join(root, ".github/workflows");
+      await fs.mkdir(path.join(directory, "nested"), { recursive: true });
+      for (const name of ["b.yaml", "a.yml", ".hidden.yml"]) {
+        await fs.writeFile(path.join(directory, name), "on: push\njobs: {}\n");
+      }
+      await fs.writeFile(
+        path.join(directory, "nested", "skip.yml"),
+        "on: push\njobs: {}\n",
+      );
+      await fs.symlink(
+        path.join(directory, "a.yml"),
+        path.join(directory, "link.yml"),
+      );
+
+      expect(
+        (await loadWorkflowFiles(root)).map((workflow) =>
+          path.basename(workflow.path),
+        ),
+      ).toEqual([".hidden.yml", "a.yml", "b.yaml"]);
+
+      const aliasRoot = path.join(root, "alias");
+      await fs.mkdir(path.join(aliasRoot, ".github"), { recursive: true });
+      await fs.symlink(directory, path.join(aliasRoot, ".github", "workflows"));
+      expect(
+        (await loadWorkflowFiles(aliasRoot)).map((workflow) =>
+          path.basename(workflow.path),
+        ),
+      ).toEqual([".hidden.yml", "a.yml", "b.yaml"]);
+
+      const malformedRoot = path.join(root, "malformed");
+      await fs.mkdir(path.join(malformedRoot, ".github"), { recursive: true });
+      await fs.writeFile(path.join(malformedRoot, ".github/workflows"), "");
+      await expect(loadWorkflowFiles(malformedRoot)).rejects.toMatchObject({
+        code: "ENOTDIR",
+      });
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("detects unsafe AI-agent workflow patterns", async () => {
     const result = await scanRepository("tests/fixtures");
     const rules = new Set(result.findings.map((finding) => finding.rule_id));
