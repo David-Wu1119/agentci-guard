@@ -14,6 +14,7 @@ const findings = document.getElementById('scan-findings');
 const diagnostics = document.getElementById('scan-diagnostics');
 const scanButton = document.getElementById('scan-button');
 let inputRevision = 0;
+let sourceLabel = 'pasted YAML';
 
 function resetResults(message) {
   heading.textContent = 'Ready to scan';
@@ -59,7 +60,7 @@ function renderResult(result) {
     const title = document.createElement('h5');
     title.textContent = `${usage.job} / ${usage.step}`;
     item.append(title);
-    addDetail(item, 'Location', `${usage.file}:${usage.line}`);
+    addDetail(item, 'Virtual location', `${usage.file}:${usage.line}`);
     addDetail(item, 'Evidence', usage.evidence);
     addDetail(item, 'Reachable events', usage.reachable_events.join(', '));
     agentUsages.append(item);
@@ -78,7 +79,7 @@ function renderResult(result) {
     title.textContent = `${finding.severity.toUpperCase()} · ${finding.title}`;
     item.append(title);
     addDetail(item, 'Rule', finding.rule_id);
-    addDetail(item, 'Location', `${finding.file}${finding.line ? `:${finding.line}` : ''}`);
+    addDetail(item, 'Virtual location', `${finding.file}${finding.line ? `:${finding.line}` : ''}`);
     addDetail(item, 'Finding', finding.message);
     addDetail(item, 'Why', finding.why);
     addDetail(item, 'Evidence', finding.evidence);
@@ -96,7 +97,7 @@ function renderResult(result) {
   for (const diagnostic of result.diagnostics) {
     const item = document.createElement('li');
     addDetail(item, 'Diagnostic', `${diagnostic.severity.toUpperCase()} · ${diagnostic.code}`);
-    addDetail(item, 'Location', `${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ''}`);
+    addDetail(item, 'Virtual location', `${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ''}`);
     addDetail(item, 'Message', diagnostic.message);
     diagnostics.append(item);
   }
@@ -107,8 +108,8 @@ function renderResult(result) {
   }
 
   const count = result.findings.length;
-  heading.textContent = `${count} finding${count === 1 ? '' : 's'}`;
-  status.textContent = `Scanner v${scanWorkflow.version}: ${result.agent_usages.length} recognized agent-use step${result.agent_usages.length === 1 ? '' : 's'}; ${result.analysis_complete ? 'analysis complete' : 'analysis incomplete'} for this one-file input.`;
+  heading.textContent = `${count} finding${count === 1 ? '' : 's'} for ${sourceLabel}`;
+  status.textContent = `Scanner v${scanWorkflow.version}: ${result.agent_usages.length} recognized agent-use step${result.agent_usages.length === 1 ? '' : 's'}; ${result.analysis_complete ? 'analysis complete' : 'analysis incomplete'} for ${sourceLabel}. Locations below are virtual scanner paths.`;
   completeness.textContent = result.analysis_complete
     ? 'analysis_complete: true. This covers only supported static checks for the supplied file; it does not validate the full GitHub Actions schema or guarantee security.'
     : 'analysis_complete: false. The diagnostics below identify unsupported or failed analysis; do not treat this as a clean scan.';
@@ -119,12 +120,18 @@ function renderResult(result) {
 
 yaml.addEventListener('input', () => {
   inputRevision++;
+  sourceLabel = 'pasted YAML';
+  fileInput.value = '';
   resetResults('Input changed. Scan again to see current results.');
 });
 
 document.getElementById('load-example').addEventListener('click', () => {
+  const sample = document.querySelector('#research pre code').textContent;
+  const hasDifferentInput = (yaml.value.trim() && yaml.value !== sample) || fileInput.files?.length;
+  if (hasDifferentInput && !window.confirm('Replace the current workflow or selected file with the published sample?')) return;
   inputRevision++;
-  yaml.value = document.querySelector('#research pre code').textContent;
+  yaml.value = sample;
+  sourceLabel = 'published sample';
   fileInput.value = '';
   resetResults('Published synthetic sample loaded. Select Scan workflow to analyze it.');
   yaml.focus();
@@ -133,6 +140,10 @@ document.getElementById('load-example').addEventListener('click', () => {
 fileInput.addEventListener('change', async () => {
   const file = fileInput.files?.[0];
   if (!file) return;
+  if (yaml.value.trim() && !window.confirm('Replace the current workflow with the selected file?')) {
+    fileInput.value = '';
+    return;
+  }
   const revision = ++inputRevision;
   const restoreFileFocus = document.activeElement === fileInput;
   scanButton.disabled = true;
@@ -150,6 +161,7 @@ fileInput.addEventListener('change', async () => {
     if (raw.length > maxChars) throw new RangeError('File has too many characters.');
     if (revision !== inputRevision) return;
     yaml.value = raw;
+    sourceLabel = file.name;
     status.textContent = `${file.name} loaded locally. Select Scan workflow to analyze it.`;
   } catch (cause) {
     if (revision !== inputRevision) return;
