@@ -49,7 +49,7 @@ export function renderTextReport(result: ScanResult): string {
     lines.push("Diagnostics:");
     for (const diagnostic of result.diagnostics) {
       lines.push(
-        `- [${diagnostic.kind.toUpperCase()}] ${diagnostic.code} ${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ""}: ${diagnostic.message}`,
+        `- [${diagnostic.kind.toUpperCase()}] ${diagnostic.code} ${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ""}${diagnostic.step_index === undefined ? "" : ` [step_index=${diagnostic.step_index}]`}: ${diagnostic.message}`,
       );
     }
   }
@@ -77,7 +77,7 @@ export function renderMarkdownReport(result: ScanResult): string {
           "",
           ...result.diagnostics.map(
             (diagnostic) =>
-              `- **${diagnostic.code}** — ${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ""}: ${diagnostic.message}`,
+              `- **${diagnostic.code}** — ${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ""}${diagnostic.step_index === undefined ? "" : ` [step_index=${diagnostic.step_index}]`}: ${diagnostic.message}`,
           ),
           "",
         ]

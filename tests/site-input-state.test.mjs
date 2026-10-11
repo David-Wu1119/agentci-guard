@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 
-function browserPage(hasScanner = true) {
+function browserPage(hasScanner = true, scanDiagnostics = []) {
   const makeElement = () => ({
     value: "",
     textContent: "",
@@ -59,7 +59,7 @@ function browserPage(hasScanner = true) {
         message: "Test",
       },
     ],
-    diagnostics: [],
+    diagnostics: scanDiagnostics,
     analysis_complete: true,
   });
   scan.version = "test";
@@ -97,6 +97,27 @@ function browserPage(hasScanner = true) {
 }
 
 describe("browser workflow input", () => {
+  it("shows the zero-based step index for a step-level diagnostic", () => {
+    const page = browserPage(true, [
+      {
+        code: "agentci/analysis-agent-event-unknown",
+        severity: "warning",
+        file: ".github/workflows/input.yml",
+        line: 5,
+        step_index: 0,
+        message: "Unknown Action event path",
+      },
+    ]);
+    const get = (id) => page.elements.get(id);
+    get("workflow-yaml").value = "on: discussion_comment\n";
+    get("scan-button").listeners.click();
+    const details = get("scan-diagnostics")
+      .children[0].children.flatMap((line) => line.children)
+      .map((node) => node.textContent)
+      .join(" ");
+    expect(details).toMatch(/Step index:\s+0/);
+  });
+
   it("fails closed with a refresh instruction when the scanner script is unavailable", () => {
     const page = browserPage(false);
     const get = (id) => page.elements.get(id);

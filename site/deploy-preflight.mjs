@@ -9,7 +9,6 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 const assets = [
   "index.html",
   "styles.css",
-  "app.js",
   "_headers",
   "THIRD_PARTY_LICENSES.txt",
 ];
@@ -68,7 +67,17 @@ export async function checkDeployReadiness({
     `scanner-browser.${manifest[scannerName]}.js`,
     "Scanner filename must match its manifest SHA-256",
   );
-  const builtAssets = [...assets, scannerName];
+  const appNames = Object.keys(manifest).filter((name) =>
+    /^app\.[a-f0-9]{64}\.js$/.test(name),
+  );
+  assert.equal(appNames.length, 1, "Build must contain one app filename");
+  const appName = appNames[0];
+  assert.equal(
+    appName,
+    `app.${manifest[appName]}.js`,
+    "App filename must match its manifest SHA-256",
+  );
+  const builtAssets = [...assets, scannerName, appName];
   assert.deepEqual(
     Object.keys(manifest).sort(),
     builtAssets.sort(),

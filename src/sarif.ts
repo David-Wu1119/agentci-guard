@@ -105,6 +105,9 @@ function toNotification(diagnostic: Diagnostic): SarifNotification {
     properties: {
       "agentci/kind": diagnostic.kind,
       ...(diagnostic.job ? { "agentci/job": diagnostic.job } : {}),
+      ...(diagnostic.step_index === undefined
+        ? {}
+        : { "agentci/stepIndex": diagnostic.step_index }),
     },
   };
 }

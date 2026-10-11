@@ -42,6 +42,27 @@ async function repoWith(files: Record<string, string>): Promise<string> {
 }
 
 describe("SARIF carries completeness and diagnostics", () => {
+  it("preserves step identity for same-line notifications", () => {
+    const diagnostics = [0, 1].map((step_index) => ({
+      code: "agentci/analysis-agent-event-unknown",
+      kind: "analysis" as const,
+      severity: "warning" as const,
+      file: ".github/workflows/agent.yml",
+      job: "agent",
+      line: 5,
+      step_index,
+      message: "Action event support is unknown",
+    }));
+    const notifications = toSarif({
+      findings: [],
+      diagnostics,
+      analysis_complete: false,
+    }).runs[0].invocations?.[0]?.toolExecutionNotifications;
+    expect(
+      notifications?.map((item) => item.properties?.["agentci/stepIndex"]),
+    ).toEqual([0, 1]);
+  });
+
   it("marks an incomplete zero-finding scan as unsuccessful with a notification", async () => {
     const root = await repoWith({ "ci.yml": REMOTE_REUSABLE });
     const result = await scanRepository(root);

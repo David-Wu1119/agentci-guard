@@ -78,6 +78,34 @@ describe("Markdown report", () => {
 });
 
 describe("text report", () => {
+  it("distinguishes step diagnostics that share one YAML line", () => {
+    const result = {
+      scanned_at: "2026-01-01T00:00:00.000Z",
+      root: ".",
+      workflow_count: 1,
+      agent_usages: [],
+      findings: [],
+      summary: { critical: 0, high: 0, medium: 0, low: 0 },
+      diagnostics: [0, 1].map((step_index) => ({
+        code: "agentci/analysis-agent-event-unknown",
+        kind: "analysis" as const,
+        severity: "warning" as const,
+        file: "wf.yml",
+        line: 5,
+        step_index,
+        message: "Unknown Action event path",
+      })),
+      analysis_complete: false,
+    };
+    for (const report of [
+      renderTextReport(result),
+      renderMarkdownReport(result),
+    ]) {
+      expect(report).toContain("wf.yml:5 [step_index=0]");
+      expect(report).toContain("wf.yml:5 [step_index=1]");
+    }
+  });
+
   it("labels every severity level", () => {
     const base = {
       scanned_at: "2026-01-01T00:00:00.000Z",

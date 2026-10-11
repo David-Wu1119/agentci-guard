@@ -14,10 +14,16 @@ const scannerNames = Object.keys(manifest).filter((name) =>
 assert.equal(scannerNames.length, 1, "Build must contain one scanner filename");
 const scannerName = scannerNames[0];
 assert.equal(scannerName, `scanner-browser.${manifest[scannerName]}.js`);
+const appNames = Object.keys(manifest).filter((name) =>
+  /^app\.[a-f0-9]{64}\.js$/.test(name),
+);
+assert.equal(appNames.length, 1, "Build must contain one app filename");
+const appName = appNames[0];
+assert.equal(appName, `app.${manifest[appName]}.js`);
 const assets = [
   "index.html",
   "styles.css",
-  "app.js",
+  appName,
   scannerName,
   "THIRD_PARTY_LICENSES.txt",
 ];
@@ -40,7 +46,7 @@ for (const name of assets) {
   const assetUrl =
     name === "index.html"
       ? "."
-      : ["styles.css", "app.js"].includes(name)
+      : name === "styles.css"
         ? `${name}?v=${manifest[name]}`
         : name;
   const response = await fetch(new URL(assetUrl, base), {

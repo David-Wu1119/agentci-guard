@@ -9,10 +9,14 @@ const scannerName = Object.keys(manifest).find((name) =>
   /^scanner-browser\.[a-f0-9]{64}\.js$/.test(name),
 );
 assert.ok(scannerName);
+const appName = Object.keys(manifest).find((name) =>
+  /^app\.[a-f0-9]{64}\.js$/.test(name),
+);
+assert.ok(appName);
 const servedFiles = new Set(
   Object.keys(manifest).filter((name) => name !== "_headers"),
 );
-let tamperScanner = false;
+let tamperedAsset = "";
 const server = createServer(async (request, response) => {
   const name =
     new URL(request.url, "http://localhost").pathname.slice(1) || "index.html";
@@ -38,7 +42,7 @@ const server = createServer(async (request, response) => {
     );
     const bytes = await fs.readFile(new URL(`./dist/${name}`, import.meta.url));
     response.end(
-      tamperScanner && name === scannerName
+      tamperedAsset === name
         ? Buffer.concat([bytes, Buffer.from("\n// tampered")])
         : bytes,
     );
@@ -145,7 +149,7 @@ const scanner = await evaluate(
 );
 assert.equal(scanner.ready, true);
 assert.equal(scanner.maxChars, 250000);
-for (const name of ["styles.css", "app.js"])
+for (const name of ["styles.css"])
   assert.ok(
     requests.includes(new URL(`${name}?v=${manifest[name]}`, siteUrl).href),
     `${name} did not load from its content-versioned URL`,
@@ -153,6 +157,10 @@ for (const name of ["styles.css", "app.js"])
 assert.ok(
   requests.includes(new URL(scannerName, siteUrl).href),
   "The content-addressed scanner did not load",
+);
+assert.ok(
+  requests.includes(new URL(appName, siteUrl).href),
+  "The content-addressed result renderer did not load",
 );
 assert.match(
   scanner.source,
@@ -186,7 +194,7 @@ assert.ok(
 );
 assert.match(
   sample.status,
-  /content-addressed scanner script checked by the browser; compare separately with the published Action\/CLI/,
+  /scanner and renderer scripts checked by the browser; compare separately with the published Action\/CLI/,
 );
 assert.doesNotMatch(sample.status, /Scanner v[0-9]/);
 assert.match(sample.complete, /analysis_complete: true/);
@@ -550,7 +558,7 @@ console.log(
   "PASS: five responsive widths; real scanner, errors, file input, keyboard focus and three illustrative controls; no browser exceptions or external asset requests. Desktop/mobile screenshots saved.",
 );
 await send("Network.setCacheDisabled", { cacheDisabled: true });
-tamperScanner = true;
+tamperedAsset = scannerName;
 const priorResponses = responses.length;
 await send("Page.navigate", { url: `${siteUrl}?sri-check=1` });
 for (let attempt = 0; attempt < 50; attempt++) {
@@ -573,6 +581,35 @@ assert.match(
 );
 console.log(
   "PASS: browser rejected a tampered scanner with SRI and failed closed.",
+);
+tamperedAsset = appName;
+const priorRendererResponses = responses.length;
+await send("Page.navigate", { url: `${siteUrl}?sri-check=2` });
+for (let attempt = 0; attempt < 50; attempt++) {
+  if ((await evaluate("document.readyState")) === "complete") break;
+  await new Promise((resolve) => setTimeout(resolve, 100));
+}
+assert.ok(
+  responses
+    .slice(priorRendererResponses)
+    .some(
+      ({ url, status }) =>
+        url === new URL(appName, siteUrl).href && status === 200,
+    ),
+  "Tampered renderer must be served over HTTP for the SRI check",
+);
+assert.equal(await evaluate("typeof window.agentciScanWorkflow"), "function");
+await evaluate('document.getElementById("scan-button").click()');
+assert.equal(
+  await evaluate('document.getElementById("scan-output").hidden'),
+  true,
+);
+assert.match(
+  await evaluate('document.getElementById("scan-status").textContent'),
+  /Load the sample or paste a workflow/,
+);
+console.log(
+  "PASS: browser rejected a tampered renderer with SRI; no scan ran.",
 );
 socket.close();
 await new Promise((resolve) => server.close(resolve));

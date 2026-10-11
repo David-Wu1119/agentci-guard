@@ -10,10 +10,13 @@ for name in files:
     shutil.copyfile(root/'src'/name,dest/name)
 
 subprocess.run(['node','site/build-browser.mjs'],cwd=root.parent,check=True)
+app_digest=hashlib.sha256((dest/'app.js').read_bytes()).hexdigest()
+app_name=f'app.{app_digest}.js'
+(dest/'app.js').rename(dest/app_name)
 digest=hashlib.sha256((dest/'scanner-browser.js').read_bytes()).hexdigest()
 scanner_name=f'scanner-browser.{digest}.js'
 (dest/'scanner-browser.js').rename(dest/scanner_name)
-generated=(scanner_name,'THIRD_PARTY_LICENSES.txt')
+output_files=('index.html','styles.css',app_name,'_headers',scanner_name,'THIRD_PARTY_LICENSES.txt')
 source_commit='';clean=False
 try:
     git_root=Path(subprocess.check_output(['git','rev-parse','--show-toplevel'],cwd=root.parent,text=True,stderr=subprocess.DEVNULL).strip()).resolve()
@@ -34,14 +37,15 @@ for placeholder,value in (
 ):
     assert html.count(placeholder)==1,placeholder
     html=html.replace(placeholder,value)
-for name in ('styles.css','app.js'):
+for name in ('styles.css',):
     reference=f'"{name}"'
     assert html.count(reference)==1,name
     version=hashlib.sha256((dest/name).read_bytes()).hexdigest()
     html=html.replace(reference,f'"{name}?v={version}"')
-assert html.count('"scanner-browser.js"')==1
-integrity=base64.b64encode(bytes.fromhex(digest)).decode()
-html=html.replace('"scanner-browser.js"',f'"{scanner_name}" integrity="sha256-{integrity}"')
+for source_name,output_name,version in (('app.js',app_name,app_digest),('scanner-browser.js',scanner_name,digest)):
+    assert html.count(f'"{source_name}"')==1
+    integrity=base64.b64encode(bytes.fromhex(version)).decode()
+    html=html.replace(f'"{source_name}"',f'"{output_name}" integrity="sha256-{integrity}"')
 (dest/'index.html').write_text(html)
 notices=[]
 for name in ('yaml','pathe'):
@@ -50,11 +54,11 @@ for name in ('yaml','pathe'):
     notices.append(f"{name} {metadata['version']} ({metadata['license']})\n\n{(package/'LICENSE').read_text().strip()}\n")
 (dest/'THIRD_PARTY_LICENSES.txt').write_text('\n'.join(notices))
 
-assert {item.name for item in dest.iterdir()} == set(files+generated)
-for name in files+generated:
+assert {item.name for item in dest.iterdir()} == set(output_files)
+for name in output_files:
     data=(dest/name).read_bytes()
     for forbidden in (b'/Users/',b'libfile_',b'sediment://',b'd5a515',b'f5573e',b'PRIVATE KEY',b'api_key='):
         assert forbidden not in data,(name,forbidden)
-manifest={name:hashlib.sha256((dest/name).read_bytes()).hexdigest() for name in files+generated}
+manifest={name:hashlib.sha256((dest/name).read_bytes()).hexdigest() for name in output_files}
 (root/'BUILD_MANIFEST.json').write_text(json.dumps(manifest,indent=2)+'\n')
 print('Built six allowlisted public assets:',dest)

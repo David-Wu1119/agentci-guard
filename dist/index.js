@@ -10606,7 +10606,7 @@ function renderTextReport(result) {
     lines.push("Diagnostics:");
     for (const diagnostic of result.diagnostics) {
       lines.push(
-        `- [${diagnostic.kind.toUpperCase()}] ${diagnostic.code} ${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ""}: ${diagnostic.message}`
+        `- [${diagnostic.kind.toUpperCase()}] ${diagnostic.code} ${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ""}${diagnostic.step_index === void 0 ? "" : ` [step_index=${diagnostic.step_index}]`}: ${diagnostic.message}`
       );
     }
   }
@@ -10630,7 +10630,7 @@ function renderMarkdownReport(result) {
       "## Diagnostics",
       "",
       ...result.diagnostics.map(
-        (diagnostic) => `- **${diagnostic.code}** \u2014 ${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ""}: ${diagnostic.message}`
+        (diagnostic) => `- **${diagnostic.code}** \u2014 ${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ""}${diagnostic.step_index === void 0 ? "" : ` [step_index=${diagnostic.step_index}]`}: ${diagnostic.message}`
       ),
       ""
     ] : [],
@@ -10742,7 +10742,8 @@ function toNotification(diagnostic) {
     ],
     properties: {
       "agentci/kind": diagnostic.kind,
-      ...diagnostic.job ? { "agentci/job": diagnostic.job } : {}
+      ...diagnostic.job ? { "agentci/job": diagnostic.job } : {},
+      ...diagnostic.step_index === void 0 ? {} : { "agentci/stepIndex": diagnostic.step_index }
     }
   };
 }

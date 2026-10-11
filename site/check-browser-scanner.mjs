@@ -27,24 +27,32 @@ const html = await fs.readFile(
   new URL("./dist/index.html", import.meta.url),
   "utf8",
 );
+const appNames = Object.keys(buildManifest).filter((name) =>
+  /^app\.[a-f0-9]{64}\.js$/.test(name),
+);
+assert.equal(appNames.length, 1, "Expected one content-addressed renderer");
+const appName = appNames[0];
+const appDigest = createHash("sha256")
+  .update(await fs.readFile(new URL(`./dist/${appName}`, import.meta.url)))
+  .digest("hex");
+assert.equal(appName, `app.${appDigest}.js`);
+assert.equal(buildManifest[appName], appDigest);
+assert.ok(
+  html.includes(
+    `<script src="${appName}" integrity="sha256-${Buffer.from(appDigest, "hex").toString("base64")}" defer></script>`,
+  ),
+);
 assert.ok(
   html.includes(
     `<script src="${scannerName}" integrity="sha256-${Buffer.from(digest, "hex").toString("base64")}" defer></script>`,
   ),
 );
-for (const [name, tag] of [
-  ["styles.css", "link"],
-  ["app.js", "script"],
-]) {
+for (const name of ["styles.css"]) {
   const bytes = await fs.readFile(new URL(`./dist/${name}`, import.meta.url));
   const version = createHash("sha256").update(bytes).digest("hex");
   const reference = `${name}?v=${version}`;
   assert.ok(
-    html.includes(
-      tag === "link"
-        ? `<link rel="stylesheet" href="${reference}">`
-        : `<script src="${reference}" defer></script>`,
-    ),
+    html.includes(`<link rel="stylesheet" href="${reference}">`),
     `${name} must use its content hash in the page URL`,
   );
 }
@@ -160,7 +168,7 @@ assert.deepEqual(
 assert.equal(featuredResult.analysis_complete, true);
 assert.equal(featuredResult.diagnostics.length, 0);
 assert.match(
-  await fs.readFile(new URL("./dist/app.js", import.meta.url), "utf8"),
+  await fs.readFile(new URL(`./dist/${appName}`, import.meta.url), "utf8"),
   /allowed_non_write_users requires an explicit github_token/,
 );
 assert.doesNotMatch(

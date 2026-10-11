@@ -9,7 +9,6 @@ const modulePath = new URL("../site/deploy-preflight.mjs", import.meta.url)
 const assets = [
   "index.html",
   "styles.css",
-  "app.js",
   "_headers",
   "THIRD_PARTY_LICENSES.txt",
 ];
@@ -25,6 +24,11 @@ async function fixture() {
     await writeFile(path.join(dist, asset), content);
     manifest[asset] = createHash("sha256").update(content).digest("hex");
   }
+  const appContent = "test app.js";
+  const appHash = createHash("sha256").update(appContent).digest("hex");
+  const appName = `app.${appHash}.js`;
+  await writeFile(path.join(dist, appName), appContent);
+  manifest[appName] = appHash;
   const scannerContent = "test scanner-browser.js";
   const scannerHash = createHash("sha256").update(scannerContent).digest("hex");
   const scannerName = `scanner-browser.${scannerHash}.js`;
@@ -104,7 +108,7 @@ describe("site deployment preflight", () => {
   });
 
   it("rejects a build that changed tracked files or has stale asset bytes", async () => {
-    const { root } = await fixture();
+    const { root, manifest } = await fixture();
     try {
       const { checkDeployReadiness } = await import(modulePath);
       const common = {
@@ -143,52 +147,56 @@ describe("site deployment preflight", () => {
                 : "b".repeat(40),
         }),
       ).rejects.toThrow(/HEAD.*changed|changed.*HEAD/i);
-      await writeFile(path.join(root, "site", "dist", "app.js"), "stale");
+      const appName = Object.keys(manifest).find((name) =>
+        name.startsWith("app."),
+      )!;
+      await writeFile(path.join(root, "site", "dist", appName), "stale");
       await expect(
         checkDeployReadiness({
           ...common,
           git: (...args: string[]) => (args[0] === "status" ? "" : sha),
         }),
-      ).rejects.toThrow(/app\.js/);
+      ).rejects.toThrow(/app\./);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
   });
 
-  it("rejects a scanner filename that does not match its bytes", async () => {
-    const { root, manifest } = await fixture();
-    try {
-      const { checkDeployReadiness } = await import(modulePath);
-      const scannerName = Object.keys(manifest).find((name) =>
-        name.startsWith("scanner-browser."),
-      )!;
-      const wrongName = `scanner-browser.${"b".repeat(64)}.js`;
-      await writeFile(
-        path.join(root, "site", "dist", wrongName),
-        "test scanner-browser.js",
-      );
-      delete manifest[scannerName];
-      manifest[wrongName] = createHash("sha256")
-        .update("test scanner-browser.js")
-        .digest("hex");
-      await writeFile(
-        path.join(root, "site", "BUILD_MANIFEST.json"),
-        `${JSON.stringify(manifest)}\n`,
-      );
-      await expect(
-        checkDeployReadiness({
-          root,
-          git: (...args: string[]) => (args[0] === "status" ? "" : sha),
-          build: () => {},
-          request: async () => ({
-            ok: true,
-            status: 200,
-            json: async () => ({ object: { sha } }),
+  it.each(["scanner-browser", "app"])(
+    "rejects a %s filename that does not match its bytes",
+    async (prefix) => {
+      const { root, manifest } = await fixture();
+      try {
+        const { checkDeployReadiness } = await import(modulePath);
+        const currentName = Object.keys(manifest).find((name) =>
+          name.startsWith(`${prefix}.`),
+        )!;
+        const wrongName = `${prefix}.${"b".repeat(64)}.js`;
+        const content = `test ${prefix}.js`;
+        await writeFile(path.join(root, "site", "dist", wrongName), content);
+        delete manifest[currentName];
+        manifest[wrongName] = createHash("sha256")
+          .update(content)
+          .digest("hex");
+        await writeFile(
+          path.join(root, "site", "BUILD_MANIFEST.json"),
+          `${JSON.stringify(manifest)}\n`,
+        );
+        await expect(
+          checkDeployReadiness({
+            root,
+            git: (...args: string[]) => (args[0] === "status" ? "" : sha),
+            build: () => {},
+            request: async () => ({
+              ok: true,
+              status: 200,
+              json: async () => ({ object: { sha } }),
+            }),
           }),
-        }),
-      ).rejects.toThrow(/scanner.*filename|filename.*scanner/i);
-    } finally {
-      await rm(root, { recursive: true, force: true });
-    }
-  });
+        ).rejects.toThrow(/filename/i);
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+    },
+  );
 });

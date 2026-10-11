@@ -98,6 +98,7 @@ function renderResult(result) {
     const item = document.createElement('li');
     addDetail(item, 'Diagnostic', `${diagnostic.severity.toUpperCase()} · ${diagnostic.code}`);
     addDetail(item, 'Virtual location', `${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ''}`);
+    addDetail(item, 'Step index', diagnostic.step_index);
     addDetail(item, 'Message', diagnostic.message);
     diagnostics.append(item);
   }
@@ -114,7 +115,7 @@ function renderResult(result) {
     : `Analysis incomplete${count ? ` — ${findingLabel}` : ''} for ${sourceLabel}`;
   const findingStatus = count ? `${findingLabel}; ` : '';
   const pageSource = document.querySelector('#scanner-source a')?.textContent ?? document.getElementById('scanner-source').textContent.trim();
-  status.textContent = `${result.agent_usages.length} recognized agent-use step${result.agent_usages.length === 1 ? '' : 's'}; ${findingStatus}${result.analysis_complete ? 'analysis complete' : 'analysis incomplete'} for ${sourceLabel}. Browser scanner trial (page build source: ${pageSource}; content-addressed scanner script checked by the browser; compare separately with the published Action/CLI). Locations below are virtual scanner paths.`;
+  status.textContent = `${result.agent_usages.length} recognized agent-use step${result.agent_usages.length === 1 ? '' : 's'}; ${findingStatus}${result.analysis_complete ? 'analysis complete' : 'analysis incomplete'} for ${sourceLabel}. Browser scanner trial (page build source: ${pageSource}; scanner and renderer scripts checked by the browser; compare separately with the published Action/CLI). Locations below are virtual scanner paths.`;
   completeness.textContent = result.analysis_complete
     ? 'analysis_complete: true. This covers only supported static checks for the supplied file; it does not validate the full GitHub Actions schema or guarantee security.'
     : 'analysis_complete: false. The diagnostics below identify unsupported or failed analysis; do not treat this as a clean scan.';
