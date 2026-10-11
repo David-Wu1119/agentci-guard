@@ -7648,7 +7648,7 @@ function looksLikeAiCli(value) {
   return aiCliInvocations(value).length > 0 || hasOpaqueAiCliSubstitution(value) || hasOpaqueAiCliShellCommand(value);
 }
 function looksLikeAiHttpDispatch(value) {
-  return aiHttpDispatches(value).length > 0;
+  return aiHttpDispatches(value).length > 0 || hasOpaqueAiHttpSubstitution(value) || hasOpaqueAiHttpShellCommand(value);
 }
 function shellWords(value) {
   const words = [];
@@ -7805,10 +7805,22 @@ function shellCommandSegments(value) {
   let quote = "";
   let escaped = false;
   let pipeline = "";
+  let separatorBefore = "";
   const push = (end, separator) => {
     const command = script.slice(start, end).trim();
-    if (command) segments.push({ command, pipedInput: pipeline });
+    if (!command && separator === "\n" && ["&&", "||", "|", "|&"].includes(separatorBefore)) {
+      start = end + 1;
+      return;
+    }
+    if (command || separator === ")")
+      segments.push({
+        command,
+        pipedInput: pipeline,
+        separatorBefore,
+        separatorAfter: separator
+      });
     pipeline = separator === "|" || separator === "|&" ? [pipeline, command].filter(Boolean).join("\n") : "";
+    separatorBefore = separator;
     start = end + separator.length;
   };
   for (let index = 0; index < script.length; index++) {
@@ -7841,7 +7853,31 @@ function shellCommandSegments(value) {
       index = end >= 0 ? end - 1 : script.length - 1;
       continue;
     }
+    if (character === "#" && (index === 0 || /[\s;&|()]/.test(script[index - 1]))) {
+      const newline = script.indexOf("\n", index);
+      push(index, newline >= 0 ? "\n" : "");
+      start = newline >= 0 ? newline + 1 : script.length;
+      index = newline >= 0 ? newline : script.length;
+      continue;
+    }
     if (character === "&" && script[index - 1] === ">") continue;
+    if (character === "(" || character === "\n") {
+      const prefix = script.slice(Math.max(start, script.lastIndexOf("{", index - 1) + 1), index).trim();
+      const declarator = /^(?:(?:if|elif|while|until|then|else|do)\s+)?(?:function\s+)?(?:[A-Za-z_]\w*|:)(?:\s*\(\s*\))?$/;
+      if (declarator.test(prefix)) {
+        if (character === "(") {
+          const emptyParameters = /^\(\s*\)/.exec(script.slice(index));
+          if (emptyParameters && !/\(\s*\)$/.test(prefix)) {
+            index += emptyParameters[0].length - 1;
+            continue;
+          }
+          if (/\(\s*\)$/.test(prefix) || /(?:^|\s)function\s+/.test(prefix))
+            continue;
+        }
+        if (character === "\n" && (/\(\s*\)$/.test(prefix) || /(?:^|\s)function\s+/.test(prefix)))
+          continue;
+      }
+    }
     if ("\n;&|()".includes(character)) {
       const next = script[index + 1];
       const paired = (character === "&" || character === "|") && next === character || character === "|" && next === "&";
@@ -7852,6 +7888,305 @@ function shellCommandSegments(value) {
   }
   push(script.length, "");
   return segments;
+}
+function hasOpaqueAiShellGrouping(value) {
+  return shellCommandSegments(value).some(
+    (segment) => segment.separatorBefore === "("
+  );
+}
+function shellAnd(left, right) {
+  if (left === false || right === false) return false;
+  return left === "unknown" || right === "unknown" ? "unknown" : true;
+}
+function shellNot(value) {
+  return value === "unknown" ? value : !value;
+}
+function shellOr(left, right) {
+  return shellNot(shellAnd(shellNot(left), shellNot(right)));
+}
+function literalShellCondition(value, shadowed) {
+  if (shadowed.has(value.replace(/^! /, ""))) return "unknown";
+  if (value === "true" || value === ":") return true;
+  if (value === "false") return false;
+  if (value === "! true") return false;
+  if (value === "! false") return true;
+  return "unknown";
+}
+var SHELL_FUNCTION_HEADER = /^(?:function\s+([A-Za-z_]\w*|:)(?:\s*\(\s*\))?|([A-Za-z_]\w*|:)\s*\(\s*\))\s*(\{|\(|(?=(?:if|for|select|while|until|case)\b|\[\[))/;
+function shellExecutableSegments(value) {
+  const executable = [];
+  const frames = [];
+  const shadowed = /* @__PURE__ */ new Set();
+  const deferredShadows = /* @__PURE__ */ new Map();
+  const deferredCalls = /* @__PURE__ */ new Map();
+  let pendingFunction = "";
+  let previousStatus = "unknown";
+  let controlTransferSeen = false;
+  const reach = () => frames.reduce(
+    (current, frame) => shellAnd(current, shellAnd(frame.entered, frame.active)),
+    true
+  );
+  const definitionReach = () => frames.reduce(
+    (current, frame) => shellAnd(
+      current,
+      shellAnd(
+        frame.entered,
+        frame.kind === "function" ? true : frame.active
+      )
+    ),
+    true
+  );
+  const closeFunction = (end) => {
+    const frame = frames.at(-1);
+    if (frame?.kind === "function" && frame.end === end) frames.pop();
+  };
+  const functionParenthesis = (separator) => {
+    for (let index = frames.length - 1; index >= 0; index--) {
+      const frame = frames[index];
+      if (frame.kind !== "function" || frame.end !== ")") continue;
+      if (separator === "(") frame.depth++;
+      if (separator === ")" && --frame.depth === 0 && frames.at(-1) === frame)
+        frames.pop();
+      return;
+    }
+  };
+  for (const segment of shellCommandSegments(value)) {
+    if (!segment.command && segment.separatorAfter === ")") {
+      functionParenthesis(")");
+      continue;
+    }
+    let command = pendingFunction && segment.separatorBefore === "\n" && /^(?:\{|\(|if|for|select|while|until|case|\[\[)(?=\s|$)/.test(
+      segment.command
+    ) ? `${pendingFunction} ${segment.command}` : segment.command;
+    pendingFunction = "";
+    let startsCondition = false;
+    let negated = false;
+    const parent = frames.at(-1);
+    const priorStatus = parent?.inCondition ? parent.condition : previousStatus;
+    const gate = segment.separatorBefore === "&&" ? priorStatus : segment.separatorBefore === "||" ? shellNot(priorStatus) : true;
+    while (command) {
+      const functionHeader = SHELL_FUNCTION_HEADER.exec(command);
+      if (functionHeader) {
+        const name = functionHeader[1] ?? functionHeader[2];
+        if (shellAnd(definitionReach(), gate) !== false) {
+          const enclosing = [...frames].reverse().find((frame2) => frame2.kind === "function");
+          if (enclosing?.kind === "function") {
+            const names = deferredShadows.get(enclosing.name) ?? /* @__PURE__ */ new Set();
+            names.add(name);
+            deferredShadows.set(enclosing.name, names);
+          } else shadowed.add(name);
+        }
+        command = command.slice(functionHeader[0].length).trimStart();
+        const body = functionHeader[3] || command.split(/\s/, 1)[0];
+        frames.push({
+          kind: "function",
+          name,
+          entered: gate,
+          active: false,
+          inCondition: false,
+          depth: body === "(" ? 1 : 0,
+          end: body === "{" || body === "(" ? body === "{" ? "}" : ")" : body === "if" ? "fi" : body === "case" ? "esac" : body === "[[" ? "segment" : "done"
+        });
+        continue;
+      }
+      const keyword = /^(if|elif|then|else|fi|for|select|while|until|do|done|case|esac|!|\{|\})(?=\s|$)/.exec(
+        command
+      )?.[1];
+      if (!keyword) break;
+      command = command.slice(keyword.length).trimStart();
+      const frame = frames.at(-1);
+      if (keyword === "case") {
+        frames.push({
+          kind: "case",
+          entered: gate,
+          active: "unknown",
+          inCondition: false
+        });
+        command = "";
+        break;
+      }
+      if (keyword === "esac" && frame?.kind === "case") {
+        frames.pop();
+        closeFunction("esac");
+        command = "";
+        break;
+      }
+      if (keyword === "if") {
+        frames.push({
+          kind: "if",
+          entered: gate,
+          matched: false,
+          condition: literalShellCondition(command, shadowed),
+          active: true,
+          inCondition: true
+        });
+        startsCondition = true;
+        if (command.startsWith("! ")) command = command.slice(2).trimStart();
+        if (SHELL_FUNCTION_HEADER.test(command)) continue;
+        break;
+      }
+      if (keyword === "for" || keyword === "select") {
+        const list = /^([A-Za-z_]\w*)\s+in\s*(.*)$/.exec(command)?.[2];
+        const condition = keyword === "select" || list === void 0 ? "unknown" : list === "" ? false : /[$*?[({]/.test(list) ? "unknown" : true;
+        frames.push({
+          kind: "loop",
+          entered: gate,
+          condition,
+          active: true,
+          inCondition: false,
+          until: false
+        });
+        command = "";
+        break;
+      }
+      if (keyword === "while" || keyword === "until") {
+        const condition = literalShellCondition(command, shadowed);
+        frames.push({
+          kind: "loop",
+          entered: gate,
+          condition,
+          active: true,
+          inCondition: true,
+          until: keyword === "until"
+        });
+        startsCondition = true;
+        if (command.startsWith("! ")) command = command.slice(2).trimStart();
+        if (SHELL_FUNCTION_HEADER.test(command)) continue;
+        break;
+      }
+      if (keyword === "then" && frame?.kind === "if") {
+        frame.active = shellAnd(shellNot(frame.matched), frame.condition);
+        frame.inCondition = false;
+        continue;
+      }
+      if (keyword === "elif" && frame?.kind === "if") {
+        frame.matched = shellNot(
+          shellAnd(shellNot(frame.matched), shellNot(frame.condition))
+        );
+        frame.active = shellNot(frame.matched);
+        frame.condition = literalShellCondition(command, shadowed);
+        frame.inCondition = true;
+        startsCondition = true;
+        if (command.startsWith("! ")) command = command.slice(2).trimStart();
+        if (SHELL_FUNCTION_HEADER.test(command)) continue;
+        break;
+      }
+      if (keyword === "else" && frame?.kind === "if") {
+        frame.active = shellAnd(
+          shellNot(frame.matched),
+          shellNot(frame.condition)
+        );
+        frame.inCondition = false;
+        continue;
+      }
+      if (keyword === "do" && frame?.kind === "loop") {
+        frame.active = frame.until ? shellNot(frame.condition) : frame.condition;
+        frame.inCondition = false;
+        continue;
+      }
+      if (keyword === "fi" && frame?.kind === "if") {
+        frames.pop();
+        closeFunction("fi");
+        command = "";
+        break;
+      }
+      if (keyword === "done" && frame?.kind === "loop") {
+        frames.pop();
+        closeFunction("done");
+        command = "";
+        break;
+      }
+      if (keyword === "}" && (frame?.kind === "function" && frame.end === "}" || frame?.kind === "group")) {
+        frames.pop();
+        command = "";
+        break;
+      }
+      if (keyword === "!") {
+        negated = !negated;
+        continue;
+      }
+      if (keyword === "{") {
+        frames.push({
+          kind: "group",
+          entered: gate,
+          active: true,
+          inCondition: false
+        });
+        continue;
+      }
+      command = "";
+      break;
+    }
+    const conditionFrame = frames.at(-1);
+    const conditionValue = negated ? shellNot(literalShellCondition(command, shadowed)) : literalShellCondition(command, shadowed);
+    const current = shellAnd(
+      shellAnd(reach(), gate),
+      controlTransferSeen ? "unknown" : true
+    );
+    if (!startsCondition && conditionFrame?.inCondition && command && (segment.separatorBefore === "&&" || segment.separatorBefore === "||" || segment.separatorBefore === ";" || segment.separatorBefore === "\n" || segment.separatorBefore === "|" || segment.separatorBefore === "|&" || segment.separatorBefore === "&")) {
+      conditionFrame.condition = ["|", "|&", "&"].includes(
+        segment.separatorBefore
+      ) ? "unknown" : segment.separatorBefore === "&&" ? shellAnd(conditionFrame.condition, conditionValue) : segment.separatorBefore === "||" ? shellOr(conditionFrame.condition, conditionValue) : conditionValue;
+    }
+    const functionBody = frames.some((frame) => frame.kind === "function");
+    if (command && (current !== false || functionBody))
+      executable.push({
+        command,
+        pipedInput: segment.pipedInput,
+        reach: current,
+        functionBody
+      });
+    previousStatus = ["|", "|&", "&"].includes(segment.separatorBefore) ? "unknown" : conditionFrame?.inCondition ? conditionFrame.condition : command ? gate === false ? priorStatus : gate === "unknown" ? "unknown" : conditionValue : "unknown";
+    if (/^(?:function\s+(?:[A-Za-z_]\w*|:)(?:\s*\(\s*\))?|(?:[A-Za-z_]\w*|:)\s*\(\s*\))$/.test(
+      command
+    ))
+      pendingFunction = command;
+    if (command && (functionBody || current !== false)) {
+      const words = shellWords(command);
+      let index = 0;
+      while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[index]?.raw ?? "")) index++;
+      if (!startsCondition && index === 0 && words[0]?.raw === "time") {
+        index = words[1]?.raw === "-p" ? 2 : 1;
+        while (words[index]?.raw === "!") index++;
+      }
+      const call = words[index];
+      const evalWords = evalLaunchedCommand(words);
+      const evalCall = evalWords[0]?.text === "eval";
+      const evalScript = evalCall ? evalWords.slice(1).map((word) => word.text).join(" ") : "";
+      const simpleEval = /^[A-Za-z_]\w*(?:[ \t]+[A-Za-z0-9_./:+-]+)*$/.test(evalScript) && !/^(?:time|eval|command|builtin|exec|source)\b/.test(evalScript);
+      const invoked = evalCall ? simpleEval ? shellWords(evalScript)[0] : void 0 : call;
+      const opaqueCall = /[$`*?{}\[\]]/.test(invoked?.expandableText ?? "") || evalCall && evalScript !== "" && !simpleEval;
+      const calls = opaqueCall ? ["*"] : invoked ? [invoked.text] : [];
+      if (functionBody && shellAnd(definitionReach(), gate) !== false) {
+        const enclosing = [...frames].reverse().find((frame) => frame.kind === "function");
+        if (enclosing?.kind === "function") {
+          const names = deferredCalls.get(enclosing.name) ?? /* @__PURE__ */ new Set();
+          for (const name of calls) names.add(name);
+          deferredCalls.set(enclosing.name, names);
+        }
+      } else if (current !== false) {
+        const pending = [...calls];
+        const seen = /* @__PURE__ */ new Set();
+        while (pending.length) {
+          const name = pending.pop();
+          if (name === "*") {
+            pending.push(...deferredShadows.keys(), ...deferredCalls.keys());
+            continue;
+          }
+          if (seen.has(name)) continue;
+          seen.add(name);
+          for (const nested of deferredShadows.get(name) ?? [])
+            shadowed.add(nested);
+          pending.push(...deferredCalls.get(name) ?? []);
+        }
+      }
+    }
+    closeFunction("segment");
+    functionParenthesis(segment.separatorAfter);
+    if (!functionBody && /^(?:exit|return|break|continue)(?=\s|$)/.test(command))
+      controlTransferSeen = true;
+  }
+  return executable;
 }
 function firstUnquotedRedirection(command) {
   let quote = "";
@@ -7888,12 +8223,18 @@ function firstUnquotedRedirection(command) {
 function envLaunchedCommand(words) {
   let index = 0;
   while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[index]?.raw ?? "")) index++;
-  const assignmentEnd = index;
-  while (["sudo", "command", "exec"].includes(words[index]?.text)) index++;
+  while (["sudo", "command", "exec", "time"].includes(words[index]?.text)) {
+    const launcher = words[index++].text;
+    if (launcher === "time" && words[index]?.text === "-p") index++;
+    if (launcher === "command") {
+      while (words[index]?.text === "-p") index++;
+      if (words[index]?.text === "--") index++;
+    }
+  }
   if (!["env", "/usr/bin/env"].includes(words[index]?.text)) {
     return {
-      commandWords: words.slice(assignmentEnd),
-      prefixWords: words.slice(0, assignmentEnd)
+      commandWords: words.slice(index),
+      prefixWords: words.slice(0, index)
     };
   }
   index++;
@@ -7926,9 +8267,28 @@ function envLaunchedCommand(words) {
     prefixWords: words.slice(0, index)
   };
 }
+function evalLaunchedCommand(words) {
+  let index = 0;
+  while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[index]?.raw ?? "")) index++;
+  if (index === 0 && words[index]?.raw === "time") {
+    index++;
+    if (words[index]?.raw === "-p") index++;
+    if (words[index]?.raw === "!") index++;
+    while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[index]?.raw ?? "")) index++;
+  }
+  while (["builtin", "command"].includes(words[index]?.text ?? "")) {
+    const launcher = words[index++].text;
+    if (launcher === "command") {
+      while (words[index]?.text === "-p") index++;
+    }
+    if (words[index]?.text === "--") index++;
+  }
+  return words.slice(index);
+}
 function aiCliInvocations(value) {
   const invocations = [];
-  for (const segment of shellCommandSegments(value)) {
+  for (const segment of shellExecutableSegments(value)) {
+    if (segment.reach === false) continue;
     const redirection = firstUnquotedRedirection(segment.command);
     const command = redirection >= 0 ? segment.command.slice(0, redirection) : segment.command;
     const { commandWords, prefixWords } = envLaunchedCommand(
@@ -7945,12 +8305,13 @@ function aiCliInvocations(value) {
       command: executable,
       expandableCommand: commandWords.map((word) => word.expandableText).join(" "),
       pipedInput: segment.pipedInput,
-      opaqueInput
+      opaqueInput,
+      uncertainControlFlow: segment.reach === "unknown"
     });
   }
   return invocations;
 }
-function hasOpaqueAiCliSubstitution(value) {
+function hasOpaqueAiSubstitution(value, matches) {
   const script = shellScriptWithoutHeredocBodies(value);
   let quote = "";
   let escaped = false;
@@ -7972,26 +8333,82 @@ function hasOpaqueAiCliSubstitution(value) {
     if (quote !== "'" && character === "$" && script[index + 1] === "(") {
       const end = commandSubstitutionEnd(script, index);
       const body = script.slice(index + 2, end >= 0 ? end - 1 : void 0);
-      if (aiCliInvocations(body).length > 0) return true;
+      if (matches(body)) return true;
     }
   }
   return false;
 }
-function hasOpaqueAiCliShellCommand(value) {
-  return shellCommandSegments(value).some((segment) => {
-    const { commandWords } = envLaunchedCommand(shellWords(segment.command));
-    return ["sh", "bash", "/bin/sh", "/bin/bash"].includes(
-      commandWords[0]?.text ?? ""
-    ) && commandWords[1]?.text === "-c" && aiCliInvocations(commandWords[2]?.text ?? "").length > 0;
+function hasOpaqueAiCliSubstitution(value) {
+  return hasOpaqueAiSubstitution(
+    value,
+    (body) => aiCliInvocations(body).length > 0 || hasOpaqueAiCliShellCommand(body)
+  );
+}
+function hasOpaqueAiHttpSubstitution(value) {
+  return hasOpaqueAiSubstitution(
+    value,
+    (body) => aiHttpDispatches(body).length > 0 || hasOpaqueAiHttpShellCommand(body)
+  );
+}
+function hasOpaqueAiShellFunction(value) {
+  return shellExecutableSegments(value).some(
+    (segment) => segment.functionBody && (aiCliInvocations(segment.command).length > 0 || aiHttpDispatches(segment.command).length > 0 || hasOpaqueAiCliShellCommand(segment.command) || hasOpaqueAiHttpShellCommand(segment.command))
+  );
+}
+function hasOpaqueAiShellCommand(value, matches) {
+  return shellExecutableSegments(value).some((segment) => {
+    if (segment.reach === false) return false;
+    const words = shellWords(segment.command);
+    const evalWords = evalLaunchedCommand(words);
+    if (evalWords[0]?.text === "eval")
+      return matches(
+        evalWords.slice(1).map((word) => word.text).join(" ")
+      );
+    const { commandWords } = envLaunchedCommand(words);
+    if (![
+      "sh",
+      "bash",
+      "/bin/sh",
+      "/bin/bash",
+      "/usr/bin/sh",
+      "/usr/bin/bash"
+    ].includes(commandWords[0]?.text ?? ""))
+      return false;
+    const args = commandWords.slice(1);
+    const commandIndex = args.findIndex(
+      (word) => /^-[A-Za-z]*c[A-Za-z]*$/.test(word.text)
+    );
+    if (commandIndex >= 0) return matches(args[commandIndex + 1]?.text ?? "");
+    const stdinIndex = args.findIndex((word) => word.text.startsWith("<<<"));
+    if (stdinIndex >= 0 && args.slice(0, stdinIndex).every((word) => word.text.startsWith("-")))
+      return matches(
+        args[stdinIndex].text.slice(3) || args[stdinIndex + 1]?.text || ""
+      );
+    if (!args.every((word) => word.text.startsWith("-"))) return false;
+    const inputWords = shellWords(segment.pipedInput);
+    return ["printf", "echo"].includes(inputWords[0]?.text ?? "") && inputWords.slice(1).some((word) => matches(word.text));
   });
+}
+function hasOpaqueAiCliShellCommand(value) {
+  return hasOpaqueAiShellCommand(
+    value,
+    (body) => aiCliInvocations(body).length > 0
+  );
+}
+function hasOpaqueAiHttpShellCommand(value) {
+  return hasOpaqueAiShellCommand(
+    value,
+    (body) => aiHttpDispatches(body).length > 0
+  );
 }
 function aiHttpDispatches(value) {
   const dispatches = [];
-  const script = shellScriptWithoutHeredocBodies(value);
-  for (const match of script.matchAll(
-    /(?:^|[\n;&|()])\s*curl\b([^\n;&|]*)/gim
-  )) {
-    const words = shellWords(match[1]);
+  for (const segment of shellExecutableSegments(value)) {
+    if (segment.reach === false) continue;
+    const [executable, ...words] = envLaunchedCommand(
+      shellWords(segment.command)
+    ).commandWords;
+    if (executable?.text !== "curl") continue;
     let method = "";
     let getOverride = false;
     let hasRoute = false;
@@ -8055,6 +8472,7 @@ function aiHttpDispatches(value) {
         payload: payloads.map((word) => word.text).join(" "),
         expandablePayload: payloads.map((word) => word.expandableText).join(" "),
         expandableCommand: words.map((word) => word.expandableText).join(" "),
+        uncertainControlFlow: segment.reach === "unknown",
         opaquePayload: payloads.some((word) => /^@|\$\(|`/.test(word.text))
       });
     }
@@ -9041,7 +9459,18 @@ function analyzeWorkflow(workflow, repository, context) {
       const stepUsesAiCli = cliInvocations.length > 0;
       const httpDispatches = aiHttpDispatches(materializedRun);
       const stepUsesAi = stepUsesAiAction || stepUsesAiCli || httpDispatches.length > 0;
-      if (hasOpaqueAiCliSubstitution(materializedRun) || hasOpaqueAiCliShellCommand(materializedRun)) {
+      if (cliInvocations.some((invocation) => invocation.uncertainControlFlow) || httpDispatches.some((dispatch) => dispatch.uncertainControlFlow) || (stepUsesAiCli || httpDispatches.length > 0) && hasOpaqueAiShellGrouping(materializedRun)) {
+        output.diagnostics.push({
+          code: "agentci/analysis-shell-control-flow-unknown",
+          kind: "analysis",
+          severity: "warning",
+          file,
+          job: jobName,
+          line: stepLine,
+          message: "An AI invocation appears in a shell branch or group whose reachability cannot be resolved statically; findings describe a possible path, not guaranteed execution."
+        });
+      }
+      if (hasOpaqueAiCliSubstitution(materializedRun) || hasOpaqueAiHttpSubstitution(materializedRun) || hasOpaqueAiShellFunction(materializedRun) || hasOpaqueAiCliShellCommand(materializedRun) || hasOpaqueAiHttpShellCommand(materializedRun)) {
         output.diagnostics.push({
           code: "agentci/analysis-run-dataflow-unknown",
           kind: "analysis",
@@ -9049,7 +9478,7 @@ function analyzeWorkflow(workflow, repository, context) {
           file,
           job: jobName,
           line: stepLine,
-          message: "A possible AI CLI inside command substitution or shell -c could not be attributed to a direct executable command."
+          message: "A possible AI call inside command substitution, a shell-evaluated string, or a shell function could not be attributed to a direct executable command."
         });
       }
       const httpOnly = httpDispatches.length > 0 && !stepUsesAiCli && !stepUsesAiAction;
@@ -10253,6 +10682,10 @@ export {
   hasFindingAtOrAbove,
   hasOpaqueAiCliShellCommand,
   hasOpaqueAiCliSubstitution,
+  hasOpaqueAiHttpShellCommand,
+  hasOpaqueAiHttpSubstitution,
+  hasOpaqueAiShellFunction,
+  hasOpaqueAiShellGrouping,
   hasSensitiveWrite,
   hasTrustedActorGate,
   hasTrustedPrProvenanceGate,

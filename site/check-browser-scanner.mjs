@@ -12,15 +12,18 @@ const bundle = await fs.readFile(
   new URL("./dist/scanner-browser.js", import.meta.url),
   "utf8",
 );
-const digest = createHash("sha256").update(bundle).digest();
+const digest = createHash("sha256").update(bundle).digest("hex");
 const html = await fs.readFile(
   new URL("./dist/index.html", import.meta.url),
   "utf8",
 );
 assert.ok(
-  html.includes(
-    `<script src="scanner-browser.js?v=${digest.toString("hex")}" integrity="sha256-${digest.toString("base64")}" defer></script>`,
-  ),
+  html.includes(`<script src="scanner-browser.js?v=${digest}" defer></script>`),
+);
+assert.doesNotMatch(
+  html,
+  /<script[^>]*scanner-browser\.js[^>]*\bintegrity=/,
+  "A mutable scanner URL must not use SRI across deployments",
 );
 for (const [name, tag] of [
   ["styles.css", "link"],
@@ -38,9 +41,8 @@ for (const [name, tag] of [
     `${name} must use its content hash in the page URL`,
   );
 }
-assert.ok(
-  html.includes(`<code id="scanner-digest">${digest.toString("hex")}</code>`),
-);
+assert.ok(html.includes(`<code id="scanner-digest">${digest}</code>`));
+assert.match(html, /Expected scanner bundle SHA-256 at page build/);
 let sourceCommit = "";
 let sourceDirty = true;
 try {
@@ -209,6 +211,41 @@ const duplicateKey = scan("on: push\non: pull_request\njobs: {}\n");
 assert.equal(duplicateKey.analysis_complete, false);
 assert.equal(duplicateKey.diagnostics[0]?.code, "agentci/parse-error");
 assert.equal(duplicateKey.findings.length, 0);
+const opaqueRun = scan(
+  'on: push\njobs:\n  agent:\n    runs-on: ubuntu-latest\n    steps:\n      - run: eval "claude -p fixed"\n',
+);
+assert.equal(opaqueRun.analysis_complete, false);
+assert.ok(
+  opaqueRun.diagnostics.some(
+    ({ code }) => code === "agentci/analysis-run-dataflow-unknown",
+  ),
+);
+const shadowedLiteral = scan(
+  'on: issues\npermissions:\n  contents: write\njobs:\n  agent:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          false() { true; }\n          if false; then claude -p "${{ github.event.issue.body }}"; fi\n',
+);
+assert.equal(shadowedLiteral.analysis_complete, false);
+assert.ok(shadowedLiteral.agent_usages.length > 0);
+assert.ok(
+  shadowedLiteral.diagnostics.some(
+    ({ code }) => code === "agentci/analysis-shell-control-flow-unknown",
+  ),
+);
+const indirectShadow = scan(
+  'on: issues\npermissions:\n  contents: write\njobs:\n  agent:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          outer() { false() { true; }; }\n          f=outer\n          "$f"\n          if false; then claude -p "${{ github.event.issue.body }}"; fi\n',
+);
+assert.equal(indirectShadow.analysis_complete, false);
+assert.ok(indirectShadow.agent_usages.length > 0);
+const uncalledFunction = scan(
+  'on: issues\npermissions:\n  contents: write\njobs:\n  agent:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          if ignored() { claude -p "${{ github.event.issue.body }}"; }; then :; fi\n',
+);
+assert.equal(uncalledFunction.agent_usages.length, 0);
+assert.equal(uncalledFunction.findings.length, 0);
+assert.equal(uncalledFunction.analysis_complete, false);
+assert.ok(
+  uncalledFunction.diagnostics.some(
+    ({ code }) => code === "agentci/analysis-run-dataflow-unknown",
+  ),
+);
 let aliases = "on: push\njobs:\n  a0: &a0 [x]\n";
 for (let index = 1; index <= 8; index++) {
   aliases += `  a${index}: &a${index} [${Array(10)

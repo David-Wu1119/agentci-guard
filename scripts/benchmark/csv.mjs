@@ -40,6 +40,11 @@ export function parseCsv(text) {
 export function csvObjects(text) {
   const [header, ...rows] = parseCsv(text);
   if (!header) return [];
+  const duplicate = header.find(
+    (name, index) => header.indexOf(name) !== index,
+  );
+  if (duplicate !== undefined)
+    throw new Error(`Duplicate CSV header: ${duplicate}`);
   return rows.map((row, index) => {
     if (row.length !== header.length) {
       throw new Error(

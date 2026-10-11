@@ -64,6 +64,12 @@ describe("local CLI run-step input flow", () => {
     expect(nested.diagnostics.map((item) => item.code)).toContain(
       "agentci/analysis-run-dataflow-unknown",
     );
+    const nestedShell = scan('result=$(bash -c "claude -p fixed")');
+    expect(nestedShell.agent_usages).toEqual([]);
+    expect(nestedShell.analysis_complete).toBe(false);
+    expect(nestedShell.diagnostics.map((item) => item.code)).toContain(
+      "agentci/analysis-run-dataflow-unknown",
+    );
   });
 
   it("respects env's option terminator and executable boundary", () => {
@@ -89,6 +95,10 @@ describe("local CLI run-step input flow", () => {
     for (const run of [
       'CI=1 claude -p "\${{ github.event.issue.body }}"',
       'CI=1 env claude -p "\${{ github.event.issue.body }}"',
+      'time claude -p "\${{ github.event.issue.body }}"',
+      'time -p claude -p "\${{ github.event.issue.body }}"',
+      'command -p claude -p "\${{ github.event.issue.body }}"',
+      'command -- claude -p "\${{ github.event.issue.body }}"',
     ]) {
       const result = scan(run);
       expect(result.agent_usages).toHaveLength(1);
@@ -148,6 +158,328 @@ describe("local CLI run-step input flow", () => {
       );
       expect(rules(result)).not.toContain("agentci/untrusted-input-in-prompt");
       expect(rules(result)).not.toContain("agentci/untrusted-ai-write-token");
+      expect(result.analysis_complete).toBe(true);
+    }
+  });
+
+  it("recognizes an agent command after shell control keywords", () => {
+    for (const run of [
+      'if true; then claude -p "\${{ github.event.issue.body }}"; fi',
+      'if false; then :; else claude -p "\${{ github.event.issue.body }}"; fi',
+      'for item in one; do claude -p "\${{ github.event.issue.body }}"; done',
+      'if claude -p "\${{ github.event.issue.body }}"; then :; fi',
+    ]) {
+      const result = scan(run);
+      expect(result.agent_usages).toHaveLength(1);
+      expect(rules(result)).toContain("agentci/untrusted-input-in-prompt");
+      expect(rules(result)).toContain("agentci/untrusted-ai-write-token");
+      expect(result.analysis_complete).toBe(true);
+    }
+    for (const run of [
+      'echo "then claude -p \${{ github.event.issue.body }}"',
+      '"then" claude -p "\${{ github.event.issue.body }}"',
+      '# if true; then claude -p "\${{ github.event.issue.body }}"; fi',
+      'if false; then claude -p "\${{ github.event.issue.body }}"; fi',
+      'then claude -p "\${{ github.event.issue.body }}"',
+    ]) {
+      expect(scan(run).agent_usages).toEqual([]);
+    }
+    const uncertain = scan(
+      'if test "$RUN_AGENT" = yes; then claude -p "\${{ github.event.issue.body }}"; fi',
+    );
+    expect(uncertain.diagnostics.map((item) => item.code)).toContain(
+      "agentci/analysis-shell-control-flow-unknown",
+    );
+    expect(uncertain.analysis_complete).toBe(false);
+  });
+
+  it("keeps compound conditions and function bodies out of certain CLI findings", () => {
+    const dispatch = 'claude -p "\${{ github.event.issue.body }}"';
+    const reached = scan(`if false || true; then ${dispatch}; fi`);
+    expect(reached.agent_usages).toHaveLength(1);
+    expect(reached.analysis_complete).toBe(true);
+    for (const run of [
+      `if true && false; then ${dispatch}; fi`,
+      `for item in ; do ${dispatch}; done`,
+      `create_agent() { ${dispatch}; }`,
+      `function create_agent { ${dispatch}; }`,
+      `create_agent() { :; { :; }; ${dispatch}; }`,
+      `false && ${dispatch}`,
+      `true || ${dispatch}`,
+      `if false && ${dispatch}; then :; fi`,
+      `if true || ${dispatch}; then :; fi`,
+      `! true && ${dispatch}`,
+      `! false || ${dispatch}`,
+    ]) {
+      expect(scan(run).agent_usages).toEqual([]);
+    }
+    for (const run of [
+      `create_agent() { ${dispatch}; }`,
+      `create_agent() { ${dispatch}; }; create_agent`,
+      `function create_agent { ${dispatch}; }; create_agent`,
+      `create_agent() { :; { :; }; ${dispatch}; }; create_agent`,
+      `create_agent() { bash -c '${dispatch}'; }; create_agent`,
+    ]) {
+      const result = scan(run);
+      expect(result.analysis_complete).toBe(false);
+      expect(result.diagnostics.map((item) => item.code)).toContain(
+        "agentci/analysis-run-dataflow-unknown",
+      );
+    }
+    for (const run of [
+      `if test "$X" && ${dispatch}; then :; fi`,
+      `echo maybe && ${dispatch}`,
+      `if true | false; then ${dispatch}; fi`,
+      `if false | true; then ${dispatch}; fi`,
+      `while false | true; do ${dispatch}; done`,
+      `case x in y) ${dispatch};; esac`,
+      `case x in x) :;; y) ${dispatch};; esac`,
+      `exit 0; ${dispatch}`,
+      `if true; then exit 0; ${dispatch}; fi`,
+      `for item in one; do break; ${dispatch}; done`,
+      `select item in one; do ${dispatch}; break; done`,
+      `false && (${dispatch})`,
+      `true || (${dispatch})`,
+    ]) {
+      const result = scan(run);
+      expect(result.agent_usages).toHaveLength(1);
+      expect(result.analysis_complete).toBe(false);
+      expect(result.diagnostics.map((item) => item.code)).toContain(
+        "agentci/analysis-shell-control-flow-unknown",
+      );
+    }
+    for (const run of [`! false && ${dispatch}`, `! true || ${dispatch}`]) {
+      const result = scan(run);
+      expect(result.agent_usages).toHaveLength(1);
+      expect(result.analysis_complete).toBe(true);
+    }
+  });
+
+  it("does not treat shadowed literal shell commands as fixed conditions", () => {
+    const dispatch = 'claude -p "\${{ github.event.issue.body }}"';
+    for (const run of [
+      `false() { true; }; if false; then ${dispatch}; fi`,
+      `function false { true; }; false && ${dispatch}`,
+      `true() { false; }; true || ${dispatch}`,
+      `function true { false; }; if true; then :; else ${dispatch}; fi`,
+      `:() { false; }; : || ${dispatch}`,
+      `function false\n{\n true\n}\nif false; then ${dispatch}; fi`,
+      `false() # comment\n{ true; }\nif false; then ${dispatch}; fi`,
+      `false()\n# comment\n{ true; }\nif false; then ${dispatch}; fi`,
+      `function false # comment\n{ true; }\nif false; then ${dispatch}; fi`,
+      `false () { true; }; if false; then ${dispatch}; fi`,
+      `false ( )\n{ true; }\nif false; then ${dispatch}; fi`,
+      `if true; then false() { true; }; fi; if false; then ${dispatch}; fi`,
+      `if false; then :; else false() { true; }; fi; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; outer; if false; then ${dispatch}; fi`,
+      `outer() { inner() { false() { true; }; }; inner; }; outer; if false; then ${dispatch}; fi`,
+      `top() { outer() { inner() { false() { true; }; }; inner; }; outer; }; top; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; time outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; time -p outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; time eval outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; time CI=1 eval outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; time ! outer || :; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; time -p ! outer || :; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; F=1 outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; eval outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; ! eval outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; builtin eval outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; command eval outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; builtin command eval outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; command builtin eval outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; command -p eval outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; command -- eval outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; command -p -- eval outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; builtin -- eval outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; builtin command -- eval outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; eval time outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; eval eval outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; f=outer; $f; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; f=outer; "$f"; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; o{u,u}ter; if false; then ${dispatch}; fi`,
+      `false() ( true ); if false; then ${dispatch}; fi`,
+      `false() if true; then true; fi; if false; then ${dispatch}; fi`,
+      `false() for item in one; do true; done; if false; then ${dispatch}; fi`,
+      `false() [[ 1 == 1 ]]; if false; then ${dispatch}; fi`,
+    ]) {
+      const result = scan(run);
+      expect(result.agent_usages, run).toHaveLength(1);
+      expect(result.analysis_complete).toBe(false);
+      expect(result.diagnostics.map((item) => item.code)).toContain(
+        "agentci/analysis-shell-control-flow-unknown",
+      );
+    }
+    const unreachableDefinition = scan(
+      `if false; then false() { true; }; fi; if false; then ${dispatch}; fi`,
+    );
+    expect(unreachableDefinition.agent_usages).toEqual([]);
+    expect(unreachableDefinition.analysis_complete).toBe(true);
+    const nestedUnreachable = scan(
+      `outer() { if false; then false() { true; }; fi; }; if false; then ${dispatch}; fi`,
+    );
+    expect(nestedUnreachable.agent_usages).toEqual([]);
+    expect(nestedUnreachable.analysis_complete).toBe(true);
+    const uncalledOuter = scan(
+      `outer() { false() { true; }; }; if false; then ${dispatch}; fi`,
+    );
+    expect(uncalledOuter.agent_usages).toEqual([]);
+    expect(uncalledOuter.analysis_complete).toBe(true);
+    const nestedNotCalled = scan(
+      `outer() { inner() { false() { true; }; }; }; outer; if false; then ${dispatch}; fi`,
+    );
+    expect(nestedNotCalled.agent_usages).toEqual([]);
+    expect(nestedNotCalled.analysis_complete).toBe(true);
+    const nestedCallSkipped = scan(
+      `outer() { inner() { false() { true; }; }; if false; then inner; fi; }; outer; if false; then ${dispatch}; fi`,
+    );
+    expect(nestedCallSkipped.agent_usages).toEqual([]);
+    expect(nestedCallSkipped.analysis_complete).toBe(true);
+    for (const command of [
+      "time echo hi",
+      "eval echo hi",
+      "eval 'echo hi'",
+      "'time' outer || :",
+      '"time" outer || :',
+      "'o{u,u}ter' || :",
+      "F=1 time outer || :",
+      "command outer || :",
+      "builtin outer || :",
+      "env eval outer || :",
+      "builtin env eval outer || :",
+      "builtin time eval outer || :",
+      "command time eval outer || :",
+      "if time outer; then :; fi",
+      "while time outer; do break; done",
+    ]) {
+      const unrelatedCall = scan(
+        `outer() { false() { true; }; }; ${command}; if false; then ${dispatch}; fi`,
+      );
+      expect(unrelatedCall.agent_usages, command).toEqual([]);
+      expect(unrelatedCall.analysis_complete, command).toBe(true);
+    }
+  });
+
+  it("does not report agent commands in uncalled function bodies", () => {
+    const dispatch = 'claude -p "\${{ github.event.issue.body }}"';
+    for (const run of [
+      `function ignored\n{\n ${dispatch}\n}\n:`,
+      `if true; then ignored() { ${dispatch}; }; fi`,
+      `ignored() if true; then ${dispatch}; fi; :`,
+      `ignored() while true; do ${dispatch}; break; done; :`,
+      `ignored() ( ${dispatch} ); :`,
+      `ignored() ( ( true ); ${dispatch} ); :`,
+      `if ignored() { ${dispatch}; }; then :; fi`,
+      `while ignored() { ${dispatch}; }; do break; done`,
+    ]) {
+      const result = scan(run);
+      expect(result.agent_usages).toEqual([]);
+      expect(result.analysis_complete).toBe(false);
+      expect(result.diagnostics.map((item) => item.code)).toContain(
+        "agentci/analysis-run-dataflow-unknown",
+      );
+    }
+    const direct = scan(`ignored() { exit 0; }; ${dispatch}`);
+    expect(direct.agent_usages).toHaveLength(1);
+    expect(direct.analysis_complete).toBe(true);
+  });
+
+  it("does not enter compounds skipped by short-circuiting", () => {
+    const dispatch = 'claude -p "\${{ github.event.issue.body }}"';
+    for (const run of [
+      `true || if true; then ${dispatch}; fi`,
+      `false && if true; then ${dispatch}; fi`,
+      `false && for item in one; do ${dispatch}; done`,
+      `false && while true; do ${dispatch}; done`,
+      `true || case x in x) ${dispatch};; esac`,
+      `true || { :; ${dispatch}; }`,
+    ]) {
+      const result = scan(run);
+      expect(result.agent_usages).toEqual([]);
+      expect(result.findings).toEqual([]);
+      expect(result.diagnostics.map((item) => item.code)).not.toContain(
+        "agentci/analysis-shell-control-flow-unknown",
+      );
+      expect(result.analysis_complete).toBe(true);
+    }
+    const uncertain = scan(
+      `test "$RUN_AGENT" && if true; then ${dispatch}; fi`,
+    );
+    expect(uncertain.agent_usages).toHaveLength(1);
+    expect(uncertain.analysis_complete).toBe(false);
+    expect(uncertain.diagnostics.map((item) => item.code)).toContain(
+      "agentci/analysis-shell-control-flow-unknown",
+    );
+  });
+
+  it("preserves short-circuit gates and pipeline input across newlines", () => {
+    const dispatch = "claude -p fixed";
+    for (const run of [
+      `false &&\n${dispatch}`,
+      `true ||\n${dispatch}`,
+      `false && # skipped\n${dispatch}`,
+    ]) {
+      const result = scan(run);
+      expect(result.agent_usages).toEqual([]);
+      expect(result.findings).toEqual([]);
+      expect(result.analysis_complete).toBe(true);
+    }
+
+    for (const pipe of ["|", "|&"]) {
+      const piped = scan(
+        `printf "\${{ github.event.issue.body }}" ${pipe}\nclaude -p fixed`,
+      );
+      expect(piped.agent_usages).toHaveLength(1);
+      expect(piped.diagnostics.map((item) => item.code)).toContain(
+        "agentci/analysis-run-dataflow-unknown",
+      );
+      expect(piped.analysis_complete).toBe(false);
+    }
+  });
+
+  it("abstains on literal eval and shell-stdin agent execution", () => {
+    for (const run of [
+      'eval "claude -p fixed"',
+      '! eval "claude -p fixed"',
+      'time CI=1 eval "claude -p fixed"',
+      'builtin eval "claude -p fixed"',
+      'command -p eval "claude -p fixed"',
+      'command -- eval "claude -p fixed"',
+      'command -p -- eval "claude -p fixed"',
+      'builtin -- eval "claude -p fixed"',
+      'builtin command -- eval "claude -p fixed"',
+      'bash <<< "claude -p fixed"',
+      'bash -s <<< "claude -p fixed"',
+      'bash -e <<< "claude -p fixed"',
+      'sh -s <<< "claude -p fixed"',
+      'bash -s -e <<< "claude -p fixed"',
+      'bash -lc "claude -p fixed"',
+      'bash --noprofile -c "claude -p fixed"',
+      String.raw`printf 'claude -p fixed\n' | bash`,
+      String.raw`printf 'claude -p fixed\n' | /usr/bin/bash`,
+    ]) {
+      const result = scan(run);
+      expect(result.agent_usages).toEqual([]);
+      expect(result.findings).toEqual([]);
+      expect(result.diagnostics.map((item) => item.code)).toContain(
+        "agentci/analysis-run-dataflow-unknown",
+      );
+      expect(result.analysis_complete).toBe(false);
+    }
+    for (const run of [
+      'eval "echo claude -p fixed"',
+      'command -p -v eval "claude -p fixed"',
+      'builtin -p eval "claude -p fixed"',
+      'env eval "claude -p fixed"',
+      'builtin env eval "claude -p fixed"',
+      'builtin time eval "claude -p fixed"',
+      'command time eval "claude -p fixed"',
+      'command -p echo "claude -p fixed"',
+      'bash <<< "echo claude -p fixed"',
+      String.raw`printf 'claude -p fixed\n' | cat`,
+    ]) {
+      const result = scan(run);
+      expect(result.agent_usages).toEqual([]);
+      expect(result.diagnostics).toEqual([]);
       expect(result.analysis_complete).toBe(true);
     }
   });

@@ -164,8 +164,47 @@ try {
     report,
   );
 
+  const annotationA = path.join(a, "annotation-sheet.csv");
+  const goodAnnotation = fs.readFileSync(annotationA, "utf8");
+  const [annotationHeader, ...annotationRows] = parseCsv(goodAnnotation);
+  annotationRows[annotationRows.length - 1] = [
+    ...annotationRows[annotationRows.length - 2],
+  ];
+  fs.writeFileSync(
+    annotationA,
+    renderCsv([annotationHeader, ...annotationRows]),
+  );
+  failure(
+    "duplicate unit",
+    "check-candidate-pilot-passes.mjs",
+    a,
+    b,
+    labelsA,
+    labelsB,
+    path.join(temporary, "duplicate-unit.json"),
+  );
+  fs.writeFileSync(annotationA, goodAnnotation);
+
   const timingB = path.join(b, "timing-sheet.csv");
   const goodTiming = fs.readFileSync(timingB, "utf8");
+  const [timingHeader, ...timingRows] = parseCsv(goodTiming);
+  fs.writeFileSync(
+    timingB,
+    renderCsv([
+      [...timingHeader, "active_minutes"],
+      ...timingRows.map((row) => [...row, "1"]),
+    ]),
+  );
+  failure(
+    "Timing CSV header differs from the frozen template",
+    "check-candidate-pilot-passes.mjs",
+    a,
+    b,
+    labelsA,
+    labelsB,
+    path.join(temporary, "duplicate-timing-header.json"),
+  );
+  fs.writeFileSync(timingB, goodTiming);
   fs.writeFileSync(timingB, goodTiming.replaceAll("2026-01-09", "2026-01-07"));
   failure(
     "minimum is 7 days",

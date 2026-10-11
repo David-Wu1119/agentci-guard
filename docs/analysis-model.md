@@ -98,11 +98,11 @@ in it. Version and help invocations (`aider --version`) are likewise not
 executions, which is why a scheduled workflow that checks a published package
 version reports clean.
 
-The `run:` CLI matcher is not a shell parser. It currently misses an agent
-command preceded by inline `NAME=value`/`env NAME=value` assignments, and a
-bare agent command written as heredoc data can look executable. These are
-known false-negative/false-positive shapes; a regex-only assignment fix was
-rejected because it worsened the heredoc case.
+The `run:` CLI matcher is not a general shell parser. It handles common direct
+commands, assignments, branches, pipes, and literal nested shell strings, but
+dynamically constructed shell scripts can still hide an agent invocation.
+An `analysis_complete: true` result means no supported construct triggered a
+diagnostic; it does not prove the workflow is safe.
 
 ## The agent's own gate
 

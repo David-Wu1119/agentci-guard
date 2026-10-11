@@ -5,7 +5,7 @@
 <meta name="description" content="AgentCI Guard is an experimental static linter for risky AI-agent workflows in GitHub Actions. Review token permissions, event paths and analysis limits.">
 <meta name="theme-color" content="#f4f1e8"><link rel="canonical" href="https://cryptoaxiom.net/">
 <title>AgentCI Guard — Review the authority behind your agent</title>
-<link rel="stylesheet" href="styles.css"><script src="scanner-browser.js" integrity="__SCANNER_SRI__" defer></script><script src="app.js" defer></script>
+<link rel="stylesheet" href="styles.css"><script src="scanner-browser.js" defer></script><script src="app.js" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -29,7 +29,7 @@
 </div><section class="example-result" aria-labelledby="scan-results-heading">
 <p class="eyebrow">ACTUAL SCANNER OUTPUT</p><h3 id="scan-results-heading" tabindex="-1">Ready to scan</h3>
 <p id="scan-status" role="status">Load the sample or paste a workflow, then run the scanner.</p>
-<details class="fine scanner-provenance"><summary>Build provenance (not accuracy evidence)</summary><p class="scanner-digest">Scanner source: <span id="scanner-source">__SOURCE_PROVENANCE__</span>. Browser bundle SHA-256: <code id="scanner-digest">__SCANNER_SHA256__</code>. These identify build provenance, not measured accuracy or a validated release.</p></details>
+<details class="fine scanner-provenance"><summary>Build provenance (not accuracy evidence)</summary><p class="scanner-digest">Page build source: <span id="scanner-source">__SOURCE_PROVENANCE__</span>. Expected scanner bundle SHA-256 at page build: <code id="scanner-digest">__SCANNER_SHA256__</code>. Cached HTML can load a newer deployment's script; these values are not runtime integrity evidence or measured accuracy.</p></details>
 <p id="scan-error" role="alert" hidden></p>
 <div id="scan-output" hidden><p id="scan-completeness"></p><h4>Findings</h4><ul id="scan-findings"></ul><h4>Recognized agent-use steps</h4><ul id="scan-agent-usages"></ul><h4>Diagnostics</h4><ul id="scan-diagnostics"></ul></div>
 </section></div></section>

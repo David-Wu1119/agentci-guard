@@ -109,7 +109,13 @@ for (const [index, packet] of packets.entries()) {
   const rows = csvObjects(csvText);
   if (rows.length !== context.registry.size)
     throw new Error(`Pass ${index + 1} has incomplete annotation CSV.`);
+  const seenUnits = new Set();
   for (const row of rows) {
+    if (seenUnits.has(row.unit_id))
+      throw new Error(
+        `Pass ${index + 1} CSV contains duplicate unit ${row.unit_id}.`,
+      );
+    seenUnits.add(row.unit_id);
     const registry = context.registry.get(row.unit_id);
     if (!registry) throw new Error(`Unknown candidate unit ${row.unit_id}.`);
     for (const field of [
@@ -245,7 +251,19 @@ function verifyPacket(packet, expectedChecksums) {
 }
 
 function validateTiming(file, annotator, cases) {
-  const rows = csvObjects(fs.readFileSync(file, "utf8"));
+  const text = fs.readFileSync(file, "utf8");
+  const frozenHeader = parseCsv(
+    fs.readFileSync(
+      path.join(repositoryRoot, "benchmark/candidate-pilot/timing-sheet.csv"),
+      "utf8",
+    ),
+  )[0];
+  if (!isDeepStrictEqual(parseCsv(text)[0], frozenHeader)) {
+    throw new Error(
+      `${file}: Timing CSV header differs from the frozen template.`,
+    );
+  }
+  const rows = csvObjects(text);
   if (rows.length !== cases.length)
     throw new Error(`${file}: expected ${cases.length} timing rows.`);
   const byCase = new Map(rows.map((row) => [row.case_id, row]));

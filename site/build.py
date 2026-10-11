@@ -1,5 +1,5 @@
 from pathlib import Path
-import base64,hashlib,json,shutil,subprocess
+import hashlib,json,shutil,subprocess
 
 root=Path(__file__).resolve().parent
 files=('index.html','styles.css','app.js','_headers')
@@ -11,7 +11,7 @@ for name in files:
     shutil.copyfile(root/'src'/name,dest/name)
 
 subprocess.run(['node','site/build-browser.mjs'],cwd=root.parent,check=True)
-digest=hashlib.sha256((dest/'scanner-browser.js').read_bytes()).digest()
+digest=hashlib.sha256((dest/'scanner-browser.js').read_bytes()).hexdigest()
 source_commit='';clean=False
 try:
     git_root=Path(subprocess.check_output(['git','rev-parse','--show-toplevel'],cwd=root.parent,text=True,stderr=subprocess.DEVNULL).strip()).resolve()
@@ -27,8 +27,7 @@ else:
     provenance='Uncommitted local build (no exact source commit)' if source_commit else 'Source revision unavailable (non-Git build)'
 html=(dest/'index.html').read_text()
 for placeholder,value in (
-    ('__SCANNER_SRI__','sha256-'+base64.b64encode(digest).decode()),
-    ('__SCANNER_SHA256__',digest.hex()),
+    ('__SCANNER_SHA256__',digest),
     ('__SOURCE_PROVENANCE__',provenance),
 ):
     assert html.count(placeholder)==1,placeholder

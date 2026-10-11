@@ -11,6 +11,10 @@ import {
   hasAgentGateBypass,
   hasOpaqueAiCliShellCommand,
   hasOpaqueAiCliSubstitution,
+  hasOpaqueAiHttpShellCommand,
+  hasOpaqueAiHttpSubstitution,
+  hasOpaqueAiShellFunction,
+  hasOpaqueAiShellGrouping,
   isPinnedAction,
   isSelfGatingAgentAction,
   looksLikeAiAction,
@@ -468,8 +472,28 @@ function analyzeWorkflow(
       const stepUsesAi =
         stepUsesAiAction || stepUsesAiCli || httpDispatches.length > 0;
       if (
+        cliInvocations.some((invocation) => invocation.uncertainControlFlow) ||
+        httpDispatches.some((dispatch) => dispatch.uncertainControlFlow) ||
+        ((stepUsesAiCli || httpDispatches.length > 0) &&
+          hasOpaqueAiShellGrouping(materializedRun))
+      ) {
+        output.diagnostics.push({
+          code: "agentci/analysis-shell-control-flow-unknown",
+          kind: "analysis",
+          severity: "warning",
+          file,
+          job: jobName,
+          line: stepLine,
+          message:
+            "An AI invocation appears in a shell branch or group whose reachability cannot be resolved statically; findings describe a possible path, not guaranteed execution.",
+        });
+      }
+      if (
         hasOpaqueAiCliSubstitution(materializedRun) ||
-        hasOpaqueAiCliShellCommand(materializedRun)
+        hasOpaqueAiHttpSubstitution(materializedRun) ||
+        hasOpaqueAiShellFunction(materializedRun) ||
+        hasOpaqueAiCliShellCommand(materializedRun) ||
+        hasOpaqueAiHttpShellCommand(materializedRun)
       ) {
         output.diagnostics.push({
           code: "agentci/analysis-run-dataflow-unknown",
@@ -479,7 +503,7 @@ function analyzeWorkflow(
           job: jobName,
           line: stepLine,
           message:
-            "A possible AI CLI inside command substitution or shell -c could not be attributed to a direct executable command.",
+            "A possible AI call inside command substitution, a shell-evaluated string, or a shell function could not be attributed to a direct executable command.",
         });
       }
       const httpOnly =
