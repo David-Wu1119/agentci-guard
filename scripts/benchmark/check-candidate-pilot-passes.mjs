@@ -245,7 +245,19 @@ function verifyPacket(packet, expectedChecksums) {
 }
 
 function validateTiming(file, annotator, cases) {
-  const rows = csvObjects(fs.readFileSync(file, "utf8"));
+  const text = fs.readFileSync(file, "utf8");
+  const frozenHeader = parseCsv(
+    fs.readFileSync(
+      path.join(repositoryRoot, "benchmark/candidate-pilot/timing-sheet.csv"),
+      "utf8",
+    ),
+  )[0];
+  if (!isDeepStrictEqual(parseCsv(text)[0], frozenHeader)) {
+    throw new Error(
+      `${file}: Timing CSV header differs from the frozen template.`,
+    );
+  }
+  const rows = csvObjects(text);
   if (rows.length !== cases.length)
     throw new Error(`${file}: expected ${cases.length} timing rows.`);
   const byCase = new Map(rows.map((row) => [row.case_id, row]));
