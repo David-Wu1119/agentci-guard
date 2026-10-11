@@ -44,6 +44,13 @@ freeze proves the snapshots are immutable; it does not make them unseen.
 The scorer now rejects v3 `eval` and `all` runs even if label files or manifest
 status change; only development diagnostics remain possible.
 
+The separate [nine-rule candidate micro-pilot](benchmark/candidate-pilot/README.md)
+uses seven targeted v3 cases as **development** challenges, including one whose
+original manifest split was `eval` before the leakage reclassification. Its
+neutral-ID packet and single-human test–retest checks assess annotation
+feasibility and rule ambiguity only. These labels cannot supply held-out
+precision or recall, and they do not unblock a v4 repository-disjoint sample.
+
 **Formal-evaluation blocker — rule registry mismatch.** The manifest's
 annotation registry (`annotation_schema_version` 2) names eight rules. The
 scanner at v0.4.0 has nine: `agentci/gated-ai-write-token` was added on

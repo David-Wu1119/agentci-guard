@@ -39,8 +39,11 @@ const manifest = JSON.parse(
   ),
 );
 if (manifestArgument) {
-  const { RULES } = await import("../../dist/index.js");
-  const currentRules = Object.keys(RULES);
+  const frozenCandidate =
+    manifest.pilot_id === "agentci-nine-rule-candidate-dev-micro-pilot-v1";
+  const currentRules = frozenCandidate
+    ? manifest.rules
+    : Object.keys((await import("../../dist/index.js")).RULES);
   if (
     !Array.isArray(manifest.rules) ||
     manifest.rules.length !== currentRules.length ||
@@ -53,8 +56,8 @@ if (manifestArgument) {
   if (manifest.agent_detection_task !== "agentci/agent-usage") {
     throw new Error("Custom manifest has an invalid agent detection task.");
   }
-  // Scanner rule metadata has no scope; pin the annotation contract in RULES.md.
-  const currentRuleScopes = {
+  // Keep this candidate map frozen when later scanner rules or scopes change.
+  const frozenCandidateRuleScopes = {
     "agentci/untrusted-ai-write-token": "job",
     "agentci/gated-ai-write-token": "job",
     "agentci/pull-request-target-ai": "job",
@@ -65,6 +68,10 @@ if (manifestArgument) {
     "agentci/unpinned-ai-action": "step",
     "agentci/unsafe-checkout": "step",
   };
+  // Scanner rule metadata has no scope; update this live map for later rules.
+  const currentRuleScopes = frozenCandidate
+    ? frozenCandidateRuleScopes
+    : { ...frozenCandidateRuleScopes };
   if (
     Object.keys(currentRuleScopes).length !== currentRules.length ||
     currentRules.some(
