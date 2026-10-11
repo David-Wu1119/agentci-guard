@@ -230,7 +230,8 @@ declare function looksLikeAiAction(value: string): boolean;
  */
 declare function looksLikeAiCli(value: string): boolean;
 declare function containsUntrustedGitHubContext(value: string): boolean;
-declare function untrustedGitHubContextEvents(value: string): string[];
+/** With parentOnly, keep only fields whose author can differ from the commenter. */
+declare function untrustedGitHubContextEvents(value: string, parentOnly?: boolean): string[];
 declare function containsSecretReference(value: string): boolean;
 declare function containsShellAccess(value: unknown): boolean;
 declare function isPinnedAction(uses: string): boolean;

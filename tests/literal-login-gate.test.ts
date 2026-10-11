@@ -27,7 +27,25 @@ describe("literal-login actor gates", () => {
     expect(
       hasTrustedActorGate("github.event.comment.user.login == 'maintainer'"),
     ).toBe(true);
-    expect(hasTrustedActorGate("github.triggering_actor == 'Jocs'")).toBe(true);
+    expect(hasTrustedActorGate("github.triggering_actor == 'Jocs'")).toBe(
+      false,
+    );
+  });
+
+  it("does not trust a rerun initiator as the original comment author", () => {
+    const rules = ruleIds(`
+on: issue_comment
+permissions:
+  contents: write
+jobs:
+  respond:
+    if: github.triggering_actor == 'maintainer'
+    runs-on: ubuntu-latest
+    steps:
+      - run: claude -p "\${{ github.event.comment.body }}"
+`);
+    expect(rules).toContain("agentci/untrusted-input-in-prompt");
+    expect(rules).toContain("agentci/untrusted-ai-write-token");
   });
 
   it("recognizes an allowlist of literal logins via contains(fromJSON(...))", () => {

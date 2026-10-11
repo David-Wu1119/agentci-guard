@@ -73,18 +73,27 @@ export const AI_AGENT_PATTERNS = [
 const UNTRUSTED_CONTEXT_PATTERNS: Array<{
   pattern: RegExp;
   events: string[];
+  parentEvents?: string[];
 }> = [
   {
     pattern: /github\.event\.pull_request\.(body|title|head\.ref)/i,
-    events: ["pull_request", "pull_request_target"],
+    events: [
+      "pull_request",
+      "pull_request_target",
+      "pull_request_review",
+      "pull_request_review_comment",
+    ],
+    parentEvents: ["pull_request_review", "pull_request_review_comment"],
   },
   {
     pattern: /github\.event\.issue\.(body|title)/i,
     events: ["issues", "issue_comment"],
+    parentEvents: ["issue_comment"],
   },
   {
     pattern: /github\.event\.discussion\.(body|title)/i,
     events: ["discussion", "discussion_comment"],
+    parentEvents: ["discussion_comment"],
   },
   {
     pattern: /github\.event\.comment\.body/i,
@@ -206,12 +215,41 @@ export function containsUntrustedGitHubContext(value: string): boolean {
   return untrustedGitHubContextEvents(value).length > 0;
 }
 
-export function untrustedGitHubContextEvents(value: string): string[] {
+/** With parentOnly, keep only fields whose author can differ from the commenter. */
+export function untrustedGitHubContextEvents(
+  value: string,
+  parentOnly = false,
+): string[] {
   const events = new Set<string>();
-  for (const candidate of UNTRUSTED_CONTEXT_PATTERNS) {
-    if (candidate.pattern.test(value)) {
-      for (const event of candidate.events) events.add(event);
+  let cursor = 0;
+  while (true) {
+    const start = value.indexOf("${{", cursor);
+    if (start < 0) break;
+    let expression = "";
+    let quoted = false;
+    let end = -1;
+    for (let index = start + 3; index < value.length; index++) {
+      if (value[index] === "'") {
+        if (quoted && value[index + 1] === "'") index++;
+        else quoted = !quoted;
+      } else if (!quoted && value.startsWith("}}", index)) {
+        end = index + 2;
+        break;
+      } else if (!quoted) {
+        expression += value[index];
+      }
     }
+    if (end < 0) break;
+    for (const candidate of UNTRUSTED_CONTEXT_PATTERNS) {
+      if (candidate.pattern.test(expression)) {
+        for (const event of parentOnly
+          ? (candidate.parentEvents ?? [])
+          : candidate.events) {
+          events.add(event);
+        }
+      }
+    }
+    cursor = end;
   }
   return [...events];
 }

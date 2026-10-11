@@ -10995,15 +10995,23 @@ var AI_AGENT_PATTERNS = [
 var UNTRUSTED_CONTEXT_PATTERNS = [
   {
     pattern: /github\.event\.pull_request\.(body|title|head\.ref)/i,
-    events: ["pull_request", "pull_request_target"]
+    events: [
+      "pull_request",
+      "pull_request_target",
+      "pull_request_review",
+      "pull_request_review_comment"
+    ],
+    parentEvents: ["pull_request_review", "pull_request_review_comment"]
   },
   {
     pattern: /github\.event\.issue\.(body|title)/i,
-    events: ["issues", "issue_comment"]
+    events: ["issues", "issue_comment"],
+    parentEvents: ["issue_comment"]
   },
   {
     pattern: /github\.event\.discussion\.(body|title)/i,
-    events: ["discussion", "discussion_comment"]
+    events: ["discussion", "discussion_comment"],
+    parentEvents: ["discussion_comment"]
   },
   {
     pattern: /github\.event\.comment\.body/i,
@@ -11072,12 +11080,35 @@ function looksLikeAiCli(value) {
     (pattern) => pattern.test(value)
   );
 }
-function untrustedGitHubContextEvents(value) {
+function untrustedGitHubContextEvents(value, parentOnly = false) {
   const events = /* @__PURE__ */ new Set();
-  for (const candidate of UNTRUSTED_CONTEXT_PATTERNS) {
-    if (candidate.pattern.test(value)) {
-      for (const event of candidate.events) events.add(event);
+  let cursor = 0;
+  while (true) {
+    const start = value.indexOf("${{", cursor);
+    if (start < 0) break;
+    let expression = "";
+    let quoted = false;
+    let end = -1;
+    for (let index = start + 3; index < value.length; index++) {
+      if (value[index] === "'") {
+        if (quoted && value[index + 1] === "'") index++;
+        else quoted = !quoted;
+      } else if (!quoted && value.startsWith("}}", index)) {
+        end = index + 2;
+        break;
+      } else if (!quoted) {
+        expression += value[index];
+      }
     }
+    if (end < 0) break;
+    for (const candidate of UNTRUSTED_CONTEXT_PATTERNS) {
+      if (candidate.pattern.test(expression)) {
+        for (const event of parentOnly ? candidate.parentEvents ?? [] : candidate.events) {
+          events.add(event);
+        }
+      }
+    }
+    cursor = end;
   }
   return [...events];
 }
@@ -11608,7 +11639,7 @@ function toPermissionLevel(value) {
 function isRecord(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
-var ACTOR_LOGIN_CONTEXT = "(?:github\\.actor|github\\.triggering_actor|github\\.event\\.(?:sender|comment\\.user|issue\\.user|pull_request\\.user|review\\.user)\\.login)";
+var ACTOR_LOGIN_CONTEXT = "(?:github\\.actor|github\\.event\\.(?:sender|comment\\.user|review\\.user)\\.login)";
 var LITERAL_LOGIN = `(['"])[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\\[bot\\])?\\1`;
 var TRUSTED_ACTOR_ATOMS = [
   // Restricted to one literal login. GitHub resolves the actor before the job
@@ -11618,7 +11649,7 @@ var TRUSTED_ACTOR_ATOMS = [
   new RegExp(`^${ACTOR_LOGIN_CONTEXT}\\s*(?:==|===)\\s*${LITERAL_LOGIN}$`, "i"),
   new RegExp(`^${LITERAL_LOGIN}\\s*(?:==|===)\\s*${ACTOR_LOGIN_CONTEXT}$`, "i"),
   // Restricted to the repository owner.
-  /^(?:github\.actor|github\.event\.sender\.login|github\.event\.comment\.user\.login|github\.event\.issue\.user\.login)\s*(?:==|===)\s*github\.repository_owner$/i,
+  /^(?:github\.actor|github\.event\.sender\.login|github\.event\.comment\.user\.login)\s*(?:==|===)\s*github\.repository_owner$/i,
   /^github\.repository_owner\s*(?:==|===)\s*(?:github\.actor|github\.event\.sender\.login)$/i,
   // Restricted to pull requests that originate in the base repository.
   /^github\.event\.pull_request\.head\.repo\.full_name\s*(?:==|===)\s*github\.repository$/i,
@@ -11628,12 +11659,12 @@ var TRUSTED_ACTOR_ATOMS = [
   /^github\.event\.pull_request\.head\.repo\.fork\s*(?:==|===)\s*false$/i
 ];
 var TRUSTED_ASSOCIATIONS = /* @__PURE__ */ new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
-var ASSOCIATION_EQUALITY = /^github\.event\.(?:comment|issue|pull_request|review)\.author_association\s*(?:==|===)\s*(['"])([A-Za-z_]+)\1$/i;
+var ASSOCIATION_EQUALITY = /^github\.event\.(?:comment|review)\.author_association\s*(?:==|===)\s*(['"])([A-Za-z_]+)\1$/i;
 var LOGIN_MEMBERSHIP = new RegExp(
   `^contains\\s*\\(\\s*fromJSON\\s*\\(\\s*(['"])(.*?)\\1\\s*\\)\\s*,\\s*${ACTOR_LOGIN_CONTEXT}\\s*\\)$`,
   "i"
 );
-var ASSOCIATION_MEMBERSHIP = /^contains\s*\(\s*fromJSON\s*\(\s*(['"])(.*?)\1\s*\)\s*,\s*github\.event\.(?:comment|issue|pull_request|review)\.author_association\s*\)$/i;
+var ASSOCIATION_MEMBERSHIP = /^contains\s*\(\s*fromJSON\s*\(\s*(['"])(.*?)\1\s*\)\s*,\s*github\.event\.(?:comment|review)\.author_association\s*\)$/i;
 function hasTrustedActorGate(rawCondition) {
   if (typeof rawCondition !== "string") return false;
   return conditionImpliesTrustedActor(unwrapExpression(rawCondition));
@@ -11972,6 +12003,7 @@ function analyzeWorkflow(workflow, repository, context) {
         materializeInputs(stepUses, context.inputValues)
       );
       const stepUsesAi = stepUsesAiAction || looksLikeAiCli(materializeInputs(stepRun, context.inputValues));
+      const stepActorGate = jobActorGate || hasTrustedActorGate(rawStep.if);
       const untrustedEvents = untrustedGitHubContextEvents(
         materializeInputs(
           JSON.stringify({
@@ -11979,10 +12011,13 @@ function analyzeWorkflow(workflow, repository, context) {
             effectiveEnvironment
           }),
           context.inputValues
-        )
+        ),
+        stepActorGate
       );
-      const stepActorGate = jobActorGate || hasTrustedActorGate(rawStep.if);
-      const hasUntrustedSink = !stepActorGate && contextCanReach(stepReachability.events, untrustedEvents);
+      const hasUntrustedSink = contextCanReach(
+        stepReachability.events,
+        untrustedEvents
+      );
       if (stepRun.trim().length > 0 && contextCanReach(
         stepReachability.events,
         untrustedGitHubContextEvents(
@@ -12068,7 +12103,7 @@ function analyzeWorkflow(workflow, repository, context) {
           );
         }
       }
-      if (!stepActorGate && stepReachability.events.includes("pull_request_target")) {
+      if (stepReachability.events.includes("pull_request_target")) {
         const checkout = assessPullRequestTargetCheckout(rawStep);
         if (checkout === "unsafe") {
           output.findings.push(

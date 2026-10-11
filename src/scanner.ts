@@ -397,6 +397,7 @@ function analyzeWorkflow(
       const stepUsesAi =
         stepUsesAiAction ||
         looksLikeAiCli(materializeInputs(stepRun, context.inputValues));
+      const stepActorGate = jobActorGate || hasTrustedActorGate(rawStep.if);
       const untrustedEvents = untrustedGitHubContextEvents(
         materializeInputs(
           JSON.stringify({
@@ -405,11 +406,12 @@ function analyzeWorkflow(
           }),
           context.inputValues,
         ),
+        stepActorGate,
       );
-      const stepActorGate = jobActorGate || hasTrustedActorGate(rawStep.if);
-      const hasUntrustedSink =
-        !stepActorGate &&
-        contextCanReach(stepReachability.events, untrustedEvents);
+      const hasUntrustedSink = contextCanReach(
+        stepReachability.events,
+        untrustedEvents,
+      );
       // Agent *actions* read issue, comment, and pull-request content through
       // their own token, so an untrusted trigger is itself the ingestion path.
       // Requiring a `${{ }}` expansion in the workflow misses the dominant
@@ -525,10 +527,7 @@ function analyzeWorkflow(
         }
       }
 
-      if (
-        !stepActorGate &&
-        stepReachability.events.includes("pull_request_target")
-      ) {
+      if (stepReachability.events.includes("pull_request_target")) {
         const checkout = assessPullRequestTargetCheckout(rawStep);
         if (checkout === "unsafe") {
           output.findings.push(

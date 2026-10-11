@@ -94,6 +94,12 @@ in it. Version and help invocations (`aider --version`) are likewise not
 executions, which is why a scheduled workflow that checks a published package
 version reports clean.
 
+The `run:` CLI matcher is not a shell parser. It currently misses an agent
+command preceded by inline `NAME=value`/`env NAME=value` assignments, and a
+bare agent command written as heredoc data can look executable. These are
+known false-negative/false-positive shapes; a regex-only assignment fix was
+rejected because it worsened the heredoc case.
+
 ## The agent's own gate
 
 `anthropics/claude-code-action` refuses to run for users without repository
@@ -178,22 +184,42 @@ github.repository`, or a negated `head.repo.fork`), or to a trusted
 `author_association` — `OWNER`, `MEMBER`, or `COLLABORATOR` — by equality or by
 `contains(fromJSON(...), ...)` membership.
 
+The gate must identify the actor who supplied the triggering input, not the
+author of its parent issue or pull request. On `issue_comment` and
+`pull_request_review_comment`, `github.event.issue.user` and
+`github.event.pull_request.user` can name a maintainer while an untrusted
+person wrote the comment. The same applies to those parent objects'
+`author_association` values. These parent-author checks are conservatively
+ungated even for an `issues` or `pull_request` workflow where a narrower
+activity-specific check could sometimes be sound; this analyzer does not
+prove that activity-level correspondence.
+
+`github.triggering_actor` is not a trusted gate either: on a re-run it names
+the re-run initiator, while the original event payload and `github.actor`
+remain tied to the initial run. A maintainer re-running an attacker's comment
+does not make the comment trusted.
+
 Recognition is an implication check rather than an evaluation. A conjunction is
 gated when _either_ operand is gated, because `A && B` implies `A`. A
 disjunction is gated only when _every_ operand is gated. Negation and every
 unrecognized construct are treated as ungated.
 
-Actor-gated jobs and steps do not raise `agentci/untrusted-ai-write-token`,
-`agentci/untrusted-input-in-prompt`, `agentci/pull-request-target-ai`, or
-`agentci/unsafe-checkout`. Each rule consults the gate at the scope it
-evaluates: step-level rules use the step's gate (or the job's), and the
-job-level `pull-request-target-ai` fires only if some agent step is reachable
-with neither gate. Until 2026-09-05 that rule consulted only the job gate, so an
-owner-gated agent step on `pull_request_target` was still reported critical;
-`tests/prt-step-gate.test.ts` pins the corrected behavior and its
-counterexamples. Findings that do not depend on who can trigger the
-workflow — permission breadth, action pinning, and secret exposure — are
-unaffected, because a guard restricts the attacker, not the blast radius.
+An actor gate can suppress untrusted-input findings for the triggering
+comment/review text, but not for an explicitly interpolated parent Issue,
+discussion, or pull request on a comment/review event: a trusted person can
+comment on attacker-authored content. The `pull-request-target-ai` rule is
+specifically about whether an untrusted actor can reach an agent step, so it
+still consults the job or step gate. Until 2026-09-05 it consulted only the
+job gate; `tests/prt-step-gate.test.ts` pins the corrected step behavior.
+`unsafe-checkout` does **not** consult the actor gate: an owner applying a label
+does not make an attacker PR head safe to execute. Permission breadth, action
+pinning, and secret exposure are also unaffected by actor gates.
+
+This is an incremental source-provenance model, not proof that every actor
+gate is safe. Action self-fetching and parent content on `issues`/`pull_request`
+activity other than creation still need event-activity-specific evaluation;
+until then, actor-gated findings can be false negatives. Do not use this
+version as a production security gate or quote calibrated accuracy for it.
 
 Only guards GitHub resolves before the job starts are trusted. A gate computed
 by workflow code at runtime, such as a step that queries collaborator

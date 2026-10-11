@@ -87,6 +87,88 @@ jobs:
     expect(hasWriteTokenFinding(rules)).toBe(false);
   });
 
+  it.each([
+    "github.event.issue.user.login == 'maintainer'",
+    "github.event.issue.user.login == github.repository_owner",
+    "github.event.issue.author_association == 'OWNER'",
+    "contains(fromJSON('[\"OWNER\"]'), github.event.issue.author_association)",
+  ])("does not treat the issue author as the issue commenter: %s", (gate) => {
+    const rules = ruleIds(`
+on: issue_comment
+permissions:
+  contents: write
+jobs:
+  respond:
+    if: ${gate}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-base-action@v1
+        with:
+          prompt: \${{ github.event.comment.body }}
+`);
+    expect(rules).toContain("agentci/untrusted-input-in-prompt");
+    expect(rules).toContain("agentci/untrusted-ai-write-token");
+  });
+
+  it.each([
+    "github.event.pull_request.user.login == 'maintainer'",
+    "github.event.pull_request.author_association == 'OWNER'",
+  ])(
+    "does not treat the pull request author as a review commenter: %s",
+    (gate) => {
+      const rules = ruleIds(`
+on: pull_request_review_comment
+permissions:
+  contents: write
+jobs:
+  respond:
+    if: ${gate}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-base-action@v1
+        with:
+          prompt: \${{ github.event.comment.body }}
+`);
+      expect(rules).toContain("agentci/untrusted-input-in-prompt");
+      expect(rules).toContain("agentci/untrusted-ai-write-token");
+    },
+  );
+
+  it.each([
+    [
+      "issue_comment",
+      "github.event.comment.author_association == 'OWNER'",
+      "github.event.issue.body",
+    ],
+    [
+      "pull_request_review_comment",
+      "github.event.comment.author_association == 'OWNER'",
+      "github.event.pull_request.body",
+    ],
+    [
+      "discussion_comment",
+      "github.actor == 'maintainer'",
+      "github.event.discussion.body",
+    ],
+  ])(
+    "does not sanitize parent content when a trusted %s actor comments",
+    (event, gate, source) => {
+      const rules = ruleIds(`
+on: ${event}
+permissions:
+  contents: write
+jobs:
+  respond:
+    if: ${gate}
+    runs-on: ubuntu-latest
+    steps:
+      - run: claude -p "\${{ ${source} }}"
+`);
+      expect(rules).toContain("agentci/untrusted-input-in-prompt");
+      expect(rules).toContain("agentci/untrusted-ai-write-token");
+    },
+  );
+
   it("still reports an ungated untrusted job", () => {
     const rules = ruleIds(`
 on:

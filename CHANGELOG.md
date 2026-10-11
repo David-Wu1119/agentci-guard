@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Literal `github.event.*` names in prompt text no longer count as GitHub
+  expression interpolation. This classifier change has a workflow-level
+  regression but has not been remeasured on the human corpus.
+- A parent Issue or pull-request author is no longer mistaken for the actor
+  who wrote a triggering comment; a re-run initiator is no longer mistaken
+  for the original event actor. Explicit parent-object interpolation on
+  comment/review events remains flagged even when the commenter is trusted.
+  An owner-triggered `pull_request_target` checkout of attacker PR code is
+  still unsafe. These fixes do not complete source-provenance analysis for
+  Action self-fetching or all event activities.
 - Replaced the scanner's fixed `fast-glob` pattern with direct workflow-directory
   enumeration, removing the vulnerable `braces` dependency chain without
   changing the intended one-level `.yml`/`.yaml` discovery contract. Pinned

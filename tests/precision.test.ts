@@ -22,6 +22,9 @@ describe("precision", () => {
     expect(looksLikeAiCli("aider_version=$(aider --version)")).toBe(false);
     expect(looksLikeAiCli("cursor-agent --help")).toBe(false);
     expect(looksLikeAiCli("pip install aider-chat")).toBe(false);
+    expect(looksLikeAiCli("cat <<'EOF'\nTOKEN=x claude -p hello\nEOF")).toBe(
+      false,
+    );
     expect(
       looksLikeAiCli(
         'curl https://api.openai.com/v1/responses -d \'{"model":"gpt-4o"}\'',

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import YAML from "yaml";
+import { untrustedGitHubContextEvents } from "../src/detect.js";
 import { scanWorkflow, type WorkflowFile } from "../src/index.js";
 
 const ROOT = "/repo";
@@ -69,6 +70,34 @@ jobs:
         run: claude -p "\${{ github.event.comment.body }}"
 `);
     expect(rules).toContain("agentci/untrusted-input-in-prompt");
+  });
+
+  it("does not treat a literal event-field name as interpolated input", () => {
+    const rules = rulesFor(`
+on: issues
+permissions:
+  contents: write
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - run: codex exec 'Print the literal text github.event.issue.body'
+`);
+    expect(rules).not.toContain("agentci/untrusted-input-in-prompt");
+    expect(rules).not.toContain("agentci/untrusted-ai-write-token");
+    expect(rules).toContain("agentci/ai-shell-access");
+    expect(rules).toContain("agentci/broad-write-permissions");
+  });
+
+  it("ignores quoted field names and delimiters inside expressions", () => {
+    expect(
+      untrustedGitHubContextEvents("${{ 'github.event.issue.body }}' }}"),
+    ).toEqual([]);
+    expect(
+      untrustedGitHubContextEvents(
+        "${{ format('literal }} {0}', github.event.issue.body) }}",
+      ),
+    ).toContain("issues");
   });
 
   it("does not treat a fixed-format pull request SHA as prompt injection text", () => {
