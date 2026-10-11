@@ -19,9 +19,25 @@ const html = await fs.readFile(
 );
 assert.ok(
   html.includes(
-    `<script src="scanner-browser.js" integrity="sha256-${digest.toString("base64")}" defer></script>`,
+    `<script src="scanner-browser.js?v=${digest.toString("hex")}" integrity="sha256-${digest.toString("base64")}" defer></script>`,
   ),
 );
+for (const [name, tag] of [
+  ["styles.css", "link"],
+  ["app.js", "script"],
+]) {
+  const bytes = await fs.readFile(new URL(`./dist/${name}`, import.meta.url));
+  const version = createHash("sha256").update(bytes).digest("hex");
+  const reference = `${name}?v=${version}`;
+  assert.ok(
+    html.includes(
+      tag === "link"
+        ? `<link rel="stylesheet" href="${reference}">`
+        : `<script src="${reference}" defer></script>`,
+    ),
+    `${name} must use its content hash in the page URL`,
+  );
+}
 assert.ok(
   html.includes(`<code id="scanner-digest">${digest.toString("hex")}</code>`),
 );

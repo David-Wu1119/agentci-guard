@@ -33,6 +33,11 @@ for placeholder,value in (
 ):
     assert html.count(placeholder)==1,placeholder
     html=html.replace(placeholder,value)
+for name in ('styles.css','app.js','scanner-browser.js'):
+    reference=f'"{name}"'
+    assert html.count(reference)==1,name
+    version=hashlib.sha256((dest/name).read_bytes()).hexdigest()
+    html=html.replace(reference,f'"{name}?v={version}"')
 (dest/'index.html').write_text(html)
 notices=[]
 for name in ('yaml','pathe'):
