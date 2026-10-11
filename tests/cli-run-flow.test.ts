@@ -253,6 +253,34 @@ describe("local CLI run-step input flow", () => {
     }
   });
 
+  it("does not enter compounds skipped by short-circuiting", () => {
+    const dispatch = 'claude -p "\${{ github.event.issue.body }}"';
+    for (const run of [
+      `true || if true; then ${dispatch}; fi`,
+      `false && if true; then ${dispatch}; fi`,
+      `false && for item in one; do ${dispatch}; done`,
+      `false && while true; do ${dispatch}; done`,
+      `true || case x in x) ${dispatch};; esac`,
+      `true || { :; ${dispatch}; }`,
+    ]) {
+      const result = scan(run);
+      expect(result.agent_usages).toEqual([]);
+      expect(result.findings).toEqual([]);
+      expect(result.diagnostics.map((item) => item.code)).not.toContain(
+        "agentci/analysis-shell-control-flow-unknown",
+      );
+      expect(result.analysis_complete).toBe(true);
+    }
+    const uncertain = scan(
+      `test "$RUN_AGENT" && if true; then ${dispatch}; fi`,
+    );
+    expect(uncertain.agent_usages).toHaveLength(1);
+    expect(uncertain.analysis_complete).toBe(false);
+    expect(uncertain.diagnostics.map((item) => item.code)).toContain(
+      "agentci/analysis-shell-control-flow-unknown",
+    );
+  });
+
   it("does not assert prompt input from an unused inherited environment value", () => {
     const result = scan(
       "claude -p fixed",

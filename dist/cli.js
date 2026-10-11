@@ -11341,7 +11341,7 @@ function shellExecutableSegments(value) {
   let previousStatus = "unknown";
   let controlTransferSeen = false;
   const reach = () => frames.reduce(
-    (current, frame) => shellAnd(current, frame.active),
+    (current, frame) => shellAnd(current, shellAnd(frame.entered, frame.active)),
     true
   );
   for (const segment of shellCommandSegments(value)) {
@@ -11357,7 +11357,12 @@ function shellExecutableSegments(value) {
       )?.[0];
       if (functionHeader) {
         command = command.slice(functionHeader.length).trimStart();
-        frames.push({ kind: "function", active: false, inCondition: false });
+        frames.push({
+          kind: "function",
+          entered: gate,
+          active: false,
+          inCondition: false
+        });
         continue;
       }
       const keyword = /^(if|elif|then|else|fi|for|select|while|until|do|done|case|esac|!|\{|\})(?=\s|$)/.exec(
@@ -11367,7 +11372,12 @@ function shellExecutableSegments(value) {
       command = command.slice(keyword.length).trimStart();
       const frame = frames.at(-1);
       if (keyword === "case") {
-        frames.push({ kind: "case", active: "unknown", inCondition: false });
+        frames.push({
+          kind: "case",
+          entered: gate,
+          active: "unknown",
+          inCondition: false
+        });
         command = "";
         break;
       }
@@ -11379,6 +11389,7 @@ function shellExecutableSegments(value) {
       if (keyword === "if") {
         frames.push({
           kind: "if",
+          entered: gate,
           matched: false,
           condition: literalShellCondition(command),
           active: true,
@@ -11393,6 +11404,7 @@ function shellExecutableSegments(value) {
         const condition = keyword === "select" || list === void 0 ? "unknown" : list === "" ? false : /[$*?[({]/.test(list) ? "unknown" : true;
         frames.push({
           kind: "loop",
+          entered: gate,
           condition,
           active: true,
           inCondition: false,
@@ -11405,6 +11417,7 @@ function shellExecutableSegments(value) {
         const condition = literalShellCondition(command);
         frames.push({
           kind: "loop",
+          entered: gate,
           condition,
           active: true,
           inCondition: true,
@@ -11454,7 +11467,12 @@ function shellExecutableSegments(value) {
         break;
       }
       if (keyword === "{" && segment.separatorBefore === ")" && /^(?:function\s+)?[A-Za-z_]\w*$/.test(previousCommand)) {
-        frames.push({ kind: "function", active: false, inCondition: false });
+        frames.push({
+          kind: "function",
+          entered: gate,
+          active: false,
+          inCondition: false
+        });
         continue;
       }
       if (keyword === "}" && (frame?.kind === "function" || frame?.kind === "group")) {
@@ -11467,7 +11485,12 @@ function shellExecutableSegments(value) {
         continue;
       }
       if (keyword === "{") {
-        frames.push({ kind: "group", active: true, inCondition: false });
+        frames.push({
+          kind: "group",
+          entered: gate,
+          active: true,
+          inCondition: false
+        });
         continue;
       }
       command = "";
