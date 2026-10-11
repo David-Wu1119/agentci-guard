@@ -9353,7 +9353,7 @@ function analyzeWorkflow(workflow, repository, context) {
           [...creationOnlyEvents],
           jobPermissions,
           repository,
-          context
+          { ...context, triggerSource: context.triggerSource ?? doc.on }
         )
       );
       continue;
@@ -9383,6 +9383,10 @@ function analyzeWorkflow(workflow, repository, context) {
       const stepUses = typeof rawStep.uses === "string" ? rawStep.uses : "";
       const actionReference = materializeInputs(stepUses, context.inputValues);
       const pinnedAnthropicRef = /^anthropics\/claude-code-action@([0-9a-f]{40})$/i.exec(actionReference)?.[1]?.toLowerCase();
+      const effectiveWith = materializeStructure(
+        rawStep.with,
+        context.inputValues
+      );
       const discussionEvents = isSelfGatingAgentAction(actionReference) ? stepReachability.events.filter(
         (event) => event === "discussion" || event === "discussion_comment"
       ) : [];
@@ -9407,6 +9411,59 @@ function analyzeWorkflow(workflow, repository, context) {
           if (stepReachability.events.length === 0) continue;
         }
       }
+      if (pinnedAnthropicRef === ANTHROPIC_ACTION_WITHOUT_DISCUSSION) {
+        const inputs = isRecord2(effectiveWith) ? effectiveWith : {};
+        const progress = String(inputs.track_progress ?? "");
+        const noPrompt = String(inputs.prompt ?? "") === "";
+        const triggerSource = context.triggerSource ?? doc.on;
+        const triggers = isRecord2(triggerSource) ? triggerSource : {};
+        const unsupportedEvents = stepReachability.events.filter((event) => {
+          const isPr = event === "pull_request" || event === "pull_request_target";
+          if (progress !== "true") {
+            return isPr && !progress.includes("${{") && noPrompt;
+          }
+          if (event !== "workflow_call" && ![
+            "pull_request",
+            "pull_request_target",
+            "issues",
+            "issue_comment",
+            "pull_request_review",
+            "pull_request_review_comment"
+          ].includes(event)) {
+            return true;
+          }
+          if (!isPr) return false;
+          const trigger = triggers[event];
+          const types = isRecord2(trigger) ? trigger.types : void 0;
+          return Array.isArray(types) && types.length > 0 && types.every(
+            (type) => typeof type === "string" && ![
+              "opened",
+              "synchronize",
+              "ready_for_review",
+              "reopened",
+              "labeled"
+            ].includes(type)
+          );
+        });
+        if (unsupportedEvents.length > 0) {
+          output.diagnostics.push({
+            code: "agentci/analysis-agent-event-unsupported",
+            kind: "analysis",
+            severity: "warning",
+            file,
+            job: jobName,
+            line: stepLine,
+            message: "This verified Anthropic Action revision skips or rejects the configured event/input paths before Claude starts; those paths were excluded from AI findings."
+          });
+          stepReachability = {
+            ...stepReachability,
+            events: stepReachability.events.filter(
+              (event) => !unsupportedEvents.includes(event)
+            )
+          };
+          if (stepReachability.events.length === 0) continue;
+        }
+      }
       const effectiveEnvironment = mergeEnvironment(
         jobEnvironment,
         rawStep.env
@@ -9423,10 +9480,6 @@ function analyzeWorkflow(workflow, repository, context) {
         context.inputValues
       );
       const stepRun = typeof rawStep.run === "string" ? rawStep.run : "";
-      const effectiveWith = materializeStructure(
-        rawStep.with,
-        context.inputValues
-      );
       const stepUsesAiAction = looksLikeAiAction(actionReference);
       const materializedRun = materializeInputs(stepRun, context.inputValues);
       const cliInvocations = aiCliInvocations(materializedRun);
@@ -9886,6 +9939,7 @@ function analyzeReusableCall(caller, jobName, rawJob, jobLine, events, creationO
   }
   return analyzeWorkflow(target, repository, {
     events,
+    triggerSource: context.triggerSource,
     creationOnlyEvents,
     actorGate: Boolean(context.actorGate) || hasTrustedActorGate(rawJob.if),
     prGate: Boolean(context.prGate) || hasTrustedPrProvenanceGate(rawJob.if),
@@ -9958,9 +10012,10 @@ function selfFetchedSources(uses, withBlock, events, creationOnlyEvents) {
     return events.filter((event) => UNTRUSTED_EVENTS.has(event)).map((event) => ({ event, source: "other" }));
   }
   const inputs = isRecord2(withBlock) ? withBlock : {};
-  const prompt = String(inputs.prompt ?? "").trim();
+  const prompt = String(inputs.prompt ?? "");
   const hasPrompt = prompt.length > 0 && !/^\$\{\{[\s\S]*\}\}$/.test(prompt);
-  const trackProgress = inputs.track_progress !== void 0 && ![false, "false", ""].includes(inputs.track_progress);
+  const progress = String(inputs.track_progress ?? "");
+  const trackProgress = progress === "true" || progress.includes("${{");
   if (hasPrompt && !trackProgress) return [];
   const defaultTagEvents = /* @__PURE__ */ new Set([
     "issues",

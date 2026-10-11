@@ -132,3 +132,172 @@ jobs:
     expect(result.diagnostics).toEqual([]);
   });
 });
+
+describe("Anthropic Action tracked PR activity compatibility", () => {
+  const workflow = (ref: string, activities: string) => `
+on:
+  pull_request_target:
+    types: [${activities}]
+permissions:
+  contents: write
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@${ref}
+        with:
+          track_progress: true
+`;
+
+  it("excludes a pinned Action that rejects every configured PR activity", () => {
+    const result = scan(workflow(VERIFIED_REF, "closed"));
+    expect(result.agent_usages).toEqual([]);
+    expect(result.findings).toEqual([]);
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+      "agentci/analysis-agent-event-unsupported",
+    ]);
+    expect(result.analysis_complete).toBe(false);
+  });
+
+  it("retains an accepted activity even when another is rejected", () => {
+    const result = scan(workflow(VERIFIED_REF, "closed, opened"));
+    expect(result.agent_usages).toHaveLength(1);
+    expect(result.findings.map((finding) => finding.rule_id)).toContain(
+      "agentci/untrusted-ai-write-token",
+    );
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it("does not extrapolate this revision's rejection to a mutable ref", () => {
+    const result = scan(workflow("v1", "closed"));
+    expect(result.agent_usages).toHaveLength(1);
+    expect(result.findings.map((finding) => finding.rule_id)).toContain(
+      "agentci/untrusted-ai-write-token",
+    );
+  });
+
+  it("excludes a pinned PR Action with no prompt or progress trigger", () => {
+    const result = scan(
+      workflow(VERIFIED_REF, "opened").replace(
+        "        with:\n          track_progress: true\n",
+        "",
+      ),
+    );
+    expect(result.agent_usages).toEqual([]);
+    expect(result.findings).toEqual([]);
+    expect(result.analysis_complete).toBe(false);
+  });
+
+  it("retains a pinned PR Action with a prompt in default agent mode", () => {
+    const result = scan(
+      workflow(VERIFIED_REF, "closed").replace(
+        "track_progress: true",
+        "prompt: Review this PR",
+      ),
+    );
+    expect(result.agent_usages).toHaveLength(1);
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it("does not treat an uppercase progress input as enabled", () => {
+    const result = scan(
+      workflow(VERIFIED_REF, "closed").replace(
+        "track_progress: true",
+        'track_progress: "TRUE"\n          prompt: Fix this',
+      ),
+    );
+    expect(result.agent_usages).toHaveLength(1);
+    expect(result.diagnostics).toEqual([]);
+    expect(result.findings.map((finding) => finding.rule_id)).not.toContain(
+      "agentci/untrusted-ai-write-token",
+    );
+  });
+
+  it("does not treat a whitespace-only prompt as absent", () => {
+    const result = scan(
+      workflow(VERIFIED_REF, "opened").replace(
+        "track_progress: true",
+        "prompt: '   '",
+      ),
+    );
+    expect(result.agent_usages).toHaveLength(1);
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it("does not invent tag-mode ingestion for a whitespace Issue prompt", () => {
+    const result = scan(`
+on:
+  issues:
+    types: [opened]
+permissions:
+  issues: write
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@${VERIFIED_REF}
+        with:
+          prompt: '   '
+`);
+    expect(result.agent_usages).toHaveLength(1);
+    expect(result.findings.map((finding) => finding.rule_id)).not.toContain(
+      "agentci/gated-ai-write-token",
+    );
+  });
+
+  it("excludes a pinned Action when progress tracking rejects the event", () => {
+    const result = scan(
+      workflow(VERIFIED_REF, "opened").replace(
+        "  pull_request_target:\n    types: [opened]",
+        "  push:\n    branches: [main]",
+      ),
+    );
+    expect(result.agent_usages).toEqual([]);
+    expect(result.findings).toEqual([]);
+    expect(result.analysis_complete).toBe(false);
+  });
+
+  it("preserves caller PR activities through a local reusable workflow", () => {
+    const caller = parseWorkflowFile(
+      ".github/workflows/caller.yml",
+      `
+on:
+  pull_request_target:
+    types: [closed]
+permissions:
+  contents: write
+jobs:
+  delegate:
+    uses: ./.github/workflows/agent.yml
+    with:
+      progress: true
+`,
+    );
+    const callee = parseWorkflowFile(
+      ".github/workflows/agent.yml",
+      `
+on:
+  workflow_call:
+    inputs:
+      progress:
+        type: boolean
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@${VERIFIED_REF}
+        with:
+          track_progress: \${{ inputs.progress }}
+`,
+    );
+    const result = scanWorkflowFiles([caller, callee], ".", {
+      ignore: [],
+      ignorePaths: [],
+    });
+    expect(result.agent_usages).toEqual([]);
+    expect(result.findings).toEqual([]);
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+      "agentci/analysis-agent-event-unsupported",
+    );
+  });
+});

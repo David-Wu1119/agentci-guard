@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The verified Anthropic Action revision `1d6de8c` no longer produces AI
+  findings when its configured `track_progress` event/activity is rejected
+  before Claude starts, or when a PR path has no prompt and progress tracking
+  is off. Caller PR activities are preserved through local reusable workflows.
+  Synthetic regressions cover accepted and rejected paths. This does not
+  establish implicit-ingestion behavior for mutable or unverified Action refs;
+  the stricter D2 unknown policy remains pending. A scanner-bundle comparison
+  against clean `b63ac94` changed 0 of 152 public development workflows
+  (critical 32→32, high 36→36, medium 180→180); those counts are behavior, not
+  accuracy, and the new pinned-version edge cases are synthetic.
 - A `run:` step that launches the `@anthropic-ai/claude-code` package through
   `npx -y` is now recognized as an agent instead of silently returning a
   complete scan with zero agent uses. The synthetic
