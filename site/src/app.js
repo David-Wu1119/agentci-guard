@@ -61,6 +61,7 @@ function renderResult(result) {
     title.textContent = `${usage.job} / ${usage.step}`;
     item.append(title);
     addDetail(item, 'Virtual location', `${usage.file}:${usage.line}`);
+    addDetail(item, 'Step index', usage.step_index);
     addDetail(item, 'Evidence', usage.evidence);
     addDetail(item, 'Reachable events', usage.reachable_events.join(', '));
     agentUsages.append(item);
@@ -80,6 +81,8 @@ function renderResult(result) {
     item.append(title);
     addDetail(item, 'Rule', finding.rule_id);
     addDetail(item, 'Virtual location', `${finding.file}${finding.line ? `:${finding.line}` : ''}`);
+    addDetail(item, 'Job', finding.job);
+    addDetail(item, 'Step index', finding.step_index);
     addDetail(item, 'Finding', finding.message);
     addDetail(item, 'Why', finding.why);
     addDetail(item, 'Evidence', finding.evidence);
@@ -98,6 +101,7 @@ function renderResult(result) {
     const item = document.createElement('li');
     addDetail(item, 'Diagnostic', `${diagnostic.severity.toUpperCase()} · ${diagnostic.code}`);
     addDetail(item, 'Virtual location', `${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ''}`);
+    addDetail(item, 'Job', diagnostic.job);
     addDetail(item, 'Step index', diagnostic.step_index);
     addDetail(item, 'Message', diagnostic.message);
     diagnostics.append(item);

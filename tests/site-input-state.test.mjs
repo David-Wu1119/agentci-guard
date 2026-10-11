@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 
-function browserPage(hasScanner = true, scanDiagnostics = []) {
+function browserPage(hasScanner = true, scanResult = {}) {
   const makeElement = () => ({
     value: "",
     textContent: "",
@@ -59,8 +59,9 @@ function browserPage(hasScanner = true, scanDiagnostics = []) {
         message: "Test",
       },
     ],
-    diagnostics: scanDiagnostics,
+    diagnostics: [],
     analysis_complete: true,
+    ...scanResult,
   });
   scan.version = "test";
   runInNewContext(
@@ -98,16 +99,18 @@ function browserPage(hasScanner = true, scanDiagnostics = []) {
 
 describe("browser workflow input", () => {
   it("shows the zero-based step index for a step-level diagnostic", () => {
-    const page = browserPage(true, [
-      {
-        code: "agentci/analysis-agent-event-unknown",
-        severity: "warning",
-        file: ".github/workflows/input.yml",
-        line: 5,
-        step_index: 0,
-        message: "Unknown Action event path",
-      },
-    ]);
+    const page = browserPage(true, {
+      diagnostics: [
+        {
+          code: "agentci/analysis-agent-event-unknown",
+          severity: "warning",
+          file: ".github/workflows/input.yml",
+          line: 5,
+          step_index: 0,
+          message: "Unknown Action event path",
+        },
+      ],
+    });
     const get = (id) => page.elements.get(id);
     get("workflow-yaml").value = "on: discussion_comment\n";
     get("scan-button").listeners.click();
@@ -116,6 +119,61 @@ describe("browser workflow input", () => {
       .map((node) => node.textContent)
       .join(" ");
     expect(details).toMatch(/Step index:\s+0/);
+  });
+
+  it("identifies same-line findings, usages, and diagnostics by step", () => {
+    const file = ".github/workflows/input.yml";
+    const page = browserPage(true, {
+      agent_usages: [0, 1].map((step_index) => ({
+        job: "agent",
+        step: "Duplicate",
+        file,
+        line: 5,
+        step_index,
+        evidence: "same action",
+        reachable_events: ["push"],
+      })),
+      findings: [0, 1].map((step_index) => ({
+        severity: "high",
+        title: "Test finding",
+        rule_id: "agentci/test",
+        file,
+        job: "agent",
+        line: 5,
+        step_index,
+        message: "same finding",
+      })),
+      diagnostics: [0, 1].map((step_index) => ({
+        code: "agentci/test",
+        severity: "warning",
+        file,
+        job: "agent",
+        line: 5,
+        step_index,
+        message: "same diagnostic",
+      })),
+    });
+    const get = (id) => page.elements.get(id);
+    get("workflow-yaml").value = "on: push\n";
+    get("scan-button").listeners.click();
+    const cardText = (item) =>
+      item.children
+        .flatMap((line) => line.children)
+        .map((node) => node.textContent)
+        .join(" ");
+    for (const id of [
+      "scan-agent-usages",
+      "scan-findings",
+      "scan-diagnostics",
+    ]) {
+      const cards = get(id).children.map(cardText);
+      expect(cards).toHaveLength(2);
+      expect(cards[0]).toMatch(/Step index:\s+0/);
+      expect(cards[1]).toMatch(/Step index:\s+1/);
+      if (id !== "scan-agent-usages") {
+        expect(cards[0]).toMatch(/Job:\s+agent/);
+      }
+    }
   });
 
   it("fails closed with a refresh instruction when the scanner script is unavailable", () => {

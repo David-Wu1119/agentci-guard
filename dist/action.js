@@ -10287,7 +10287,7 @@ function renderTextReport(result) {
   for (const finding of result.findings) {
     lines.push(`${label(finding.severity)} ${finding.rule_id}`);
     lines.push(
-      `File: ${finding.file}${finding.job ? ` / job: ${finding.job}` : ""}${finding.step ? ` / step: ${finding.step}` : ""}`
+      `File: ${finding.file}${finding.line ? `:${finding.line}` : ""}${finding.job ? ` / job: ${finding.job}` : ""}${finding.step ? ` / step: ${finding.step}` : ""}${finding.step_index === void 0 ? "" : ` / step_index: ${finding.step_index}`}`
     );
     lines.push(`Evidence: ${finding.evidence}`);
     lines.push(`Why: ${finding.why}`);

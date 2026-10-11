@@ -78,6 +78,43 @@ describe("Markdown report", () => {
 });
 
 describe("text report", () => {
+  it("distinguishes same-line findings with duplicate step names", () => {
+    const result = {
+      scanned_at: "2026-01-01T00:00:00.000Z",
+      root: ".",
+      workflow_count: 1,
+      agent_usages: [],
+      findings: [0, 1].map((step_index) => ({
+        id: `finding-${step_index}`,
+        rule_id: "agentci/ai-shell-access",
+        title: "Shell access",
+        severity: "high" as const,
+        file: "wf.yml",
+        job: "agent",
+        step: "Duplicate",
+        step_index,
+        line: 5,
+        message: "same finding",
+        why: "same reason",
+        fix: [],
+        evidence: "same evidence",
+      })),
+      summary: { critical: 0, high: 2, medium: 0, low: 0 },
+      diagnostics: [],
+      analysis_complete: true,
+    };
+    const text = renderTextReport(result);
+    const markdown = renderMarkdownReport(result);
+    expect(text).toContain(
+      "wf.yml:5 / job: agent / step: Duplicate / step_index: 0",
+    );
+    expect(text).toContain(
+      "wf.yml:5 / job: agent / step: Duplicate / step_index: 1",
+    );
+    expect(markdown).toContain("**Step index:** 0");
+    expect(markdown).toContain("**Step index:** 1");
+  });
+
   it("distinguishes step diagnostics that share one YAML line", () => {
     const result = {
       scanned_at: "2026-01-01T00:00:00.000Z",

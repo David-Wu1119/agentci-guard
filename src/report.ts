@@ -36,7 +36,7 @@ export function renderTextReport(result: ScanResult): string {
   for (const finding of result.findings) {
     lines.push(`${label(finding.severity)} ${finding.rule_id}`);
     lines.push(
-      `File: ${finding.file}${finding.job ? ` / job: ${finding.job}` : ""}${finding.step ? ` / step: ${finding.step}` : ""}`,
+      `File: ${finding.file}${finding.line ? `:${finding.line}` : ""}${finding.job ? ` / job: ${finding.job}` : ""}${finding.step ? ` / step: ${finding.step}` : ""}${finding.step_index === undefined ? "" : ` / step_index: ${finding.step_index}`}`,
     );
     lines.push(`Evidence: ${finding.evidence}`);
     lines.push(`Why: ${finding.why}`);
@@ -94,6 +94,9 @@ function renderFindingMarkdown(finding: Finding): string[] {
     finding.line ? `**Line:** ${finding.line}` : "",
     finding.job ? `**Job:** ${finding.job}` : "",
     finding.step ? `**Step:** ${finding.step}` : "",
+    finding.step_index === undefined
+      ? ""
+      : `**Step index:** ${finding.step_index}`,
     `**Evidence:** \`${finding.evidence.replace(/`/g, "'")}\``,
     "",
     finding.why,
