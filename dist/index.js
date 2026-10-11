@@ -7812,8 +7812,13 @@ function shellCommandSegments(value) {
       start = end + 1;
       return;
     }
-    if (command)
-      segments.push({ command, pipedInput: pipeline, separatorBefore });
+    if (command || separator === ")")
+      segments.push({
+        command,
+        pipedInput: pipeline,
+        separatorBefore,
+        separatorAfter: separator
+      });
     pipeline = separator === "|" || separator === "|&" ? [pipeline, command].filter(Boolean).join("\n") : "";
     separatorBefore = separator;
     start = end + separator.length;
@@ -7856,6 +7861,23 @@ function shellCommandSegments(value) {
       continue;
     }
     if (character === "&" && script[index - 1] === ">") continue;
+    if (character === "(" || character === "\n") {
+      const prefix = script.slice(Math.max(start, script.lastIndexOf("{", index - 1) + 1), index).trim();
+      const declarator = /^(?:(?:if|elif|while|until|then|else|do)\s+)?(?:function\s+)?(?:[A-Za-z_]\w*|:)(?:\s*\(\s*\))?$/;
+      if (declarator.test(prefix)) {
+        if (character === "(") {
+          const emptyParameters = /^\(\s*\)/.exec(script.slice(index));
+          if (emptyParameters && !/\(\s*\)$/.test(prefix)) {
+            index += emptyParameters[0].length - 1;
+            continue;
+          }
+          if (/\(\s*\)$/.test(prefix) || /(?:^|\s)function\s+/.test(prefix))
+            continue;
+        }
+        if (character === "\n" && (/\(\s*\)$/.test(prefix) || /(?:^|\s)function\s+/.test(prefix)))
+          continue;
+      }
+    }
     if ("\n;&|()".includes(character)) {
       const next = script[index + 1];
       const paired = (character === "&" || character === "|") && next === character || character === "|" && next === "&";
@@ -7882,41 +7904,87 @@ function shellNot(value) {
 function shellOr(left, right) {
   return shellNot(shellAnd(shellNot(left), shellNot(right)));
 }
-function literalShellCondition(value) {
+function literalShellCondition(value, shadowed) {
+  if (shadowed.has(value.replace(/^! /, ""))) return "unknown";
   if (value === "true" || value === ":") return true;
   if (value === "false") return false;
   if (value === "! true") return false;
   if (value === "! false") return true;
   return "unknown";
 }
+var SHELL_FUNCTION_HEADER = /^(?:function\s+([A-Za-z_]\w*|:)(?:\s*\(\s*\))?|([A-Za-z_]\w*|:)\s*\(\s*\))\s*(\{|\(|(?=(?:if|for|select|while|until|case)\b|\[\[))/;
 function shellExecutableSegments(value) {
   const executable = [];
   const frames = [];
-  let previousCommand = "";
+  const shadowed = /* @__PURE__ */ new Set();
+  const deferredShadows = /* @__PURE__ */ new Map();
+  let pendingFunction = "";
   let previousStatus = "unknown";
   let controlTransferSeen = false;
   const reach = () => frames.reduce(
     (current, frame) => shellAnd(current, shellAnd(frame.entered, frame.active)),
     true
   );
+  const definitionReach = () => frames.reduce(
+    (current, frame) => shellAnd(
+      current,
+      shellAnd(
+        frame.entered,
+        frame.kind === "function" ? true : frame.active
+      )
+    ),
+    true
+  );
+  const closeFunction = (end) => {
+    const frame = frames.at(-1);
+    if (frame?.kind === "function" && frame.end === end) frames.pop();
+  };
+  const functionParenthesis = (separator) => {
+    for (let index = frames.length - 1; index >= 0; index--) {
+      const frame = frames[index];
+      if (frame.kind !== "function" || frame.end !== ")") continue;
+      if (separator === "(") frame.depth++;
+      if (separator === ")" && --frame.depth === 0 && frames.at(-1) === frame)
+        frames.pop();
+      return;
+    }
+  };
   for (const segment of shellCommandSegments(value)) {
-    let command = segment.command;
+    if (!segment.command && segment.separatorAfter === ")") {
+      functionParenthesis(")");
+      continue;
+    }
+    let command = pendingFunction && segment.separatorBefore === "\n" && /^(?:\{|\(|if|for|select|while|until|case|\[\[)(?=\s|$)/.test(
+      segment.command
+    ) ? `${pendingFunction} ${segment.command}` : segment.command;
+    pendingFunction = "";
     let startsCondition = false;
     let negated = false;
     const parent = frames.at(-1);
     const priorStatus = parent?.inCondition ? parent.condition : previousStatus;
     const gate = segment.separatorBefore === "&&" ? priorStatus : segment.separatorBefore === "||" ? shellNot(priorStatus) : true;
     while (command) {
-      const functionHeader = /^function\s+[A-Za-z_]\w*\s*\{(?=\s|$)/.exec(
-        command
-      )?.[0];
+      const functionHeader = SHELL_FUNCTION_HEADER.exec(command);
       if (functionHeader) {
-        command = command.slice(functionHeader.length).trimStart();
+        const name = functionHeader[1] ?? functionHeader[2];
+        if (shellAnd(definitionReach(), gate) !== false) {
+          const enclosing = [...frames].reverse().find((frame2) => frame2.kind === "function");
+          if (enclosing?.kind === "function") {
+            const names = deferredShadows.get(enclosing.name) ?? /* @__PURE__ */ new Set();
+            names.add(name);
+            deferredShadows.set(enclosing.name, names);
+          } else shadowed.add(name);
+        }
+        command = command.slice(functionHeader[0].length).trimStart();
+        const body = functionHeader[3] || command.split(/\s/, 1)[0];
         frames.push({
           kind: "function",
+          name,
           entered: gate,
           active: false,
-          inCondition: false
+          inCondition: false,
+          depth: body === "(" ? 1 : 0,
+          end: body === "{" || body === "(" ? body === "{" ? "}" : ")" : body === "if" ? "fi" : body === "case" ? "esac" : body === "[[" ? "segment" : "done"
         });
         continue;
       }
@@ -7938,6 +8006,7 @@ function shellExecutableSegments(value) {
       }
       if (keyword === "esac" && frame?.kind === "case") {
         frames.pop();
+        closeFunction("esac");
         command = "";
         break;
       }
@@ -7946,12 +8015,13 @@ function shellExecutableSegments(value) {
           kind: "if",
           entered: gate,
           matched: false,
-          condition: literalShellCondition(command),
+          condition: literalShellCondition(command, shadowed),
           active: true,
           inCondition: true
         });
         startsCondition = true;
         if (command.startsWith("! ")) command = command.slice(2).trimStart();
+        if (SHELL_FUNCTION_HEADER.test(command)) continue;
         break;
       }
       if (keyword === "for" || keyword === "select") {
@@ -7969,7 +8039,7 @@ function shellExecutableSegments(value) {
         break;
       }
       if (keyword === "while" || keyword === "until") {
-        const condition = literalShellCondition(command);
+        const condition = literalShellCondition(command, shadowed);
         frames.push({
           kind: "loop",
           entered: gate,
@@ -7980,6 +8050,7 @@ function shellExecutableSegments(value) {
         });
         startsCondition = true;
         if (command.startsWith("! ")) command = command.slice(2).trimStart();
+        if (SHELL_FUNCTION_HEADER.test(command)) continue;
         break;
       }
       if (keyword === "then" && frame?.kind === "if") {
@@ -7992,10 +8063,11 @@ function shellExecutableSegments(value) {
           shellAnd(shellNot(frame.matched), shellNot(frame.condition))
         );
         frame.active = shellNot(frame.matched);
-        frame.condition = literalShellCondition(command);
+        frame.condition = literalShellCondition(command, shadowed);
         frame.inCondition = true;
         startsCondition = true;
         if (command.startsWith("! ")) command = command.slice(2).trimStart();
+        if (SHELL_FUNCTION_HEADER.test(command)) continue;
         break;
       }
       if (keyword === "else" && frame?.kind === "if") {
@@ -8013,24 +8085,17 @@ function shellExecutableSegments(value) {
       }
       if (keyword === "fi" && frame?.kind === "if") {
         frames.pop();
+        closeFunction("fi");
         command = "";
         break;
       }
       if (keyword === "done" && frame?.kind === "loop") {
         frames.pop();
+        closeFunction("done");
         command = "";
         break;
       }
-      if (keyword === "{" && segment.separatorBefore === ")" && /^(?:function\s+)?[A-Za-z_]\w*$/.test(previousCommand)) {
-        frames.push({
-          kind: "function",
-          entered: gate,
-          active: false,
-          inCondition: false
-        });
-        continue;
-      }
-      if (keyword === "}" && (frame?.kind === "function" || frame?.kind === "group")) {
+      if (keyword === "}" && (frame?.kind === "function" && frame.end === "}" || frame?.kind === "group")) {
         frames.pop();
         command = "";
         break;
@@ -8052,7 +8117,7 @@ function shellExecutableSegments(value) {
       break;
     }
     const conditionFrame = frames.at(-1);
-    const conditionValue = negated ? shellNot(literalShellCondition(command)) : literalShellCondition(command);
+    const conditionValue = negated ? shellNot(literalShellCondition(command, shadowed)) : literalShellCondition(command, shadowed);
     const current = shellAnd(
       shellAnd(reach(), gate),
       controlTransferSeen ? "unknown" : true
@@ -8071,8 +8136,16 @@ function shellExecutableSegments(value) {
         functionBody
       });
     previousStatus = ["|", "|&", "&"].includes(segment.separatorBefore) ? "unknown" : conditionFrame?.inCondition ? conditionFrame.condition : command ? gate === false ? priorStatus : gate === "unknown" ? "unknown" : conditionValue : "unknown";
-    previousCommand = segment.command;
-    if (/^(?:exit|return|break|continue)(?=\s|$)/.test(command))
+    if (/^(?:function\s+(?:[A-Za-z_]\w*|:)(?:\s*\(\s*\))?|(?:[A-Za-z_]\w*|:)\s*\(\s*\))$/.test(
+      command
+    ))
+      pendingFunction = command;
+    if (current !== false && !functionBody)
+      for (const name of deferredShadows.get(shellWords(command)[0]?.text) ?? [])
+        shadowed.add(name);
+    closeFunction("segment");
+    functionParenthesis(segment.separatorAfter);
+    if (!functionBody && /^(?:exit|return|break|continue)(?=\s|$)/.test(command))
       controlTransferSeen = true;
   }
   return executable;

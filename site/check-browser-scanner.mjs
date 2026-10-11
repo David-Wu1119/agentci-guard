@@ -218,6 +218,27 @@ assert.ok(
     ({ code }) => code === "agentci/analysis-run-dataflow-unknown",
   ),
 );
+const shadowedLiteral = scan(
+  'on: issues\npermissions:\n  contents: write\njobs:\n  agent:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          false() { true; }\n          if false; then claude -p "${{ github.event.issue.body }}"; fi\n',
+);
+assert.equal(shadowedLiteral.analysis_complete, false);
+assert.ok(shadowedLiteral.agent_usages.length > 0);
+assert.ok(
+  shadowedLiteral.diagnostics.some(
+    ({ code }) => code === "agentci/analysis-shell-control-flow-unknown",
+  ),
+);
+const uncalledFunction = scan(
+  'on: issues\npermissions:\n  contents: write\njobs:\n  agent:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          if ignored() { claude -p "${{ github.event.issue.body }}"; }; then :; fi\n',
+);
+assert.equal(uncalledFunction.agent_usages.length, 0);
+assert.equal(uncalledFunction.findings.length, 0);
+assert.equal(uncalledFunction.analysis_complete, false);
+assert.ok(
+  uncalledFunction.diagnostics.some(
+    ({ code }) => code === "agentci/analysis-run-dataflow-unknown",
+  ),
+);
 let aliases = "on: push\njobs:\n  a0: &a0 [x]\n";
 for (let index = 1; index <= 8; index++) {
   aliases += `  a${index}: &a${index} [${Array(10)

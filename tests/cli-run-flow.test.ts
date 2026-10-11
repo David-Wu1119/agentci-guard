@@ -253,6 +253,76 @@ describe("local CLI run-step input flow", () => {
     }
   });
 
+  it("does not treat shadowed literal shell commands as fixed conditions", () => {
+    const dispatch = 'claude -p "\${{ github.event.issue.body }}"';
+    for (const run of [
+      `false() { true; }; if false; then ${dispatch}; fi`,
+      `function false { true; }; false && ${dispatch}`,
+      `true() { false; }; true || ${dispatch}`,
+      `function true { false; }; if true; then :; else ${dispatch}; fi`,
+      `:() { false; }; : || ${dispatch}`,
+      `function false\n{\n true\n}\nif false; then ${dispatch}; fi`,
+      `false() # comment\n{ true; }\nif false; then ${dispatch}; fi`,
+      `false()\n# comment\n{ true; }\nif false; then ${dispatch}; fi`,
+      `function false # comment\n{ true; }\nif false; then ${dispatch}; fi`,
+      `false () { true; }; if false; then ${dispatch}; fi`,
+      `false ( )\n{ true; }\nif false; then ${dispatch}; fi`,
+      `if true; then false() { true; }; fi; if false; then ${dispatch}; fi`,
+      `if false; then :; else false() { true; }; fi; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; outer; if false; then ${dispatch}; fi`,
+      `false() ( true ); if false; then ${dispatch}; fi`,
+      `false() if true; then true; fi; if false; then ${dispatch}; fi`,
+      `false() for item in one; do true; done; if false; then ${dispatch}; fi`,
+      `false() [[ 1 == 1 ]]; if false; then ${dispatch}; fi`,
+    ]) {
+      const result = scan(run);
+      expect(result.agent_usages, run).toHaveLength(1);
+      expect(result.analysis_complete).toBe(false);
+      expect(result.diagnostics.map((item) => item.code)).toContain(
+        "agentci/analysis-shell-control-flow-unknown",
+      );
+    }
+    const unreachableDefinition = scan(
+      `if false; then false() { true; }; fi; if false; then ${dispatch}; fi`,
+    );
+    expect(unreachableDefinition.agent_usages).toEqual([]);
+    expect(unreachableDefinition.analysis_complete).toBe(true);
+    const nestedUnreachable = scan(
+      `outer() { if false; then false() { true; }; fi; }; if false; then ${dispatch}; fi`,
+    );
+    expect(nestedUnreachable.agent_usages).toEqual([]);
+    expect(nestedUnreachable.analysis_complete).toBe(true);
+    const uncalledOuter = scan(
+      `outer() { false() { true; }; }; if false; then ${dispatch}; fi`,
+    );
+    expect(uncalledOuter.agent_usages).toEqual([]);
+    expect(uncalledOuter.analysis_complete).toBe(true);
+  });
+
+  it("does not report agent commands in uncalled function bodies", () => {
+    const dispatch = 'claude -p "\${{ github.event.issue.body }}"';
+    for (const run of [
+      `function ignored\n{\n ${dispatch}\n}\n:`,
+      `if true; then ignored() { ${dispatch}; }; fi`,
+      `ignored() if true; then ${dispatch}; fi; :`,
+      `ignored() while true; do ${dispatch}; break; done; :`,
+      `ignored() ( ${dispatch} ); :`,
+      `ignored() ( ( true ); ${dispatch} ); :`,
+      `if ignored() { ${dispatch}; }; then :; fi`,
+      `while ignored() { ${dispatch}; }; do break; done`,
+    ]) {
+      const result = scan(run);
+      expect(result.agent_usages).toEqual([]);
+      expect(result.analysis_complete).toBe(false);
+      expect(result.diagnostics.map((item) => item.code)).toContain(
+        "agentci/analysis-run-dataflow-unknown",
+      );
+    }
+    const direct = scan(`ignored() { exit 0; }; ${dispatch}`);
+    expect(direct.agent_usages).toHaveLength(1);
+    expect(direct.analysis_complete).toBe(true);
+  });
+
   it("does not enter compounds skipped by short-circuiting", () => {
     const dispatch = 'claude -p "\${{ github.event.issue.body }}"';
     for (const run of [

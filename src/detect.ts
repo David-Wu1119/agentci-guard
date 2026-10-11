@@ -448,14 +448,18 @@ function commandSubstitutionEnd(value: string, start: number): number {
  * agent CLI with its own arguments. This is not a general shell parser:
  * scanner.ts reports an analysis diagnostic for opaque stdin/variable flow.
  */
-function shellCommandSegments(
-  value: string,
-): Array<{ command: string; pipedInput: string; separatorBefore: string }> {
+function shellCommandSegments(value: string): Array<{
+  command: string;
+  pipedInput: string;
+  separatorBefore: string;
+  separatorAfter: string;
+}> {
   const script = shellScriptWithoutHeredocBodies(value);
   const segments: Array<{
     command: string;
     pipedInput: string;
     separatorBefore: string;
+    separatorAfter: string;
   }> = [];
   let start = 0;
   let quote = "";
@@ -472,8 +476,13 @@ function shellCommandSegments(
       start = end + 1;
       return;
     }
-    if (command)
-      segments.push({ command, pipedInput: pipeline, separatorBefore });
+    if (command || separator === ")")
+      segments.push({
+        command,
+        pipedInput: pipeline,
+        separatorBefore,
+        separatorAfter: separator,
+      });
     pipeline =
       separator === "|" || separator === "|&"
         ? [pipeline, command].filter(Boolean).join("\n")
@@ -525,6 +534,29 @@ function shellCommandSegments(
     }
     // `2>&1` duplicates a file descriptor; its `&` is not a command boundary.
     if (character === "&" && script[index - 1] === ">") continue;
+    if (character === "(" || character === "\n") {
+      const prefix = script
+        .slice(Math.max(start, script.lastIndexOf("{", index - 1) + 1), index)
+        .trim();
+      const declarator =
+        /^(?:(?:if|elif|while|until|then|else|do)\s+)?(?:function\s+)?(?:[A-Za-z_]\w*|:)(?:\s*\(\s*\))?$/;
+      if (declarator.test(prefix)) {
+        if (character === "(") {
+          const emptyParameters = /^\(\s*\)/.exec(script.slice(index));
+          if (emptyParameters && !/\(\s*\)$/.test(prefix)) {
+            index += emptyParameters[0].length - 1;
+            continue;
+          }
+          if (/\(\s*\)$/.test(prefix) || /(?:^|\s)function\s+/.test(prefix))
+            continue;
+        }
+        if (
+          character === "\n" &&
+          (/\(\s*\)$/.test(prefix) || /(?:^|\s)function\s+/.test(prefix))
+        )
+          continue;
+      }
+    }
     if ("\n;&|()".includes(character)) {
       const next = script[index + 1];
       const paired =
@@ -562,7 +594,14 @@ type ShellFrame = { entered: ShellReach } & (
       inCondition: boolean;
       until: boolean;
     }
-  | { kind: "function"; active: false; inCondition: false }
+  | {
+      kind: "function";
+      name: string;
+      active: false;
+      inCondition: false;
+      end: "}" | ")" | "fi" | "done" | "esac" | "segment";
+      depth: number;
+    }
   | { kind: "group"; active: true; inCondition: false }
   | { kind: "case"; active: "unknown"; inCondition: false }
 );
@@ -580,13 +619,20 @@ function shellOr(left: ShellReach, right: ShellReach): ShellReach {
   return shellNot(shellAnd(shellNot(left), shellNot(right)));
 }
 
-function literalShellCondition(value: string): ShellReach {
+function literalShellCondition(
+  value: string,
+  shadowed: ReadonlySet<string>,
+): ShellReach {
+  if (shadowed.has(value.replace(/^! /, ""))) return "unknown";
   if (value === "true" || value === ":") return true;
   if (value === "false") return false;
   if (value === "! true") return false;
   if (value === "! false") return true;
   return "unknown";
 }
+
+const SHELL_FUNCTION_HEADER =
+  /^(?:function\s+([A-Za-z_]\w*|:)(?:\s*\(\s*\))?|([A-Za-z_]\w*|:)\s*\(\s*\))\s*(\{|\(|(?=(?:if|for|select|while|until|case)\b|\[\[))/;
 
 /**
  * Recognize the command position in common literal shell compounds. This is
@@ -606,7 +652,10 @@ function shellExecutableSegments(value: string): Array<{
     functionBody: boolean;
   }> = [];
   const frames: ShellFrame[] = [];
-  let previousCommand = "";
+  // shortcut: subshell function scope and unset -f are not modeled; upgrade for measured misses.
+  const shadowed = new Set<string>();
+  const deferredShadows = new Map<string, Set<string>>();
+  let pendingFunction = "";
   let previousStatus: ShellReach = "unknown";
   let controlTransferSeen = false;
   const reach = () =>
@@ -615,8 +664,48 @@ function shellExecutableSegments(value: string): Array<{
         shellAnd(current, shellAnd(frame.entered, frame.active)),
       true,
     );
+  const definitionReach = () =>
+    frames.reduce<ShellReach>(
+      (current, frame) =>
+        shellAnd(
+          current,
+          shellAnd(
+            frame.entered,
+            frame.kind === "function" ? true : frame.active,
+          ),
+        ),
+      true,
+    );
+  const closeFunction = (
+    end: Extract<ShellFrame, { kind: "function" }>["end"],
+  ) => {
+    const frame = frames.at(-1);
+    if (frame?.kind === "function" && frame.end === end) frames.pop();
+  };
+  const functionParenthesis = (separator: string) => {
+    for (let index = frames.length - 1; index >= 0; index--) {
+      const frame = frames[index];
+      if (frame.kind !== "function" || frame.end !== ")") continue;
+      if (separator === "(") frame.depth++;
+      if (separator === ")" && --frame.depth === 0 && frames.at(-1) === frame)
+        frames.pop();
+      return;
+    }
+  };
   for (const segment of shellCommandSegments(value)) {
-    let command = segment.command;
+    if (!segment.command && segment.separatorAfter === ")") {
+      functionParenthesis(")");
+      continue;
+    }
+    let command =
+      pendingFunction &&
+      segment.separatorBefore === "\n" &&
+      /^(?:\{|\(|if|for|select|while|until|case|\[\[)(?=\s|$)/.test(
+        segment.command,
+      )
+        ? `${pendingFunction} ${segment.command}`
+        : segment.command;
+    pendingFunction = "";
     let startsCondition = false;
     let negated = false;
     const parent = frames.at(-1);
@@ -630,16 +719,41 @@ function shellExecutableSegments(value: string): Array<{
           ? shellNot(priorStatus)
           : true;
     while (command) {
-      const functionHeader = /^function\s+[A-Za-z_]\w*\s*\{(?=\s|$)/.exec(
-        command,
-      )?.[0];
+      const functionHeader = SHELL_FUNCTION_HEADER.exec(command);
       if (functionHeader) {
-        command = command.slice(functionHeader.length).trimStart();
+        const name = functionHeader[1] ?? functionHeader[2];
+        if (shellAnd(definitionReach(), gate) !== false) {
+          const enclosing = [...frames]
+            .reverse()
+            .find((frame) => frame.kind === "function");
+          if (enclosing?.kind === "function") {
+            const names =
+              deferredShadows.get(enclosing.name) ?? new Set<string>();
+            names.add(name);
+            deferredShadows.set(enclosing.name, names);
+          } else shadowed.add(name);
+        }
+        command = command.slice(functionHeader[0].length).trimStart();
+        const body = functionHeader[3] || command.split(/\s/, 1)[0];
         frames.push({
           kind: "function",
+          name,
           entered: gate,
           active: false,
           inCondition: false,
+          depth: body === "(" ? 1 : 0,
+          end:
+            body === "{" || body === "("
+              ? body === "{"
+                ? "}"
+                : ")"
+              : body === "if"
+                ? "fi"
+                : body === "case"
+                  ? "esac"
+                  : body === "[["
+                    ? "segment"
+                    : "done",
         });
         continue;
       }
@@ -662,6 +776,7 @@ function shellExecutableSegments(value: string): Array<{
       }
       if (keyword === "esac" && frame?.kind === "case") {
         frames.pop();
+        closeFunction("esac");
         command = "";
         break;
       }
@@ -670,12 +785,13 @@ function shellExecutableSegments(value: string): Array<{
           kind: "if",
           entered: gate,
           matched: false,
-          condition: literalShellCondition(command),
+          condition: literalShellCondition(command, shadowed),
           active: true,
           inCondition: true,
         });
         startsCondition = true;
         if (command.startsWith("! ")) command = command.slice(2).trimStart();
+        if (SHELL_FUNCTION_HEADER.test(command)) continue;
         break;
       }
       if (keyword === "for" || keyword === "select") {
@@ -700,7 +816,7 @@ function shellExecutableSegments(value: string): Array<{
         break;
       }
       if (keyword === "while" || keyword === "until") {
-        const condition = literalShellCondition(command);
+        const condition = literalShellCondition(command, shadowed);
         frames.push({
           kind: "loop",
           entered: gate,
@@ -711,6 +827,7 @@ function shellExecutableSegments(value: string): Array<{
         });
         startsCondition = true;
         if (command.startsWith("! ")) command = command.slice(2).trimStart();
+        if (SHELL_FUNCTION_HEADER.test(command)) continue;
         break;
       }
       if (keyword === "then" && frame?.kind === "if") {
@@ -723,10 +840,11 @@ function shellExecutableSegments(value: string): Array<{
           shellAnd(shellNot(frame.matched), shellNot(frame.condition)),
         );
         frame.active = shellNot(frame.matched);
-        frame.condition = literalShellCondition(command);
+        frame.condition = literalShellCondition(command, shadowed);
         frame.inCondition = true;
         startsCondition = true;
         if (command.startsWith("! ")) command = command.slice(2).trimStart();
+        if (SHELL_FUNCTION_HEADER.test(command)) continue;
         break;
       }
       if (keyword === "else" && frame?.kind === "if") {
@@ -746,30 +864,20 @@ function shellExecutableSegments(value: string): Array<{
       }
       if (keyword === "fi" && frame?.kind === "if") {
         frames.pop();
+        closeFunction("fi");
         command = "";
         break;
       }
       if (keyword === "done" && frame?.kind === "loop") {
         frames.pop();
+        closeFunction("done");
         command = "";
         break;
       }
       if (
-        keyword === "{" &&
-        segment.separatorBefore === ")" &&
-        /^(?:function\s+)?[A-Za-z_]\w*$/.test(previousCommand)
-      ) {
-        frames.push({
-          kind: "function",
-          entered: gate,
-          active: false,
-          inCondition: false,
-        });
-        continue;
-      }
-      if (
         keyword === "}" &&
-        (frame?.kind === "function" || frame?.kind === "group")
+        ((frame?.kind === "function" && frame.end === "}") ||
+          frame?.kind === "group")
       ) {
         frames.pop();
         command = "";
@@ -793,8 +901,8 @@ function shellExecutableSegments(value: string): Array<{
     }
     const conditionFrame = frames.at(-1);
     const conditionValue = negated
-      ? shellNot(literalShellCondition(command))
-      : literalShellCondition(command);
+      ? shellNot(literalShellCondition(command, shadowed))
+      : literalShellCondition(command, shadowed);
     const current = shellAnd(
       shellAnd(reach(), gate),
       controlTransferSeen ? "unknown" : true,
@@ -840,8 +948,22 @@ function shellExecutableSegments(value: string): Array<{
               ? "unknown"
               : conditionValue
           : "unknown";
-    previousCommand = segment.command;
-    if (/^(?:exit|return|break|continue)(?=\s|$)/.test(command))
+    if (
+      /^(?:function\s+(?:[A-Za-z_]\w*|:)(?:\s*\(\s*\))?|(?:[A-Za-z_]\w*|:)\s*\(\s*\))$/.test(
+        command,
+      )
+    )
+      pendingFunction = command;
+    if (current !== false && !functionBody)
+      for (const name of deferredShadows.get(shellWords(command)[0]?.text) ??
+        [])
+        shadowed.add(name);
+    closeFunction("segment");
+    functionParenthesis(segment.separatorAfter);
+    if (
+      !functionBody &&
+      /^(?:exit|return|break|continue)(?=\s|$)/.test(command)
+    )
       controlTransferSeen = true;
   }
   return executable;
