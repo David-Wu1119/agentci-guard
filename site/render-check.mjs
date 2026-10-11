@@ -83,6 +83,16 @@ const scanner = await evaluate(
 );
 assert.equal(scanner.ready, true);
 assert.equal(scanner.maxChars, 250000);
+const manifest = JSON.parse(
+  await fs.readFile(new URL("./BUILD_MANIFEST.json", import.meta.url), "utf8"),
+);
+for (const name of ["styles.css", "app.js", "scanner-browser.js"])
+  assert.ok(
+    requests.includes(
+      new URL(`./dist/${name}?v=${manifest[name]}`, import.meta.url).href,
+    ),
+    `${name} did not load from its content-versioned URL`,
+  );
 assert.match(
   scanner.source,
   /Uncommitted local build|clean checkout|Source revision unavailable/,

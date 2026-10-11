@@ -31,12 +31,15 @@ for (const name of [...assets, "_headers"]) {
 
 let stale = false;
 for (const name of assets) {
-  const response = await fetch(
-    new URL(name === "index.html" ? "." : name, base),
-    {
-      signal: AbortSignal.timeout(15_000),
-    },
-  );
+  const assetUrl =
+    name === "index.html"
+      ? "."
+      : ["styles.css", "app.js", "scanner-browser.js"].includes(name)
+        ? `${name}?v=${manifest[name]}`
+        : name;
+  const response = await fetch(new URL(assetUrl, base), {
+    signal: AbortSignal.timeout(15_000),
+  });
   assert.ok(response.ok, `${name}: HTTP ${response.status}`);
   assert.equal(
     new URL(response.url).origin,
