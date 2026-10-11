@@ -31,8 +31,13 @@ const send = (method, params = {}) =>
     socket.send(JSON.stringify({ id: key, method, params }));
   });
 const evaluate = async (expression) =>
-  (await send("Runtime.evaluate", { expression, returnByValue: true })).result
-    .value;
+  (
+    await send("Runtime.evaluate", {
+      expression,
+      returnByValue: true,
+      awaitPromise: true,
+    })
+  ).result.value;
 await send("Page.enable");
 await send("Runtime.enable");
 await send("Network.enable");
@@ -63,7 +68,37 @@ assert.deepEqual(research.caseRows, [
   ["agentci/broad-write-permissions", "medium", "medium"],
 ]);
 checks.push({ research });
-for (const width of [1440, 768, 390, 320]) {
+const scanner = await evaluate(
+  '({ready:typeof window.agentciScanWorkflow==="function",version:window.agentciScanWorkflow?.version,maxChars:window.agentciScanWorkflow?.maxChars})',
+);
+assert.equal(scanner.ready, true);
+assert.equal(scanner.maxChars, 250000);
+await evaluate('document.getElementById("load-example").click()');
+await evaluate('document.getElementById("scan-button").click()');
+const sample = await evaluate(
+  '({heading:document.getElementById("scan-results-heading").textContent,complete:document.getElementById("scan-completeness").textContent,rules:Array.from(document.querySelectorAll("#scan-findings li")).map(li=>li.textContent),diagnostics:document.querySelectorAll("#scan-diagnostics li").length,errorHidden:document.getElementById("scan-error").hidden})',
+);
+assert.equal(sample.heading, "3 findings");
+assert.match(sample.complete, /analysis_complete: true/);
+assert.match(
+  sample.complete,
+  /does not validate the full GitHub Actions schema/,
+);
+assert.equal(
+  await evaluate(
+    'document.getElementById("scan-scope").textContent.includes("not a GitHub Actions schema validator")',
+  ),
+  true,
+);
+assert.equal(sample.rules.length, 3);
+for (const [rule] of research.caseRows)
+  assert.ok(
+    sample.rules.some((row) => row.includes(rule)),
+    rule,
+  );
+assert.equal(sample.errorHidden, true);
+checks.push({ scanner, sample });
+for (const width of [1440, 1024, 768, 390, 320]) {
   await send("Emulation.setDeviceMetricsOverride", {
     width,
     height: 1000,
@@ -72,9 +107,11 @@ for (const width of [1440, 768, 390, 320]) {
   });
   await new Promise((r) => setTimeout(r, 80));
   const dimensions = await evaluate(
-    '({width:innerWidth,scroll:document.documentElement.scrollWidth,buttons:document.querySelectorAll("[data-case]").length})',
+    '({width:innerWidth,scroll:document.documentElement.scrollWidth,illustrativeButtons:document.querySelectorAll("[data-case]").length,scanButton:!!document.getElementById("scan-button")})',
   );
   assert.ok(dimensions.scroll <= dimensions.width, JSON.stringify(dimensions));
+  assert.equal(dimensions.illustrativeButtons, 3);
+  assert.equal(dimensions.scanButton, true);
   checks.push({ viewport: width, ...dimensions, overflow: false });
 }
 for (const name of ["default", "bypass", "unknown"]) {
@@ -85,10 +122,108 @@ for (const name of ["default", "bypass", "unknown"]) {
   assert.equal(value.pressed, 1);
   checks.push({ control: name, ...value });
 }
+const setAndScan = (raw) =>
+  evaluate(`(() => {
+    const input = document.getElementById("workflow-yaml");
+    input.value = ${JSON.stringify(raw)};
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    document.getElementById("scan-button").click();
+    return {
+      heading: document.getElementById("scan-results-heading").textContent,
+      complete: document.getElementById("scan-completeness").textContent,
+      error: document.getElementById("scan-error").textContent,
+      outputHidden: document.getElementById("scan-output").hidden,
+      findingText: document.getElementById("scan-findings").textContent,
+      diagnostics: document.querySelectorAll("#scan-diagnostics li").length
+    };
+  })()`);
+const malformed = await setAndScan("on: [\njobs: {");
+assert.match(malformed.complete, /analysis_complete: false/);
+assert.ok(malformed.diagnostics > 0);
+assert.equal(malformed.outputHidden, false);
+const genericYaml = await setAndScan("foo: bar");
+assert.match(genericYaml.error, /not a GitHub Actions workflow/);
+assert.equal(genericYaml.outputHidden, true);
+const clean = await setAndScan(
+  "on: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ok\n",
+);
+assert.equal(clean.heading, "0 findings");
+assert.match(clean.findingText, /not proof of safety/i);
+assert.equal(clean.error, "");
+const empty = await setAndScan("  ");
+assert.match(empty.error, /Paste workflow YAML/);
+assert.equal(empty.outputHidden, true);
+const oversized = await evaluate(`(() => {
+  const input = document.getElementById("workflow-yaml");
+  input.value = "x".repeat(window.agentciScanWorkflow.maxChars + 1);
+  document.getElementById("scan-button").click();
+  return { error: document.getElementById("scan-error").textContent, outputHidden: document.getElementById("scan-output").hidden };
+})()`);
+assert.match(oversized.error, /too large/);
+assert.equal(oversized.outputHidden, true);
+const tooManySteps = await setAndScan(
+  `on: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n${Array.from({ length: 501 }, () => "      - run: echo ok").join("\n")}\n`,
+);
+assert.match(tooManySteps.error, /browser limit of 500 steps/);
+assert.equal(tooManySteps.outputHidden, true);
+checks.push({ malformed, genericYaml, clean, empty, oversized, tooManySteps });
+const filePick = await evaluate(`(async () => {
+  const sample = document.querySelector("#research pre code").textContent;
+  const selected = new File([sample], "<img src=x onerror=alert(1)>.yaml", { type: "text/yaml" });
+  const transfer = new DataTransfer();
+  transfer.items.add(selected);
+  const input = document.getElementById("workflow-file");
+  input.files = transfer.files;
+  input.dispatchEvent(new Event("change"));
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  return { loaded: document.getElementById("workflow-yaml").value === sample,
+    status: document.getElementById("scan-status").textContent,
+    injectedImageCount: document.querySelectorAll("img").length };
+})()`);
+assert.equal(filePick.loaded, true);
+assert.match(filePick.status, /loaded locally/);
+assert.equal(filePick.injectedImageCount, 0);
+checks.push({ filePick });
+const oversizeFile = await evaluate(`(async () => {
+  const selected = new File(["x".repeat(window.agentciScanWorkflow.maxChars + 1)], "oversized.yml");
+  const transfer = new DataTransfer();
+  transfer.items.add(selected);
+  const input = document.getElementById("workflow-file");
+  input.files = transfer.files;
+  input.dispatchEvent(new Event("change"));
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  return { yaml: document.getElementById("workflow-yaml").value,
+    error: document.getElementById("scan-error").textContent,
+    outputHidden: document.getElementById("scan-output").hidden };
+})()`);
+assert.equal(oversizeFile.yaml, "");
+assert.match(oversizeFile.error, /too large/);
+assert.equal(oversizeFile.outputHidden, true);
+checks.push({ oversizeFile });
+await evaluate('document.getElementById("workflow-yaml").focus()');
+await send("Input.dispatchKeyEvent", {
+  type: "keyDown",
+  key: "Tab",
+  code: "Tab",
+  windowsVirtualKeyCode: 9,
+  nativeVirtualKeyCode: 9,
+});
+await send("Input.dispatchKeyEvent", {
+  type: "keyUp",
+  key: "Tab",
+  code: "Tab",
+  windowsVirtualKeyCode: 9,
+  nativeVirtualKeyCode: 9,
+});
+const keyboardFocus = await evaluate("document.activeElement.id");
+assert.equal(keyboardFocus, "workflow-file");
+checks.push({ keyboardFocus });
 const broken = await evaluate(
   'Array.from(document.querySelectorAll("a[href^=\\\"#\\\"]")).filter(a=>a.hash && !document.getElementById(a.hash.slice(1))).map(a=>a.hash)',
 );
 assert.deepEqual(broken, []);
+await evaluate('document.getElementById("load-example").click()');
+await evaluate('document.getElementById("scan-button").click()');
 await fs.mkdir(root + "screenshots", { recursive: true });
 for (const [name, width] of [
   ["desktop", 1440],
@@ -129,6 +264,6 @@ await fs.writeFile(
   ) + "\n",
 );
 console.log(
-  "PASS: four responsive widths; three controls; anchor targets; no console exceptions or external asset requests. Desktop/mobile screenshots saved.",
+  "PASS: five responsive widths; real scanner, errors, file input, keyboard focus and three illustrative controls; no browser exceptions or external asset requests. Desktop/mobile screenshots saved.",
 );
 socket.close();

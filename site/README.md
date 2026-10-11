@@ -1,16 +1,11 @@
 # AgentCI Guard research site
 
-This is the source for the static page deployed to [cryptoaxiom.net](https://cryptoaxiom.net/) on 2026-10-11 (Cloudflare Pages deployment `a145c82a-bdbc-4333-9d31-58dd85567830`). It explains the scanner and replays one synthetic fixture from public scanner commit `5c045e0469f412aecd0f9d5f32876bf10c7fc66b`. It does not upload workflows or run a live scan, and it does not report measured accuracy.
+This directory builds the static [cryptoaxiom.net](https://cryptoaxiom.net/) site. The page explains the experimental scanner, replays one synthetic fixture from public commit `5c045e0469f412aecd0f9d5f32876bf10c7fc66b`, and offers a browser-local scan of one GitHub Actions YAML file. It does not measure precision or recall, connect to GitHub, or execute the workflow.
 
-Build from this directory with `python3 build.py`. The script copies only the four files in `src/` to `dist/` and writes `BUILD_MANIFEST.json` with SHA-256 hashes. The deployed asset hashes were:
+The browser scan uses the same `parseWorkflowFile` and `scanWorkflowFiles` core as the CLI, bundled into `scanner-browser.js`. Pasted text and chosen files stay in the browser; they are not uploaded. Input is capped at 250,000 characters, or 250,000 bytes for a selected file, and 500 steps across all jobs. Results use the virtual path `.github/workflows/input.yml`. The browser wrapper rejects obvious malformed structure but is not a GitHub Actions schema validator. Repository config and other local reusable workflow files are unavailable to this one-file scan, so a complete repository review still needs the CLI or GitHub Action. Always read `diagnostics` and `analysis_complete`; zero findings does not prove safety.
 
-| File         | SHA-256                                                            |
-| ------------ | ------------------------------------------------------------------ |
-| `index.html` | `5f66c631390a18341152d6a780aac95b76b1708542a22394c9754065ac2b02b3` |
-| `styles.css` | `ad9093b0efdcd64a129bf54cfb9350bc5278041d13923b0a39dca321631aa4f6` |
-| `app.js`     | `3b5c28184ebdd6cf1ff38a84d817dc1a0adb6cd9b175f7e40ee5808da32248fd` |
-| `_headers`   | `ef24fb2358900654f58ca9eedbb33f7f125e83dca707029f70ec8032e4daded3` |
+From the repository root, run `pnpm site:check`. This builds the scanner and the six allowlisted site assets, verifies the browser bundle against the scanner on adversarial fixtures, and writes `site/BUILD_MANIFEST.json` with SHA-256 hashes. The assets are `index.html`, `styles.css`, `app.js`, `scanner-browser.js`, `_headers`, and `THIRD_PARTY_LICENSES.txt`. No extra browser dependency or hosted API is used.
 
-The browser check is `node render-check.mjs` with Chrome/Chromium already listening on local DevTools port 9337. It checks 1440, 768, 390, and 320 px layouts, the illustrative buttons, internal links, browser exceptions, and external asset requests. The script writes ignored screenshots and `VISUAL_CHECKS.json`.
+For the rendered check, start Chrome or Chromium with DevTools on local port 9337, then run `node site/render-check.mjs`. It checks the real sample scan, malformed/non-workflow/empty/oversized inputs, local file loading, keyboard focus, the original illustrative controls, anchors, five viewport widths, console exceptions, and external requests. It writes ignored screenshots and `site/VISUAL_CHECKS.json`. The local `file://` check does not apply Cloudflare response headers; verify those on the live deployment separately.
 
-The original production rollback is deployment `d732b37d-480c-49c4-a73d-60cb88bef059`. Direct-upload deployment does not mean the scanner source, benchmark, or human evaluation changed; those live in the repository root. The v3 benchmark is development-only and has no human labels. A fresh repository-disjoint v4 evaluation is required before any precision or recall claim.
+The previous informational-page deployment on 2026-10-11 was Cloudflare Pages deployment `a145c82a-bdbc-4333-9d31-58dd85567830`; that receipt and its hashes do not prove this interactive revision is live. The original rollback deployment is `d732b37d-480c-49c4-a73d-60cb88bef059`. The v3 benchmark remains development-only without human labels. A fresh repository-disjoint v4 evaluation is required before any precision or recall claim.

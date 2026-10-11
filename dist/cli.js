@@ -18719,6 +18719,8 @@ var package_default = {
     "benchmark:verify": "node scripts/benchmark/verify-snapshot.mjs && node scripts/benchmark/generate-annotation-sheet.mjs --check && node scripts/benchmark/generate-review-sheet.mjs --check && node scripts/benchmark/generate-pilot-sheet.mjs --check && node scripts/benchmark/validate-labels.mjs",
     "benchmark:smoke": "node scripts/benchmark/smoke-annotation-toolchain.mjs",
     "benchmark:behavior": "node scripts/benchmark/report-behavior.mjs --out evidence/behavior",
+    "site:build": "python3 site/build.py",
+    "site:check": "npm run build && python3 site/build.py && node site/check-browser-scanner.mjs",
     "licenses:check": "node scripts/generate-third-party-licenses.mjs --check",
     "package:smoke": "node scripts/verify-standalone-package.mjs"
   },
@@ -18763,7 +18765,9 @@ var package_default = {
     ajv: "^8.20.0",
     "ajv-draft-04": "1.0.0",
     "ajv-formats": "^3.0.1",
+    esbuild: "0.27.7",
     prettier: "^3.8.3",
+    pathe: "2.0.3",
     tsup: "^8.5.1",
     tsx: "^4.21.0",
     typescript: "^5.9.3",
