@@ -97,7 +97,7 @@ await evaluate('document.getElementById("scan-button").click()');
 const sample = await evaluate(
   '({heading:document.getElementById("scan-results-heading").textContent,complete:document.getElementById("scan-completeness").textContent,usages:Array.from(document.querySelectorAll("#scan-agent-usages li")).map(li=>li.textContent),rules:Array.from(document.querySelectorAll("#scan-findings li")).map(li=>li.textContent),diagnostics:document.querySelectorAll("#scan-diagnostics li").length,errorHidden:document.getElementById("scan-error").hidden})',
 );
-assert.equal(sample.heading, "2 findings");
+assert.equal(sample.heading, "2 findings for published sample");
 assert.match(sample.complete, /analysis_complete: true/);
 assert.match(
   sample.complete,
@@ -112,7 +112,7 @@ assert.equal(
 assert.equal(sample.rules.length, 2);
 assert.equal(sample.usages.length, 1);
 assert.match(sample.usages[0], /Evidence:.*anthropics\/claude-code-action@/);
-assert.match(sample.usages[0], /Location:.*input\.yml:/);
+assert.match(sample.usages[0], /Virtual location:.*input\.yml:/);
 for (const [rule] of research.caseRows)
   assert.ok(
     sample.rules.some((row) => row.includes(rule)),
@@ -179,14 +179,14 @@ assert.equal(genericYaml.outputHidden, true);
 const clean = await setAndScan(
   "on: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ok\n",
 );
-assert.equal(clean.heading, "0 findings");
+assert.equal(clean.heading, "0 findings for pasted YAML");
 assert.match(clean.findingText, /not proof of safety/i);
 assert.match(clean.usageText, /No supported agent-use step detected/);
 assert.equal(clean.error, "");
 const usageOnly = await setAndScan(
   "on: push\npermissions:\n  contents: read\njobs:\n  agent:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Agent\n        uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567\n        with:\n          prompt: hi\n",
 );
-assert.equal(usageOnly.heading, "0 findings");
+assert.equal(usageOnly.heading, "0 findings for pasted YAML");
 assert.equal(usageOnly.usageRows, 1);
 assert.match(usageOnly.usageText, /Evidence:.*anthropics\/claude-code-action@/);
 assert.match(usageOnly.complete, /analysis_complete: true/);
@@ -255,6 +255,7 @@ checks.push({
   oversized,
   tooManySteps,
 });
+await evaluate("window.confirm = () => true");
 const filePick = await evaluate(`(async () => {
   const sample = document.querySelector("#research pre code").textContent;
   const selected = new File([sample], "<img src=x onerror=alert(1)>.yaml", { type: "text/yaml" });
@@ -264,7 +265,8 @@ const filePick = await evaluate(`(async () => {
   input.files = transfer.files;
   input.focus();
   input.dispatchEvent(new Event("change"));
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  for (let attempt = 0; attempt < 100 && document.getElementById("scan-button").disabled; attempt++)
+    await new Promise((resolve) => setTimeout(resolve, 20));
   return { loaded: document.getElementById("workflow-yaml").value === sample,
     status: document.getElementById("scan-status").textContent,
     injectedImageCount: document.querySelectorAll("img").length,
@@ -274,7 +276,45 @@ assert.equal(filePick.loaded, true);
 assert.match(filePick.status, /loaded locally/);
 assert.equal(filePick.injectedImageCount, 0);
 assert.equal(filePick.focus, "workflow-file");
-checks.push({ filePick });
+const uploadedScan = await evaluate(`(() => {
+  document.getElementById("scan-button").click();
+  return { heading: document.getElementById("scan-results-heading").textContent,
+    status: document.getElementById("scan-status").textContent,
+    location: document.getElementById("scan-findings").textContent };
+})()`);
+assert.match(uploadedScan.heading, /<img src=x onerror=alert\(1\)>\.yaml/);
+assert.match(uploadedScan.status, /virtual scanner paths/);
+assert.match(
+  uploadedScan.location,
+  /Virtual location: \.github\/workflows\/input\.yml/,
+);
+checks.push({ filePick, uploadedScan });
+await send("Emulation.setDeviceMetricsOverride", {
+  width: 320,
+  height: 700,
+  deviceScaleFactor: 1,
+  mobile: false,
+});
+const longFilename = await evaluate(`(async () => {
+  const name = "x".repeat(220) + ".yaml";
+  const selected = new File(["on: push\\njobs:\\n  test:\\n    runs-on: ubuntu-latest\\n    steps:\\n      - run: echo ok\\n"], name, { type: "text/yaml" });
+  const transfer = new DataTransfer();
+  transfer.items.add(selected);
+  const input = document.getElementById("workflow-file");
+  input.files = transfer.files;
+  input.dispatchEvent(new Event("change"));
+  for (let attempt = 0; attempt < 100 && document.getElementById("scan-button").disabled; attempt++)
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  document.getElementById("scan-button").click();
+  return { named: document.getElementById("scan-results-heading").textContent.includes(name),
+    width: innerWidth, scroll: document.documentElement.scrollWidth };
+})()`);
+assert.equal(longFilename.named, true);
+assert.ok(
+  longFilename.scroll <= longFilename.width,
+  JSON.stringify(longFilename),
+);
+checks.push({ longFilename });
 const oversizeFile = await evaluate(`(async () => {
   const pasted = "on: push";
   const yaml = document.getElementById("workflow-yaml");
@@ -286,7 +326,8 @@ const oversizeFile = await evaluate(`(async () => {
   const input = document.getElementById("workflow-file");
   input.files = transfer.files;
   input.dispatchEvent(new Event("change"));
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  for (let attempt = 0; attempt < 100 && document.getElementById("scan-button").disabled; attempt++)
+    await new Promise((resolve) => setTimeout(resolve, 20));
   return { pastedPreserved: yaml.value === pasted,
     error: document.getElementById("scan-error").textContent,
     outputHidden: document.getElementById("scan-output").hidden };

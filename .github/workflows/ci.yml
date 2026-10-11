@@ -55,6 +55,26 @@ jobs:
       - name: Verify browser scanner parity
         run: pnpm site:check
 
+      - name: Verify site interactions in Chrome
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          google-chrome --headless=new --no-sandbox --allow-file-access-from-files \
+            --remote-debugging-port=9337 \
+            --user-data-dir="$RUNNER_TEMP/agentci-site-chrome" about:blank \
+            >"$RUNNER_TEMP/agentci-site-chrome.log" 2>&1 &
+          chrome_pid=$!
+          trap 'kill "$chrome_pid" 2>/dev/null || true' EXIT
+          for ((attempt = 0; attempt < 50; attempt++)); do
+            if curl --fail --silent http://127.0.0.1:9337/json/version >/dev/null; then
+              node site/render-check.mjs
+              exit 0
+            fi
+            sleep 0.2
+          done
+          sed -n '1,120p' "$RUNNER_TEMP/agentci-site-chrome.log"
+          exit 1
+
       - name: Verify committed Action bundle
         run: |
           git diff --exit-code -- dist
