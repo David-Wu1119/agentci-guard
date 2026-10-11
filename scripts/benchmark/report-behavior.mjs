@@ -19,6 +19,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
+const REPORT_SCHEMA_VERSION = 2;
 const args = process.argv.slice(2);
 const flag = (name) => {
   const index = args.indexOf(name);
@@ -90,6 +91,7 @@ function report(outDir) {
           file: finding.file,
           job: finding.job ?? null,
           step: finding.step ?? null,
+          step_index: finding.step_index ?? null,
           line: finding.line ?? null,
         }))
         .sort(sortFinding),
@@ -100,6 +102,7 @@ function report(outDir) {
           severity: diagnostic.severity,
           file: diagnostic.file,
           job: diagnostic.job ?? null,
+          step_index: diagnostic.step_index ?? null,
           line: diagnostic.line ?? null,
         }))
         .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
@@ -108,6 +111,7 @@ function report(outDir) {
 
   mkdirSync(outDir, { recursive: true });
   const meta = {
+    report_schema_version: REPORT_SCHEMA_VERSION,
     generated_at: new Date().toISOString(),
     commit: git("rev-parse HEAD"),
     working_tree_changes: git("status --porcelain").split("\n").filter(Boolean)
@@ -229,6 +233,14 @@ function summarize(meta, records) {
 function compare(beforePath, afterPath) {
   const before = JSON.parse(readFileSync(beforePath, "utf8"));
   const after = JSON.parse(readFileSync(afterPath, "utf8"));
+  if (
+    before.meta?.report_schema_version !== REPORT_SCHEMA_VERSION ||
+    after.meta?.report_schema_version !== REPORT_SCHEMA_VERSION
+  ) {
+    throw new Error(
+      `Unsupported behavioral report schema (before: ${before.meta?.report_schema_version ?? "missing"}, after: ${after.meta?.report_schema_version ?? "missing"}). Regenerate both reports with this reporter before comparing.`,
+    );
+  }
   const byId = (doc) => new Map(doc.cases.map((c) => [c.case_id, c]));
   const a = byId(before);
   const b = byId(after);
@@ -237,14 +249,30 @@ function compare(beforePath, afterPath) {
     c && c.scanned
       ? {
           findings: c.findings
-            .map(
-              (f) =>
-                `${f.rule_id}|${f.severity}|${f.file}|${f.job ?? ""}|${f.step ?? ""}`,
+            .map((f) =>
+              JSON.stringify([
+                f.rule_id,
+                f.severity,
+                f.file,
+                f.job ?? null,
+                f.step ?? null,
+                f.step_index ?? null,
+                f.line ?? null,
+              ]),
             )
             .sort(),
           complete: c.analysis_complete,
           diagnostics: c.diagnostics
-            .map((d) => `${d.code}|${d.file}|${d.job ?? ""}`)
+            .map((d) =>
+              JSON.stringify([
+                d.code,
+                d.severity,
+                d.file,
+                d.job ?? null,
+                d.step_index ?? null,
+                d.line ?? null,
+              ]),
+            )
             .sort(),
         }
       : { scanned: false };
@@ -258,22 +286,17 @@ function compare(beforePath, afterPath) {
     if (JSON.stringify(x) === JSON.stringify(y)) continue;
     changed++;
     console.log(`## ${id} (${(b.get(id) ?? a.get(id)).repository})`);
-    const removed = (x.findings ?? []).filter(
-      (f) => !(y.findings ?? []).includes(f),
-    );
-    const added = (y.findings ?? []).filter(
-      (f) => !(x.findings ?? []).includes(f),
-    );
+    const removed = multisetDifference(x.findings ?? [], y.findings ?? []);
+    const added = multisetDifference(y.findings ?? [], x.findings ?? []);
     for (const f of removed) console.log(`- removed: ${f}`);
     for (const f of added) console.log(`- added:   ${f}`);
     if (x.complete !== y.complete)
       console.log(`- analysis_complete: ${x.complete} → ${y.complete}`);
-    const dRemoved = (x.diagnostics ?? []).filter(
-      (d) => !(y.diagnostics ?? []).includes(d),
+    const dRemoved = multisetDifference(
+      x.diagnostics ?? [],
+      y.diagnostics ?? [],
     );
-    const dAdded = (y.diagnostics ?? []).filter(
-      (d) => !(x.diagnostics ?? []).includes(d),
-    );
+    const dAdded = multisetDifference(y.diagnostics ?? [], x.diagnostics ?? []);
     for (const d of dRemoved) console.log(`- diagnostic removed: ${d}`);
     for (const d of dAdded) console.log(`- diagnostic added:   ${d}`);
     console.log("");
@@ -292,11 +315,23 @@ function compare(beforePath, afterPath) {
   console.log(`\n${changed} of ${ids.length} cases changed.`);
 }
 
+function multisetDifference(left, right) {
+  const unmatched = [...right];
+  return left.filter((item) => {
+    const index = unmatched.indexOf(item);
+    if (index === -1) return true;
+    unmatched.splice(index, 1);
+    return false;
+  });
+}
+
 function sortFinding(a, b) {
   return (
     a.file.localeCompare(b.file) ||
     (a.job ?? "").localeCompare(b.job ?? "") ||
     (a.step ?? "").localeCompare(b.step ?? "") ||
+    (a.step_index ?? -1) - (b.step_index ?? -1) ||
+    (a.line ?? -1) - (b.line ?? -1) ||
     a.rule_id.localeCompare(b.rule_id)
   );
 }

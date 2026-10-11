@@ -103,11 +103,13 @@ pnpm benchmark:behavior                       # writes evidence/behavior/{cases.
 node scripts/benchmark/report-behavior.mjs --compare before/cases.json after/cases.json
 ```
 
-It scans exactly the manifest's cases, records findings, diagnostics, and
-completeness per case with stable ordering, splits cases four ways
-(complete/incomplete × findings/none), and lists every case that moved between
-two runs. A failure to load a case is an explicit failed row, never a dropped
-one. It is a behavioral report, not an accuracy measurement. The manual
+It scans exactly the manifest's cases, records finding and diagnostic identity
+(including job-local step index and line) and completeness per case with stable
+ordering, splits cases four ways (complete/incomplete × findings/none), and
+lists changes to those recorded fields between two runs. Regenerate both
+reports with the same reporter schema before comparing them. A failure to load
+a case is an explicit failed row, never a dropped one. This does not compare
+message or evidence wording and is not an accuracy measurement. The manual
 pattern it replaces:
 
 ```bash

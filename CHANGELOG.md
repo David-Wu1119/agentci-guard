@@ -26,6 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Text/Markdown reports and the browser now show job-local step indices for
+  findings; the browser also shows them for agent-use steps. Same-line or
+  identically named steps therefore remain distinct in those outputs.
+  The development behavioral report also preserves step indices and compares
+  location/severity changes and duplicate counts. Its schema is now v2;
+  historical reports must be regenerated before comparison. No scanner rule
+  changed, and these reports are not accuracy measurements.
 - Step-scoped diagnostics now carry `step_index` in JSON, SARIF, text,
   Markdown, and the browser display. The development scorer no longer assigns
   one step's uncertainty to another step in the same job.
