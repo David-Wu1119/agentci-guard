@@ -156,15 +156,16 @@ them is visible as an expression.
 The first is interpolation: `${{ github.event.issue.title }}` and its siblings
 expanded into a prompt, an input, or a `run:` block. This is what
 `agentci/untrusted-input-in-prompt` reports.
-For local agent CLIs, the current candidate conservatively treats a whole
-`run:` step as one sink. It can therefore attribute text in an unrelated
-command of the same step to the AI invocation; that is an unresolved
-false-positive path. For a direct hosted-agent HTTP POST, the candidate
-instead traces the request body and only environment variables referenced by
-that body. A source used solely by an unrelated command is not a proven prompt
-input; opaque or unresolved shell flow emits
-`agentci/analysis-run-dataflow-unknown`. The direct-`curl` parser is not a
-general shell dataflow analysis, and CLI command-level flow remains open.
+For a local agent CLI, the candidate traces the recognized command and only
+environment variables expanded in it. A source used solely by a sibling
+command is not a proven CLI input. The local CLI nevertheless inherits its
+environment: an unreferenced untrusted environment value leaves analysis
+incomplete instead of proving ingestion or safety. Shell assignments, pipes,
+stdin redirection, and other unresolved flow likewise emit
+`agentci/analysis-run-dataflow-unknown`. For a direct hosted-agent HTTP POST,
+the candidate traces the request body and only environment variables
+referenced by that body. These bounded parsers are not general shell dataflow
+analysis.
 
 The second route is Action self-fetching, which depends on vendor and mode.
 At the pinned Anthropic revision, [tag mode fetches parent Issue/PR data](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/modes/tag/index.ts)

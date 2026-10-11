@@ -75,19 +75,21 @@ guard. Other activity types remain conservative. These distinctions affect
 both `untrusted-input-in-prompt` and
 the write-token rules; they do not revise the archived v0.1.1 pilot contract.
 
-Direct interpolation is checked in `uses`, `run`, `with`, `shell`,
-`working-directory`, and the effective workflow → job → step environment.
-Step `name`, `id`, `if`, and other display/control metadata do not pass text
-to the agent and are not direct-input sinks. This does not prove that every
-value in `with` or the environment is consumed by the agent. A local CLI
-`run:` step with multiple commands is still treated as one sink: text
-interpolated only into an unrelated command can cause a false positive. For a
-direct hosted-agent HTTP POST, the candidate instead traces the request body
-and environment variables referenced by that body. Unrelated commands and
-unused environment values are not proven prompt input. Opaque or unresolved
-shell flow emits `analysis-run-dataflow-unknown`; this bounded parser is not a
-general shell dataflow analysis. CLI command-level flow remains unresolved
-before freezing the nine-rule evaluation.
+Action inputs are checked in `uses`, `with`, and the effective workflow →
+job → step environment. Step `name`, `id`, `if`, and other display/control
+metadata do not pass text to the agent and are not direct-input sinks. This
+does not prove that every Action input or environment value is consumed. For
+a local CLI `run:`, the candidate traces the recognized command and
+environment values expanded in it, rather than attributing a sibling
+command's text to the agent. An inherited untrusted environment value that
+is not referenced in the CLI command is not proven prompt input, but the
+local process can still read it; this emits
+`analysis-run-dataflow-unknown`, not a clean result. For a direct hosted-agent
+HTTP POST, the candidate traces the request body and environment variables
+referenced by that body. Unrelated commands and unused environment values are
+not proven HTTP prompt input. Opaque or unresolved shell flow emits
+`analysis-run-dataflow-unknown`; this bounded parser is not a general shell
+dataflow analysis.
 
 The candidate recognizes documented hosted-agent creation/follow-up routes
 only when a direct `curl` command sends POST. GET list/status calls and URL

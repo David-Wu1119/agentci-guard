@@ -214,7 +214,8 @@ export const SELF_GATED_EVENTS = new Set([
 
 export function looksLikeAiUsage(value: string): boolean {
   return (
-    AI_AGENT_PATTERNS.some((pattern) => pattern.test(value)) ||
+    looksLikeAiAction(value) ||
+    looksLikeAiCli(value) ||
     looksLikeAiHttpDispatch(value)
   );
 }
@@ -243,7 +244,11 @@ export function looksLikeAiAction(value: string): boolean {
  * A local CLI invocation, separate from an HTTP dispatch to a remote agent.
  */
 export function looksLikeAiCli(value: string): boolean {
-  return AI_AGENT_CLI_PATTERNS.some((pattern) => pattern.test(value));
+  // A command substitution executes too, but scanner.ts treats its dataflow
+  // as opaque rather than claiming a proven direct CLI sink.
+  return (
+    aiCliInvocations(value).length > 0 || hasOpaqueAiCliSubstitution(value)
+  );
 }
 
 export function looksLikeAiHttpDispatch(value: string): boolean {
@@ -251,6 +256,12 @@ export function looksLikeAiHttpDispatch(value: string): boolean {
 }
 
 type ShellWord = { text: string; expandableText: string };
+export type AiCliInvocation = {
+  command: string;
+  expandableCommand: string;
+  pipedInput: string;
+  opaqueInput: boolean;
+};
 type AiHttpDispatch = {
   command: string;
   payload: string;
@@ -272,11 +283,27 @@ function shellWords(value: string): ShellWord[] {
     expandableText = "";
     started = false;
   };
-  for (const character of value) {
+  for (let index = 0; index < value.length; index++) {
+    const character = value[index];
     if (escaped) {
       text += character;
       if (character !== "$") expandableText += character;
       escaped = false;
+    } else if (value.startsWith("${{", index)) {
+      // Actions evaluates expressions before invoking the runner shell, even
+      // when the expression appears inside shell single quotes. Preserve the
+      // full expression so its own quoted punctuation cannot be re-parsed as
+      // shell syntax or hide a context field from the source matcher.
+      const end = githubExpressionEnd(value, index);
+      if (end < 0) {
+        text += character;
+        if (quote !== "'") expandableText += character;
+      } else {
+        const expression = value.slice(index, end);
+        text += expression;
+        expandableText += expression;
+        index = end - 1;
+      }
     } else if (character === "\\" && quote !== "'") {
       escaped = true;
     } else if (quote) {
@@ -302,12 +329,48 @@ function shellWords(value: string): ShellWord[] {
   return words;
 }
 
-export function aiHttpDispatches(value: string): AiHttpDispatch[] {
-  // shortcut: direct curl commands only; extend with a shell parser if a
-  // measured miss shows dispatch through wrappers or generated scripts.
-  const dispatches: AiHttpDispatch[] = [];
+function heredocDelimiter(line: string): string {
+  let quote = "";
+  let escaped = false;
+  for (let index = 0; index < line.length - 1; index++) {
+    const character = line[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (character === "\\" && quote !== "'") {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      if (character === quote) quote = "";
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+    if (character === "#" && (index === 0 || /\s/.test(line[index - 1]))) break;
+    if (line.startsWith("${{", index)) {
+      const end = githubExpressionEnd(line, index);
+      if (end >= 0) index = end - 1;
+      continue;
+    }
+    if (line.startsWith("<<<", index) || !line.startsWith("<<", index))
+      continue;
+    const operand = line
+      .slice(index + 2)
+      .match(
+        /^-?\s*(?:'([A-Za-z_][\w-]*)'|"([A-Za-z_][\w-]*)"|([A-Za-z_][\w-]*))/,
+      );
+    if (operand) return operand[1] ?? operand[2] ?? operand[3];
+  }
+  return "";
+}
+
+function shellScriptWithoutHeredocBodies(value: string): string {
   let heredoc = "";
-  const script = value
+  return value
     .replace(/\\\r?\n/g, " ")
     .split("\n")
     .filter((line) => {
@@ -315,10 +378,236 @@ export function aiHttpDispatches(value: string): AiHttpDispatch[] {
         if (line.trim() === heredoc) heredoc = "";
         return false;
       }
-      heredoc = /<<-?\s*(['"]?)([A-Za-z_][\w-]*)\1/.exec(line)?.[2] ?? "";
+      heredoc = heredocDelimiter(line);
       return true;
     })
     .join("\n");
+}
+
+/** Find GitHub's closing expression delimiter outside quoted string literals. */
+function githubExpressionEnd(value: string, start: number): number {
+  let quoted = false;
+  for (let index = start + 3; index < value.length; index++) {
+    if (value[index] === "'") {
+      if (quoted && value[index + 1] === "'") index++;
+      else quoted = !quoted;
+    } else if (!quoted && value.startsWith("}}", index)) {
+      return index + 2;
+    }
+  }
+  return -1;
+}
+
+/** Keep nested shell substitutions opaque instead of promoting inner commands. */
+function commandSubstitutionEnd(value: string, start: number): number {
+  let depth = 1;
+  let quote = "";
+  let escaped = false;
+  for (let index = start + 2; index < value.length; index++) {
+    const character = value[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (character === "\\" && quote !== "'") {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      if (character === quote) quote = "";
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+    if (value.startsWith("${{", index)) {
+      const end = githubExpressionEnd(value, index);
+      if (end >= 0) index = end - 1;
+      continue;
+    }
+    if (character === "(") depth++;
+    if (character === ")" && --depth === 0) return index + 1;
+  }
+  return -1;
+}
+
+/**
+ * Split only the shell constructs needed to associate a directly executed
+ * agent CLI with its own arguments. This is not a general shell parser:
+ * scanner.ts reports an analysis diagnostic for opaque stdin/variable flow.
+ */
+function shellCommandSegments(
+  value: string,
+): Array<{ command: string; pipedInput: string }> {
+  const script = shellScriptWithoutHeredocBodies(value);
+  const segments: Array<{ command: string; pipedInput: string }> = [];
+  let start = 0;
+  let quote = "";
+  let escaped = false;
+  let pipeline = "";
+  const push = (end: number, separator: string) => {
+    const command = script.slice(start, end).trim();
+    if (command) segments.push({ command, pipedInput: pipeline });
+    pipeline =
+      separator === "|" || separator === "|&"
+        ? [pipeline, command].filter(Boolean).join("\n")
+        : "";
+    start = end + separator.length;
+  };
+  for (let index = 0; index < script.length; index++) {
+    const character = script[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (character === "\\" && quote !== "'") {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      if (character === quote) quote = "";
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+    // GitHub expressions are substituted before the shell runs; punctuation
+    // inside one is not a shell command separator.
+    if (script.startsWith("${{", index)) {
+      const end = githubExpressionEnd(script, index);
+      if (end >= 0) {
+        index = end - 1;
+        continue;
+      }
+    }
+    if (script.startsWith("$(", index)) {
+      const end = commandSubstitutionEnd(script, index);
+      index = end >= 0 ? end - 1 : script.length - 1;
+      continue;
+    }
+    // `2>&1` duplicates a file descriptor; its `&` is not a command boundary.
+    if (character === "&" && script[index - 1] === ">") continue;
+    if ("\n;&|()".includes(character)) {
+      const next = script[index + 1];
+      const paired =
+        ((character === "&" || character === "|") && next === character) ||
+        (character === "|" && next === "&");
+      const separator = paired ? character + next : character;
+      push(index, separator);
+      if (paired) index++;
+    }
+  }
+  push(script.length, "");
+  return segments;
+}
+
+function firstUnquotedRedirection(command: string): number {
+  let quote = "";
+  let escaped = false;
+  for (let index = 0; index < command.length; index++) {
+    const character = command[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (character === "\\" && quote !== "'") {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      if (character === quote) quote = "";
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+    if (command.startsWith("${{", index)) {
+      const end = githubExpressionEnd(command, index);
+      if (end >= 0) {
+        index = end - 1;
+        continue;
+      }
+    }
+    if (character === "<" || character === ">") return index;
+  }
+  return -1;
+}
+
+/** Direct local CLI commands, excluding sibling commands and shell comments. */
+export function aiCliInvocations(value: string): AiCliInvocation[] {
+  const invocations: AiCliInvocation[] = [];
+  for (const segment of shellCommandSegments(value)) {
+    const redirection = firstUnquotedRedirection(segment.command);
+    const command =
+      redirection >= 0
+        ? segment.command.slice(0, redirection)
+        : segment.command;
+    const words = shellWords(command);
+    const executable = words.map((word) => word.text).join(" ");
+    if (
+      !AI_AGENT_CLI_PATTERNS.some(
+        (pattern) => pattern.exec(executable)?.index === 0,
+      )
+    ) {
+      continue;
+    }
+    // The shell also accepts arguments *after* a redirect. We intentionally
+    // exclude the redirect tail from proven prompt material, but cannot call
+    // the command complete without parsing that tail's remaining arguments.
+    const opaqueInput =
+      redirection >= 0 || words.some((word) => /\$\(|`/.test(word.text));
+    invocations.push({
+      command: words.map((word) => word.text).join(" "),
+      expandableCommand: words.map((word) => word.expandableText).join(" "),
+      pipedInput: segment.pipedInput,
+      opaqueInput,
+    });
+  }
+  return invocations;
+}
+
+/**
+ * A CLI named inside a nested command substitution can execute even when the
+ * bounded command splitter cannot attribute its arguments. Do not report it
+ * as a proven direct invocation; let the scanner mark analysis incomplete.
+ */
+export function hasOpaqueAiCliSubstitution(value: string): boolean {
+  const script = shellScriptWithoutHeredocBodies(value);
+  let quote = "";
+  let escaped = false;
+  for (let index = 0; index < script.length - 1; index++) {
+    const character = script[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (character === "\\" && quote !== "'") {
+      escaped = true;
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      if (!quote) quote = character;
+      else if (quote === character) quote = "";
+      continue;
+    }
+    if (quote !== "'" && character === "$" && script[index + 1] === "(") {
+      const end = commandSubstitutionEnd(script, index);
+      const body = script.slice(index + 2, end >= 0 ? end - 1 : undefined);
+      if (AI_AGENT_CLI_PATTERNS.some((pattern) => pattern.test(body)))
+        return true;
+    }
+  }
+  return false;
+}
+
+export function aiHttpDispatches(value: string): AiHttpDispatch[] {
+  // shortcut: direct curl commands only; extend with a shell parser if a
+  // measured miss shows dispatch through wrappers or generated scripts.
+  const dispatches: AiHttpDispatch[] = [];
+  const script = shellScriptWithoutHeredocBodies(value);
   for (const match of script.matchAll(
     /(?:^|[\n;&|()])\s*curl\b([^\n;&|]*)/gim,
   )) {

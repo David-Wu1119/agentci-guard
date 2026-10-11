@@ -4,14 +4,15 @@ import YAML from "yaml";
 import { loadConfig, matchesPath, parseInlineIgnores } from "./config.js";
 import type { AgentciConfig } from "./config.js";
 import {
+  aiCliInvocations,
   aiHttpDispatches,
   containsSecretReference,
   containsShellAccess,
   hasAgentGateBypass,
+  hasOpaqueAiCliSubstitution,
   isPinnedAction,
   isSelfGatingAgentAction,
   looksLikeAiAction,
-  looksLikeAiCli,
   SELF_GATED_EVENTS,
   untrustedGitHubContextMatches,
 } from "./detect.js";
@@ -460,14 +461,33 @@ function analyzeWorkflow(
       );
       const stepUsesAiAction = looksLikeAiAction(actionReference);
       const materializedRun = materializeInputs(stepRun, context.inputValues);
-      const stepUsesAiCli = looksLikeAiCli(materializedRun);
+      const cliInvocations = aiCliInvocations(materializedRun);
+      const stepUsesAiCli = cliInvocations.length > 0;
       const httpDispatches = aiHttpDispatches(materializedRun);
       const stepUsesAi =
         stepUsesAiAction || stepUsesAiCli || httpDispatches.length > 0;
+      if (hasOpaqueAiCliSubstitution(materializedRun)) {
+        output.diagnostics.push({
+          code: "agentci/analysis-run-dataflow-unknown",
+          kind: "analysis",
+          severity: "warning",
+          file,
+          job: jobName,
+          line: stepLine,
+          message:
+            "A possible AI CLI inside command substitution could not be attributed to an executable command.",
+        });
+      }
       const httpOnly =
         httpDispatches.length > 0 && !stepUsesAiCli && !stepUsesAiAction;
       const httpCommands = httpDispatches
         .map((dispatch) => dispatch.command)
+        .join("\n");
+      const cliCommands = cliInvocations
+        .map((invocation) => invocation.command)
+        .join("\n");
+      const cliExpandableCommands = cliInvocations
+        .map((invocation) => invocation.expandableCommand)
         .join("\n");
       const payload = httpDispatches
         .map((dispatch) => dispatch.payload)
@@ -490,17 +510,23 @@ function analyzeWorkflow(
             );
           }),
         );
-      const sinkMaterial = httpOnly
-        ? JSON.stringify({
+      const cliEnvironment = referencedEnvironment(
+        cliCommands,
+        cliExpandableCommands,
+      );
+      const sinkMaterial = stepUsesAiAction
+        ? materialized
+        : JSON.stringify({
+            cli: cliCommands,
+            cli_env: cliEnvironment,
             payload,
-            env: referencedEnvironment(
+            http_env: referencedEnvironment(
               payload,
               httpDispatches
                 .map((dispatch) => dispatch.expandablePayload)
                 .join("\n"),
             ),
-          })
-        : materialized;
+          });
       const secretMaterial = httpOnly
         ? JSON.stringify({
             command: httpCommands,
@@ -553,6 +579,39 @@ function analyzeWorkflow(
             ),
         );
       const sinkMatches = activeMatches(sinkMaterial);
+      if (
+        stepUsesAiCli &&
+        (cliInvocations.some(
+          (invocation) =>
+            invocation.opaqueInput ||
+            activeMatches(invocation.pipedInput).length > 0,
+        ) ||
+          (activeMatches(materializedRun).length > 0 &&
+            [
+              ...cliExpandableCommands.matchAll(
+                /\$(?:\{([A-Za-z_]\w*)\}|([A-Za-z_]\w*))/g,
+              ),
+            ].some(
+              (match) =>
+                !Object.prototype.hasOwnProperty.call(
+                  effectiveEnvironment,
+                  match[1] ?? match[2],
+                ),
+            )) ||
+          (activeMatches(JSON.stringify(effectiveEnvironment)).length > 0 &&
+            activeMatches(JSON.stringify(cliEnvironment)).length === 0))
+      ) {
+        output.diagnostics.push({
+          code: "agentci/analysis-run-dataflow-unknown",
+          kind: "analysis",
+          severity: "warning",
+          file,
+          job: jobName,
+          line: stepLine,
+          message:
+            "The local AI CLI's stdin, shell variables, or inherited environment may carry input that command-level analysis cannot prove.",
+        });
+      }
       if (
         httpOnly &&
         ((activeMatches(materializedRun).length > 0 &&

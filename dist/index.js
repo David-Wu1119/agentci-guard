@@ -7636,7 +7636,7 @@ var SELF_GATED_EVENTS = /* @__PURE__ */ new Set([
   "pull_request_review_comment"
 ]);
 function looksLikeAiUsage(value) {
-  return AI_AGENT_PATTERNS.some((pattern) => pattern.test(value)) || looksLikeAiHttpDispatch(value);
+  return looksLikeAiAction(value) || looksLikeAiCli(value) || looksLikeAiHttpDispatch(value);
 }
 function looksLikeAiAction(value) {
   const reference = value.trim().replace(/^docker:\/\/(?:(?:localhost|[^/]*[.:][^/]*)\/)?/i, "");
@@ -7645,7 +7645,7 @@ function looksLikeAiAction(value) {
   );
 }
 function looksLikeAiCli(value) {
-  return AI_AGENT_CLI_PATTERNS.some((pattern) => pattern.test(value));
+  return aiCliInvocations(value).length > 0 || hasOpaqueAiCliSubstitution(value);
 }
 function looksLikeAiHttpDispatch(value) {
   return aiHttpDispatches(value).length > 0;
@@ -7663,11 +7663,23 @@ function shellWords(value) {
     expandableText = "";
     started = false;
   };
-  for (const character of value) {
+  for (let index = 0; index < value.length; index++) {
+    const character = value[index];
     if (escaped) {
       text += character;
       if (character !== "$") expandableText += character;
       escaped = false;
+    } else if (value.startsWith("${{", index)) {
+      const end = githubExpressionEnd(value, index);
+      if (end < 0) {
+        text += character;
+        if (quote !== "'") expandableText += character;
+      } else {
+        const expression = value.slice(index, end);
+        text += expression;
+        expandableText += expression;
+        index = end - 1;
+      }
     } else if (character === "\\" && quote !== "'") {
       escaped = true;
     } else if (quote) {
@@ -7692,17 +7704,237 @@ function shellWords(value) {
   push();
   return words;
 }
-function aiHttpDispatches(value) {
-  const dispatches = [];
+function heredocDelimiter(line) {
+  let quote = "";
+  let escaped = false;
+  for (let index = 0; index < line.length - 1; index++) {
+    const character = line[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (character === "\\" && quote !== "'") {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      if (character === quote) quote = "";
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+    if (character === "#" && (index === 0 || /\s/.test(line[index - 1]))) break;
+    if (line.startsWith("${{", index)) {
+      const end = githubExpressionEnd(line, index);
+      if (end >= 0) index = end - 1;
+      continue;
+    }
+    if (line.startsWith("<<<", index) || !line.startsWith("<<", index))
+      continue;
+    const operand = line.slice(index + 2).match(
+      /^-?\s*(?:'([A-Za-z_][\w-]*)'|"([A-Za-z_][\w-]*)"|([A-Za-z_][\w-]*))/
+    );
+    if (operand) return operand[1] ?? operand[2] ?? operand[3];
+  }
+  return "";
+}
+function shellScriptWithoutHeredocBodies(value) {
   let heredoc = "";
-  const script = value.replace(/\\\r?\n/g, " ").split("\n").filter((line) => {
+  return value.replace(/\\\r?\n/g, " ").split("\n").filter((line) => {
     if (heredoc) {
       if (line.trim() === heredoc) heredoc = "";
       return false;
     }
-    heredoc = /<<-?\s*(['"]?)([A-Za-z_][\w-]*)\1/.exec(line)?.[2] ?? "";
+    heredoc = heredocDelimiter(line);
     return true;
   }).join("\n");
+}
+function githubExpressionEnd(value, start) {
+  let quoted = false;
+  for (let index = start + 3; index < value.length; index++) {
+    if (value[index] === "'") {
+      if (quoted && value[index + 1] === "'") index++;
+      else quoted = !quoted;
+    } else if (!quoted && value.startsWith("}}", index)) {
+      return index + 2;
+    }
+  }
+  return -1;
+}
+function commandSubstitutionEnd(value, start) {
+  let depth = 1;
+  let quote = "";
+  let escaped = false;
+  for (let index = start + 2; index < value.length; index++) {
+    const character = value[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (character === "\\" && quote !== "'") {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      if (character === quote) quote = "";
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+    if (value.startsWith("${{", index)) {
+      const end = githubExpressionEnd(value, index);
+      if (end >= 0) index = end - 1;
+      continue;
+    }
+    if (character === "(") depth++;
+    if (character === ")" && --depth === 0) return index + 1;
+  }
+  return -1;
+}
+function shellCommandSegments(value) {
+  const script = shellScriptWithoutHeredocBodies(value);
+  const segments = [];
+  let start = 0;
+  let quote = "";
+  let escaped = false;
+  let pipeline = "";
+  const push = (end, separator) => {
+    const command = script.slice(start, end).trim();
+    if (command) segments.push({ command, pipedInput: pipeline });
+    pipeline = separator === "|" || separator === "|&" ? [pipeline, command].filter(Boolean).join("\n") : "";
+    start = end + separator.length;
+  };
+  for (let index = 0; index < script.length; index++) {
+    const character = script[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (character === "\\" && quote !== "'") {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      if (character === quote) quote = "";
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+    if (script.startsWith("${{", index)) {
+      const end = githubExpressionEnd(script, index);
+      if (end >= 0) {
+        index = end - 1;
+        continue;
+      }
+    }
+    if (script.startsWith("$(", index)) {
+      const end = commandSubstitutionEnd(script, index);
+      index = end >= 0 ? end - 1 : script.length - 1;
+      continue;
+    }
+    if (character === "&" && script[index - 1] === ">") continue;
+    if ("\n;&|()".includes(character)) {
+      const next = script[index + 1];
+      const paired = (character === "&" || character === "|") && next === character || character === "|" && next === "&";
+      const separator = paired ? character + next : character;
+      push(index, separator);
+      if (paired) index++;
+    }
+  }
+  push(script.length, "");
+  return segments;
+}
+function firstUnquotedRedirection(command) {
+  let quote = "";
+  let escaped = false;
+  for (let index = 0; index < command.length; index++) {
+    const character = command[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (character === "\\" && quote !== "'") {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      if (character === quote) quote = "";
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+    if (command.startsWith("${{", index)) {
+      const end = githubExpressionEnd(command, index);
+      if (end >= 0) {
+        index = end - 1;
+        continue;
+      }
+    }
+    if (character === "<" || character === ">") return index;
+  }
+  return -1;
+}
+function aiCliInvocations(value) {
+  const invocations = [];
+  for (const segment of shellCommandSegments(value)) {
+    const redirection = firstUnquotedRedirection(segment.command);
+    const command = redirection >= 0 ? segment.command.slice(0, redirection) : segment.command;
+    const words = shellWords(command);
+    const executable = words.map((word) => word.text).join(" ");
+    if (!AI_AGENT_CLI_PATTERNS.some(
+      (pattern) => pattern.exec(executable)?.index === 0
+    )) {
+      continue;
+    }
+    const opaqueInput = redirection >= 0 || words.some((word) => /\$\(|`/.test(word.text));
+    invocations.push({
+      command: words.map((word) => word.text).join(" "),
+      expandableCommand: words.map((word) => word.expandableText).join(" "),
+      pipedInput: segment.pipedInput,
+      opaqueInput
+    });
+  }
+  return invocations;
+}
+function hasOpaqueAiCliSubstitution(value) {
+  const script = shellScriptWithoutHeredocBodies(value);
+  let quote = "";
+  let escaped = false;
+  for (let index = 0; index < script.length - 1; index++) {
+    const character = script[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (character === "\\" && quote !== "'") {
+      escaped = true;
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      if (!quote) quote = character;
+      else if (quote === character) quote = "";
+      continue;
+    }
+    if (quote !== "'" && character === "$" && script[index + 1] === "(") {
+      const end = commandSubstitutionEnd(script, index);
+      const body = script.slice(index + 2, end >= 0 ? end - 1 : void 0);
+      if (AI_AGENT_CLI_PATTERNS.some((pattern) => pattern.test(body)))
+        return true;
+    }
+  }
+  return false;
+}
+function aiHttpDispatches(value) {
+  const dispatches = [];
+  const script = shellScriptWithoutHeredocBodies(value);
   for (const match of script.matchAll(
     /(?:^|[\n;&|()])\s*curl\b([^\n;&|]*)/gim
   )) {
@@ -8752,11 +8984,25 @@ function analyzeWorkflow(workflow, repository, context) {
       );
       const stepUsesAiAction = looksLikeAiAction(actionReference);
       const materializedRun = materializeInputs(stepRun, context.inputValues);
-      const stepUsesAiCli = looksLikeAiCli(materializedRun);
+      const cliInvocations = aiCliInvocations(materializedRun);
+      const stepUsesAiCli = cliInvocations.length > 0;
       const httpDispatches = aiHttpDispatches(materializedRun);
       const stepUsesAi = stepUsesAiAction || stepUsesAiCli || httpDispatches.length > 0;
+      if (hasOpaqueAiCliSubstitution(materializedRun)) {
+        output.diagnostics.push({
+          code: "agentci/analysis-run-dataflow-unknown",
+          kind: "analysis",
+          severity: "warning",
+          file,
+          job: jobName,
+          line: stepLine,
+          message: "A possible AI CLI inside command substitution could not be attributed to an executable command."
+        });
+      }
       const httpOnly = httpDispatches.length > 0 && !stepUsesAiCli && !stepUsesAiAction;
       const httpCommands = httpDispatches.map((dispatch) => dispatch.command).join("\n");
+      const cliCommands = cliInvocations.map((invocation) => invocation.command).join("\n");
+      const cliExpandableCommands = cliInvocations.map((invocation) => invocation.expandableCommand).join("\n");
       const payload = httpDispatches.map((dispatch) => dispatch.payload).join("\n");
       const referencedEnvironment = (expressionText, shellText) => Object.fromEntries(
         Object.entries(effectiveEnvironment).filter(([name]) => {
@@ -8769,13 +9015,19 @@ function analyzeWorkflow(workflow, repository, context) {
           ).test(shellText);
         })
       );
-      const sinkMaterial = httpOnly ? JSON.stringify({
+      const cliEnvironment = referencedEnvironment(
+        cliCommands,
+        cliExpandableCommands
+      );
+      const sinkMaterial = stepUsesAiAction ? materialized : JSON.stringify({
+        cli: cliCommands,
+        cli_env: cliEnvironment,
         payload,
-        env: referencedEnvironment(
+        http_env: referencedEnvironment(
           payload,
           httpDispatches.map((dispatch) => dispatch.expandablePayload).join("\n")
         )
-      }) : materialized;
+      });
       const secretMaterial = httpOnly ? JSON.stringify({
         command: httpCommands,
         env: referencedEnvironment(
@@ -8813,6 +9065,28 @@ function analyzeWorkflow(workflow, repository, context) {
         )
       );
       const sinkMatches = activeMatches(sinkMaterial);
+      if (stepUsesAiCli && (cliInvocations.some(
+        (invocation) => invocation.opaqueInput || activeMatches(invocation.pipedInput).length > 0
+      ) || activeMatches(materializedRun).length > 0 && [
+        ...cliExpandableCommands.matchAll(
+          /\$(?:\{([A-Za-z_]\w*)\}|([A-Za-z_]\w*))/g
+        )
+      ].some(
+        (match) => !Object.prototype.hasOwnProperty.call(
+          effectiveEnvironment,
+          match[1] ?? match[2]
+        )
+      ) || activeMatches(JSON.stringify(effectiveEnvironment)).length > 0 && activeMatches(JSON.stringify(cliEnvironment)).length === 0)) {
+        output.diagnostics.push({
+          code: "agentci/analysis-run-dataflow-unknown",
+          kind: "analysis",
+          severity: "warning",
+          file,
+          job: jobName,
+          line: stepLine,
+          message: "The local AI CLI's stdin, shell variables, or inherited environment may carry input that command-level analysis cannot prove."
+        });
+      }
       if (httpOnly && (activeMatches(materializedRun).length > 0 && activeMatches(sinkMaterial).length === 0 || containsSecretReference(materializedRun) && !containsSecretReference(secretMaterial) || httpDispatches.some(
         (dispatch) => [
           ...dispatch.expandablePayload.matchAll(
@@ -9913,6 +10187,7 @@ export {
   SENSITIVE_WRITE_SCOPES,
   SEVERITY_ORDER,
   UNTRUSTED_EVENTS,
+  aiCliInvocations,
   aiHttpDispatches,
   containsSecretReference,
   containsShellAccess,
@@ -9921,6 +10196,7 @@ export {
   formatGithubOutputs,
   hasAgentGateBypass,
   hasFindingAtOrAbove,
+  hasOpaqueAiCliSubstitution,
   hasSensitiveWrite,
   hasTrustedActorGate,
   hasTrustedPrProvenanceGate,

@@ -39,12 +39,12 @@ modeled through permissions.
 
 ## `agentci/untrusted-input-in-prompt`
 
-Raw PR, issue, comment, review, branch, or commit text is interpolated into an
-AI step's inputs, command, shell, working directory, or effective environment.
-For a direct hosted-agent HTTP POST, only the request body and environment
-variables expanded in that body count as proven prompt input; unresolved
-shell flow is an analysis diagnostic. Display metadata such as the step name
-is not an input sink.
+Raw PR, issue, comment, review, branch, or commit text is interpolated into
+an AI Action input or a recognized local CLI command. For a direct hosted
+HTTP dispatch, the request body is the input sink. Environment values count
+as proven CLI or HTTP prompt input only when expanded in those inputs;
+unreferenced inherited CLI environment values leave analysis incomplete.
+Display metadata such as the step name is not an input sink.
 
 ## `agentci/ai-shell-access`
 
