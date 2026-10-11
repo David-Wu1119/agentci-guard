@@ -343,8 +343,7 @@ security issues per [`SECURITY.md`](SECURITY.md).
 See also the [adversarial regression corpus](corpus/adversarial/README.md),
 the [benchmark protocol](BENCHMARK.md), and the retained
 [historical 75-repository scan](docs/real-world-findings.md), which is
-exploratory, not accuracy evidence, and not fully reproducible from retained
-raw inputs.
+non-reproducible exploratory output and not accuracy evidence.
 
 ## License
 

@@ -38,9 +38,10 @@ export const AI_AGENT_ACTION_PATTERNS = [
 // A command boundary is deliberately required. This prevents package names,
 // comments, paths, e-mail addresses, and prose from becoming observations.
 // Pure installation/help/version checks are not agent executions.
+// npx -y/--yes are supported only for the known Claude Code npm package.
 export const AI_AGENT_CLI_PATTERNS = [
   /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|npx|uvx)\s+)*claude(?=[\s;&|)]|$)(?![ \t]+(?:--version|--help|-h)(?:[\s;&|)]|$))/im,
-  /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|npx|uvx)\s+)*@anthropic-ai\/claude-code(?=[\s;&|)]|$)(?![ \t]+(?:--version|--help|-h)(?:[\s;&|)]|$))/im,
+  /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|uvx)\s+|npx\s+(?:(?:-y|--yes)\s+)*)*@anthropic-ai\/claude-code(?:@[A-Za-z0-9^~][A-Za-z0-9._+^~-]*)?(?=[\s;&|)]|$)(?![ \t]+(?:--version|--help|-h)(?:[\s;&|)]|$))/im,
   /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|npx|uvx)\s+)*(?:python3?\s+-m\s+)?aider(?=[\s;&|)]|$)(?![ \t]+(?:--version|--help|-h)(?:[\s;&|)]|$))/im,
   /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|npx|uvx)\s+)*cursor-agent(?=[\s;&|)]|$)(?![ \t]+(?:--version|--help|-h)(?:[\s;&|)]|$))/im,
   /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|npx|uvx)\s+)*codex[ \t]+(?:exec|run)(?:[\s]|$)/im,
