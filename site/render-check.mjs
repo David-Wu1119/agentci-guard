@@ -1,6 +1,53 @@
 import fs from "node:fs/promises";
 import assert from "node:assert/strict";
+import { createServer } from "node:http";
 const root = new URL("./", import.meta.url).pathname;
+const manifest = JSON.parse(
+  await fs.readFile(new URL("./BUILD_MANIFEST.json", import.meta.url), "utf8"),
+);
+const scannerName = Object.keys(manifest).find((name) =>
+  /^scanner-browser\.[a-f0-9]{64}\.js$/.test(name),
+);
+assert.ok(scannerName);
+const servedFiles = new Set(
+  Object.keys(manifest).filter((name) => name !== "_headers"),
+);
+let tamperScanner = false;
+const server = createServer(async (request, response) => {
+  const name =
+    new URL(request.url, "http://localhost").pathname.slice(1) || "index.html";
+  if (name === "favicon.ico") {
+    response.writeHead(204).end();
+    return;
+  }
+  if (request.method !== "GET" || !servedFiles.has(name)) {
+    response.writeHead(404).end();
+    return;
+  }
+  try {
+    response.setHeader("X-Content-Type-Options", "nosniff");
+    response.setHeader(
+      "Content-Type",
+      name.endsWith(".js")
+        ? "text/javascript"
+        : name.endsWith(".css")
+          ? "text/css"
+          : name.endsWith(".html")
+            ? "text/html"
+            : "text/plain",
+    );
+    const bytes = await fs.readFile(new URL(`./dist/${name}`, import.meta.url));
+    response.end(
+      tamperScanner && name === scannerName
+        ? Buffer.concat([bytes, Buffer.from("\n// tampered")])
+        : bytes,
+    );
+  } catch {
+    response.writeHead(500).end();
+  }
+});
+await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+const siteUrl = `http://127.0.0.1:${server.address().port}/`;
 const targets = await (await fetch("http://127.0.0.1:9337/json")).json();
 const target = targets.find((t) => t.type === "page");
 const socket = new WebSocket(target.webSocketDebuggerUrl);
@@ -12,6 +59,7 @@ let id = 0;
 const waiting = new Map();
 const exceptions = [];
 const requests = [];
+const responses = [];
 socket.onmessage = (event) => {
   const data = JSON.parse(event.data);
   if (data.id) {
@@ -22,6 +70,11 @@ socket.onmessage = (event) => {
     if (data.method === "Runtime.exceptionThrown") exceptions.push(data.params);
     if (data.method === "Network.requestWillBeSent")
       requests.push(data.params.request.url);
+    if (data.method === "Network.responseReceived")
+      responses.push({
+        url: data.params.response.url,
+        status: data.params.response.status,
+      });
   }
 };
 const send = (method, params = {}) =>
@@ -48,7 +101,7 @@ await send("Emulation.setDeviceMetricsOverride", {
   mobile: false,
 });
 await send("Page.navigate", {
-  url: new URL("./dist/index.html", import.meta.url).href,
+  url: siteUrl,
 });
 for (let attempt = 0; attempt < 50; attempt++) {
   if ((await evaluate("document.readyState")) === "complete") break;
@@ -92,16 +145,15 @@ const scanner = await evaluate(
 );
 assert.equal(scanner.ready, true);
 assert.equal(scanner.maxChars, 250000);
-const manifest = JSON.parse(
-  await fs.readFile(new URL("./BUILD_MANIFEST.json", import.meta.url), "utf8"),
-);
-for (const name of ["styles.css", "app.js", "scanner-browser.js"])
+for (const name of ["styles.css", "app.js"])
   assert.ok(
-    requests.includes(
-      new URL(`./dist/${name}?v=${manifest[name]}`, import.meta.url).href,
-    ),
+    requests.includes(new URL(`${name}?v=${manifest[name]}`, siteUrl).href),
     `${name} did not load from its content-versioned URL`,
   );
+assert.ok(
+  requests.includes(new URL(scannerName, siteUrl).href),
+  "The content-addressed scanner did not load",
+);
 assert.match(
   scanner.source,
   /Uncommitted local build|clean checkout|Source revision unavailable/,
@@ -134,7 +186,7 @@ assert.ok(
 );
 assert.match(
   sample.status,
-  /cached HTML can load a different script; compare separately with the published Action\/CLI/,
+  /content-addressed scanner script checked by the browser; compare separately with the published Action\/CLI/,
 );
 assert.doesNotMatch(sample.status, /Scanner v[0-9]/);
 assert.match(sample.complete, /analysis_complete: true/);
@@ -480,14 +532,14 @@ for (const [name, width] of [
   );
 }
 assert.equal(exceptions.length, 0);
-assert.equal(requests.filter((url) => /^https?:/.test(url)).length, 0);
+assert.equal(requests.filter((url) => !url.startsWith(siteUrl)).length, 0);
 await fs.writeFile(
   root + "VISUAL_CHECKS.json",
   JSON.stringify(
     {
       checks,
       consoleExceptions: exceptions,
-      externalAssetRequests: requests.filter((u) => /^https?:/.test(u)),
+      externalAssetRequests: requests.filter((u) => !u.startsWith(siteUrl)),
       brokenAnchors: broken,
     },
     null,
@@ -497,4 +549,30 @@ await fs.writeFile(
 console.log(
   "PASS: five responsive widths; real scanner, errors, file input, keyboard focus and three illustrative controls; no browser exceptions or external asset requests. Desktop/mobile screenshots saved.",
 );
+await send("Network.setCacheDisabled", { cacheDisabled: true });
+tamperScanner = true;
+const priorResponses = responses.length;
+await send("Page.navigate", { url: `${siteUrl}?sri-check=1` });
+for (let attempt = 0; attempt < 50; attempt++) {
+  if ((await evaluate("document.readyState")) === "complete") break;
+  await new Promise((resolve) => setTimeout(resolve, 100));
+}
+assert.ok(
+  responses
+    .slice(priorResponses)
+    .some(
+      ({ url, status }) =>
+        url === new URL(scannerName, siteUrl).href && status === 200,
+    ),
+  "Tampered scanner must be served over HTTP for the SRI check",
+);
+assert.equal(await evaluate("typeof window.agentciScanWorkflow"), "undefined");
+assert.match(
+  await evaluate('document.getElementById("scan-error").textContent'),
+  /scanner did not load.*Refresh the page/i,
+);
+console.log(
+  "PASS: browser rejected a tampered scanner with SRI and failed closed.",
+);
 socket.close();
+await new Promise((resolve) => server.close(resolve));

@@ -1,9 +1,8 @@
 from pathlib import Path
-import hashlib,json,shutil,subprocess
+import base64,hashlib,json,shutil,subprocess
 
 root=Path(__file__).resolve().parent
 files=('index.html','styles.css','app.js','_headers')
-generated=('scanner-browser.js','THIRD_PARTY_LICENSES.txt')
 dest=root/'dist';dest.mkdir(exist_ok=True)
 for old in dest.iterdir():
     if old.is_file(): old.unlink()
@@ -12,6 +11,9 @@ for name in files:
 
 subprocess.run(['node','site/build-browser.mjs'],cwd=root.parent,check=True)
 digest=hashlib.sha256((dest/'scanner-browser.js').read_bytes()).hexdigest()
+scanner_name=f'scanner-browser.{digest}.js'
+(dest/'scanner-browser.js').rename(dest/scanner_name)
+generated=(scanner_name,'THIRD_PARTY_LICENSES.txt')
 source_commit='';clean=False
 try:
     git_root=Path(subprocess.check_output(['git','rev-parse','--show-toplevel'],cwd=root.parent,text=True,stderr=subprocess.DEVNULL).strip()).resolve()
@@ -32,11 +34,14 @@ for placeholder,value in (
 ):
     assert html.count(placeholder)==1,placeholder
     html=html.replace(placeholder,value)
-for name in ('styles.css','app.js','scanner-browser.js'):
+for name in ('styles.css','app.js'):
     reference=f'"{name}"'
     assert html.count(reference)==1,name
     version=hashlib.sha256((dest/name).read_bytes()).hexdigest()
     html=html.replace(reference,f'"{name}?v={version}"')
+assert html.count('"scanner-browser.js"')==1
+integrity=base64.b64encode(bytes.fromhex(digest)).decode()
+html=html.replace('"scanner-browser.js"',f'"{scanner_name}" integrity="sha256-{integrity}"')
 (dest/'index.html').write_text(html)
 notices=[]
 for name in ('yaml','pathe'):

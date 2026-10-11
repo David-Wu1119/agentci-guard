@@ -24,6 +24,13 @@ export function relevantDiagnostics(annotation, result) {
   return result.diagnostics.filter((diagnostic) => {
     if (diagnostic.file !== annotation.workflow_file) return false;
     if (diagnostic.job && diagnostic.job !== annotation.job_id) return false;
+    if (
+      annotation.scope === "step" &&
+      diagnostic.step_index !== undefined &&
+      diagnostic.step_index !== annotation.step_index
+    ) {
+      return false;
+    }
     if (diagnostic.code === "agentci/analysis-agent-event-unsupported") {
       return false;
     }

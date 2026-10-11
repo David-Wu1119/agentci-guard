@@ -26,6 +26,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Step-scoped diagnostics now carry `step_index`, and the development scorer
+  no longer assigns one step's uncertainty to another step in the same job.
+  A two-step checkout/Claude regression covers the previous false abstention;
+  job-level uncertainty still applies across the job. This corrects scoring
+  attribution, not measured accuracy.
+- The website now serves the scanner from a content-addressed filename with
+  Subresource Integrity. Cached HTML can no longer silently run a newer
+  scanner under an older page-source label; if the old asset is unavailable,
+  scanning stops with a refresh instruction. The real-browser test confirms
+  that tampered scanner bytes are rejected. This does not change scanner rules
+  or establish precision or recall.
 - The verified Anthropic Action revision `1d6de8c` no longer produces AI
   findings when its configured `track_progress` event/activity is rejected
   before Claude starts, or when a PR path has no prompt and progress tracking

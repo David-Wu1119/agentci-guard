@@ -9376,6 +9376,7 @@ function analyzeWorkflow(workflow, repository, context) {
           severity: "warning",
           file,
           job: jobName,
+          step_index: index,
           line: stepLine,
           message: "Could not fully interpret this step's github.event_name condition; event reachability was kept conservative."
         });
@@ -9399,6 +9400,7 @@ function analyzeWorkflow(workflow, repository, context) {
           severity: "warning",
           file,
           job: jobName,
+          step_index: index,
           line: stepLine,
           message: knownUnsupported ? "This verified Anthropic Action revision rejects discussion events before Claude starts; those paths were excluded from AI findings." : "This Anthropic Action ref's discussion-event support is unverified; findings on those paths are potential, not confirmed execution."
         });
@@ -9453,6 +9455,7 @@ function analyzeWorkflow(workflow, repository, context) {
             severity: "warning",
             file,
             job: jobName,
+            step_index: index,
             line: stepLine,
             message: "This verified Anthropic Action revision skips or rejects the configured event/input paths before Claude starts; those paths were excluded from AI findings."
           });
@@ -9494,6 +9497,7 @@ function analyzeWorkflow(workflow, repository, context) {
           severity: "warning",
           file,
           job: jobName,
+          step_index: index,
           line: stepLine,
           message: "An AI invocation appears in a shell branch or group whose reachability cannot be resolved statically; findings describe a possible path, not guaranteed execution."
         });
@@ -9505,6 +9509,7 @@ function analyzeWorkflow(workflow, repository, context) {
           severity: "warning",
           file,
           job: jobName,
+          step_index: index,
           line: stepLine,
           message: "A possible AI call inside command substitution, a shell-evaluated string, or a shell function could not be attributed to a direct executable command."
         });
@@ -9554,6 +9559,7 @@ function analyzeWorkflow(workflow, repository, context) {
           severity: "warning",
           file,
           job: jobName,
+          step_index: index,
           line: stepLine,
           message: "An earlier step may write a secret to GITHUB_ENV; exposure to this AI step is not modeled."
         });
@@ -9593,6 +9599,7 @@ function analyzeWorkflow(workflow, repository, context) {
           severity: "warning",
           file,
           job: jobName,
+          step_index: index,
           line: stepLine,
           message: "The local AI CLI's stdin, shell variables, or inherited environment may carry input that command-level analysis cannot prove."
         });
@@ -9615,6 +9622,7 @@ function analyzeWorkflow(workflow, repository, context) {
           severity: "warning",
           file,
           job: jobName,
+          step_index: index,
           line: stepLine,
           message: "The HTTP request body or another command has unresolved input/secret flow; only direct payload references are findings."
         });
@@ -9644,6 +9652,7 @@ function analyzeWorkflow(workflow, repository, context) {
           severity: "warning",
           file,
           job: jobName,
+          step_index: index,
           line: stepLine,
           message: "The HTTP request reaches a hosted agent, but this job's GITHUB_TOKEN permissions do not establish the remote agent's repository write capability."
         });
@@ -9660,6 +9669,7 @@ function analyzeWorkflow(workflow, repository, context) {
           severity: "warning",
           file,
           job: jobName,
+          step_index: index,
           line: stepLine,
           message: "This AI Action ref/event has no verified contract for implicit Issue, PR, or comment ingestion; explicit input flow is analyzed separately."
         });
@@ -9710,6 +9720,7 @@ function analyzeWorkflow(workflow, repository, context) {
             severity: "warning",
             file,
             job: jobName,
+            step_index: index,
             line: stepLine,
             message: "The agent may read an untrusted Issue body with its permitted gh issue tool and a token, but static analysis cannot prove the tool was called."
           });
@@ -9811,6 +9822,7 @@ function analyzeWorkflow(workflow, repository, context) {
             severity: "warning",
             file,
             job: jobName,
+            step_index: index,
             line: stepLine,
             message: "The checkout step requests pull-request code, but its ref does not identify whether GitHub's built-in unsafe-PR protection is present."
           });
@@ -10231,7 +10243,7 @@ function dedupe(findings) {
 function dedupeDiagnostics(diagnostics) {
   const seen = /* @__PURE__ */ new Set();
   return diagnostics.filter((diagnostic) => {
-    const key = `${diagnostic.code}:${diagnostic.file}:${diagnostic.job ?? ""}:${diagnostic.line ?? ""}:${diagnostic.message}`;
+    const key = `${diagnostic.code}:${diagnostic.file}:${diagnostic.job ?? ""}:${diagnostic.step_index ?? ""}:${diagnostic.line ?? ""}:${diagnostic.message}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;

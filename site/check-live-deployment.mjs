@@ -5,16 +5,22 @@ import fs from "node:fs/promises";
 const base = new URL(process.argv[2] ?? "https://cryptoaxiom.net/");
 assert.ok(["http:", "https:"].includes(base.protocol));
 assert.ok(base.pathname.endsWith("/") && !base.search && !base.hash);
+const manifest = JSON.parse(
+  await fs.readFile(new URL("./BUILD_MANIFEST.json", import.meta.url), "utf8"),
+);
+const scannerNames = Object.keys(manifest).filter((name) =>
+  /^scanner-browser\.[a-f0-9]{64}\.js$/.test(name),
+);
+assert.equal(scannerNames.length, 1, "Build must contain one scanner filename");
+const scannerName = scannerNames[0];
+assert.equal(scannerName, `scanner-browser.${manifest[scannerName]}.js`);
 const assets = [
   "index.html",
   "styles.css",
   "app.js",
-  "scanner-browser.js",
+  scannerName,
   "THIRD_PARTY_LICENSES.txt",
 ];
-const manifest = JSON.parse(
-  await fs.readFile(new URL("./BUILD_MANIFEST.json", import.meta.url), "utf8"),
-);
 assert.deepEqual(
   Object.keys(manifest).sort(),
   [...assets, "_headers"].sort(),
@@ -34,7 +40,7 @@ for (const name of assets) {
   const assetUrl =
     name === "index.html"
       ? "."
-      : ["styles.css", "app.js", "scanner-browser.js"].includes(name)
+      : ["styles.css", "app.js"].includes(name)
         ? `${name}?v=${manifest[name]}`
         : name;
   const response = await fetch(new URL(assetUrl, base), {

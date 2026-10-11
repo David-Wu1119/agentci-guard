@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 
-function browserPage() {
+function browserPage(hasScanner = true) {
   const makeElement = () => ({
     value: "",
     textContent: "",
@@ -67,7 +67,7 @@ function browserPage() {
     readFileSync(new URL("../site/src/app.js", import.meta.url), "utf8"),
     {
       window: {
-        agentciScanWorkflow: scan,
+        agentciScanWorkflow: hasScanner ? scan : undefined,
         confirm() {
           confirmations++;
           return allowReplace;
@@ -97,6 +97,19 @@ function browserPage() {
 }
 
 describe("browser workflow input", () => {
+  it("fails closed with a refresh instruction when the scanner script is unavailable", () => {
+    const page = browserPage(false);
+    const get = (id) => page.elements.get(id);
+    expect(get("scan-error").textContent).toMatch(
+      /scanner did not load.*Refresh the page/i,
+    );
+    expect(get("scan-error").hidden).toBe(false);
+    expect(get("scan-output").hidden).toBe(true);
+    get("workflow-yaml").value = "on: push\n";
+    get("scan-button").listeners.click();
+    expect(get("scan-output").hidden).toBe(true);
+  });
+
   it("keeps an existing draft until replacement is confirmed and clears stale file selection on edit", async () => {
     const page = browserPage();
     const get = (id) => page.elements.get(id);

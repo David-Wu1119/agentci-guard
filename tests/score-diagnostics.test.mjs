@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseWorkflowFile, scanWorkflowFiles } from "../src/scanner.js";
 import {
   predict,
   relevantDiagnostics,
@@ -19,8 +20,94 @@ const result = (findings = [], diagnostics = []) => ({
 });
 const classify = (rule, scan) =>
   predict(annotation(rule), scan, "agentci/agent-usage");
+const stepAnnotation = (step_index) => ({
+  ...annotation("agentci/agent-usage"),
+  scope: "step",
+  step_index,
+});
 
 describe("score diagnostic attribution", () => {
+  it("does not move an uncertain AI Action event onto an earlier checkout step", () => {
+    const scan = scanWorkflowFiles(
+      [
+        parseWorkflowFile(
+          file,
+          `on: discussion_comment
+permissions:
+  contents: read
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: anthropics/claude-code-action@v1
+`,
+        ),
+      ],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(
+      scan.diagnostics.find(
+        (item) => item.code === "agentci/analysis-agent-event-unknown",
+      )?.step_index,
+    ).toBe(1);
+    expect(predict(stepAnnotation(0), scan, "agentci/agent-usage")).toBe(
+      "negative",
+    );
+  });
+
+  it("keeps job-level uncertainty relevant to every step", () => {
+    const scan = result([], [diagnostic("agentci/analysis-event-condition")]);
+    expect(predict(stepAnnotation(0), scan, "agentci/agent-usage")).toBe(
+      "unknown",
+    );
+    expect(predict(stepAnnotation(1), scan, "agentci/agent-usage")).toBe(
+      "unknown",
+    );
+  });
+
+  it("keeps step-level uncertainty on its own step when no finding exists", () => {
+    const scan = result(
+      [],
+      [
+        {
+          ...diagnostic("agentci/analysis-agent-event-unknown"),
+          step_index: 1,
+        },
+      ],
+    );
+    expect(predict(stepAnnotation(0), scan, "agentci/agent-usage")).toBe(
+      "negative",
+    );
+    expect(predict(stepAnnotation(1), scan, "agentci/agent-usage")).toBe(
+      "unknown",
+    );
+  });
+
+  it("keeps both same-line step diagnostics when YAML uses flow-style steps", () => {
+    const scan = scanWorkflowFiles(
+      [
+        parseWorkflowFile(
+          file,
+          `on: discussion_comment
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps: [{uses: anthropics/claude-code-action@v1}, {uses: anthropics/claude-code-action@v1}]
+`,
+        ),
+      ],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(
+      scan.diagnostics
+        .filter((item) => item.code === "agentci/analysis-agent-event-unknown")
+        .map((item) => item.step_index),
+    ).toEqual([0, 1]);
+  });
+
   it("abstains only on the two write-token rules when implicit ingestion is unverified", () => {
     const scan = result(
       [],

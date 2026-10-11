@@ -40,6 +40,8 @@ type Diagnostic = {
     message: string;
     line?: number;
     job?: string;
+    /** Zero-based index when the uncertainty belongs to one step. */
+    step_index?: number;
 };
 type ScanOptions = {
     cwd: string;

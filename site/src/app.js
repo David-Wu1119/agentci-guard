@@ -114,7 +114,7 @@ function renderResult(result) {
     : `Analysis incomplete${count ? ` — ${findingLabel}` : ''} for ${sourceLabel}`;
   const findingStatus = count ? `${findingLabel}; ` : '';
   const pageSource = document.querySelector('#scanner-source a')?.textContent ?? document.getElementById('scanner-source').textContent.trim();
-  status.textContent = `${result.agent_usages.length} recognized agent-use step${result.agent_usages.length === 1 ? '' : 's'}; ${findingStatus}${result.analysis_complete ? 'analysis complete' : 'analysis incomplete'} for ${sourceLabel}. Browser scanner trial (page build source: ${pageSource}; cached HTML can load a different script; compare separately with the published Action/CLI). Locations below are virtual scanner paths.`;
+  status.textContent = `${result.agent_usages.length} recognized agent-use step${result.agent_usages.length === 1 ? '' : 's'}; ${findingStatus}${result.analysis_complete ? 'analysis complete' : 'analysis incomplete'} for ${sourceLabel}. Browser scanner trial (page build source: ${pageSource}; content-addressed scanner script checked by the browser; compare separately with the published Action/CLI). Locations below are virtual scanner paths.`;
   completeness.textContent = result.analysis_complete
     ? 'analysis_complete: true. This covers only supported static checks for the supplied file; it does not validate the full GitHub Actions schema or guarantee security.'
     : 'analysis_complete: false. The diagnostics below identify unsupported or failed analysis; do not treat this as a clean scan.';
@@ -184,7 +184,7 @@ scanButton.addEventListener('click', () => {
   const raw = yaml.value;
   if (!raw.trim()) return showError('Paste workflow YAML or choose a file before scanning.');
   if (raw.length > maxChars) return showError(`Workflow is too large. The limit is ${maxChars.toLocaleString()} characters.`);
-  if (typeof scanWorkflow !== 'function') return showError('The scanner did not load. Use the CLI or GitHub Action instead.');
+  if (typeof scanWorkflow !== 'function') return showError('The scanner did not load. Refresh the page, or use the CLI or GitHub Action instead.');
   try {
     renderResult(scanWorkflow(raw));
   } catch (cause) {
@@ -192,7 +192,7 @@ scanButton.addEventListener('click', () => {
   }
 });
 
-if (typeof scanWorkflow !== 'function') showError('The scanner did not load. Use the CLI or GitHub Action instead.', false);
+if (typeof scanWorkflow !== 'function') showError('The scanner did not load. Refresh the page, or use the CLI or GitHub Action instead.', false);
 
 const examples = {
   unknown: ['UNREVIEWED VERSION', 'Verify the gate before reducing risk.', 'A mutable tag or an unreviewed commit does not establish the Action’s authorization behavior. The scanner reports action pinning separately; inspect the deployed version before relying on its gate.'],

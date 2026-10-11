@@ -10,7 +10,6 @@ const assets = [
   "index.html",
   "styles.css",
   "app.js",
-  "scanner-browser.js",
   "_headers",
   "THIRD_PARTY_LICENSES.txt",
 ];
@@ -26,6 +25,11 @@ async function fixture() {
     await writeFile(path.join(dist, asset), content);
     manifest[asset] = createHash("sha256").update(content).digest("hex");
   }
+  const scannerContent = "test scanner-browser.js";
+  const scannerHash = createHash("sha256").update(scannerContent).digest("hex");
+  const scannerName = `scanner-browser.${scannerHash}.js`;
+  await writeFile(path.join(dist, scannerName), scannerContent);
+  manifest[scannerName] = scannerHash;
   await writeFile(
     path.join(root, "site", "BUILD_MANIFEST.json"),
     `${JSON.stringify(manifest)}\n`,
@@ -146,6 +150,43 @@ describe("site deployment preflight", () => {
           git: (...args: string[]) => (args[0] === "status" ? "" : sha),
         }),
       ).rejects.toThrow(/app\.js/);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a scanner filename that does not match its bytes", async () => {
+    const { root, manifest } = await fixture();
+    try {
+      const { checkDeployReadiness } = await import(modulePath);
+      const scannerName = Object.keys(manifest).find((name) =>
+        name.startsWith("scanner-browser."),
+      )!;
+      const wrongName = `scanner-browser.${"b".repeat(64)}.js`;
+      await writeFile(
+        path.join(root, "site", "dist", wrongName),
+        "test scanner-browser.js",
+      );
+      delete manifest[scannerName];
+      manifest[wrongName] = createHash("sha256")
+        .update("test scanner-browser.js")
+        .digest("hex");
+      await writeFile(
+        path.join(root, "site", "BUILD_MANIFEST.json"),
+        `${JSON.stringify(manifest)}\n`,
+      );
+      await expect(
+        checkDeployReadiness({
+          root,
+          git: (...args: string[]) => (args[0] === "status" ? "" : sha),
+          build: () => {},
+          request: async () => ({
+            ok: true,
+            status: 200,
+            json: async () => ({ object: { sha } }),
+          }),
+        }),
+      ).rejects.toThrow(/scanner.*filename|filename.*scanner/i);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

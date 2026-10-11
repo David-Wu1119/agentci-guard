@@ -10,7 +10,6 @@ const assets = [
   "index.html",
   "styles.css",
   "app.js",
-  "scanner-browser.js",
   "_headers",
   "THIRD_PARTY_LICENSES.txt",
 ];
@@ -55,12 +54,27 @@ export async function checkDeployReadiness({
   const manifest = JSON.parse(
     await fs.readFile(path.join(source, "site", "BUILD_MANIFEST.json"), "utf8"),
   );
+  const scannerNames = Object.keys(manifest).filter((name) =>
+    /^scanner-browser\.[a-f0-9]{64}\.js$/.test(name),
+  );
+  assert.equal(
+    scannerNames.length,
+    1,
+    "Build must contain one scanner filename",
+  );
+  const scannerName = scannerNames[0];
+  assert.equal(
+    scannerName,
+    `scanner-browser.${manifest[scannerName]}.js`,
+    "Scanner filename must match its manifest SHA-256",
+  );
+  const builtAssets = [...assets, scannerName];
   assert.deepEqual(
     Object.keys(manifest).sort(),
-    [...assets].sort(),
+    builtAssets.sort(),
     "Build manifest must contain exactly the six allowlisted assets",
   );
-  for (const name of assets) {
+  for (const name of builtAssets) {
     const bytes = await fs.readFile(path.join(source, "site", "dist", name));
     assert.equal(
       createHash("sha256").update(bytes).digest("hex"),
