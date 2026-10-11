@@ -291,9 +291,9 @@ install -g` bin entry is a symlink, so `agentci --version` and `agentci scan`
   allowlists are not accepted. Eval corpus effect: critical 33 to 30, confined
   to those three cases. All 31 critical findings on the benchmark were read by
   hand for this change: 24 are confirmed, these 3 were this class, and 4 are the
-  documented runtime-gate limit — 77% precision on the critical rule before
-  this fix, 86% after, as measured by a single non-blind reader, not by the
-  benchmark's labeling protocol.
+  documented runtime-gate limit. The historical single-reader, non-blind
+  judgments were 24 of 31 findings before this fix and 24 of 28 after it;
+  these are not protocol-based precision estimates or public accuracy claims.
 - Event reachability now treats a condition made only of `always()`,
   `success()`, `failure()`, and `cancelled()` as complete and non-narrowing.
   These depend on prior step status, never on the trigger, so they cannot

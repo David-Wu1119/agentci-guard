@@ -4,10 +4,9 @@ v0.2.0 is a detection-correctness and distribution release. Five detection
 defects found by validating the tool against its own frozen benchmark are
 fixed, two new distribution surfaces ship, and the operator handbook exists.
 It remains an **experimental scanner with unmeasured accuracy**: the benchmark
-still carries no human labels under its protocol. The one accuracy figure in
-this release — 86% precision on the critical rule across all 31 critical
-findings on the frozen benchmark — was produced by a single non-blind reader
-and is recorded as exactly that, not as calibration.
+still carries no human labels under its protocol. Historical single-reader,
+non-blind judgments in this release are not a precision estimate and are not
+valid for public accuracy claims; this note supersedes the original wording.
 
 ## What changed since v0.1.1
 
@@ -94,10 +93,9 @@ Unchanged from v0.1.1, and still the boundary on what may be claimed:
 - [ ] Published per-rule precision, recall, F1, support, and intervals.
 - [ ] README and data card updated with the measured result.
 
-The single-reader 86% figure on the critical rule does not satisfy these. It is
-reproducible from the benchmark and the changelog, and it is the strongest
-truthful statement available. "Calibrated" and "production security gate"
-remain prohibited.
+The archived single-reader judgments on the critical rule do not satisfy these
+milestones. No public precision or recall figure is available. "Calibrated"
+and "production security gate" remain prohibited.
 
 ## Local verification
 
