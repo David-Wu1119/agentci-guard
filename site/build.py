@@ -1,5 +1,5 @@
 from pathlib import Path
-import hashlib,json,shutil,subprocess
+import base64,hashlib,json,shutil,subprocess
 
 root=Path(__file__).resolve().parent
 files=('index.html','styles.css','app.js','_headers')
@@ -11,6 +11,15 @@ for name in files:
     shutil.copyfile(root/'src'/name,dest/name)
 
 subprocess.run(['node','site/build-browser.mjs'],cwd=root.parent,check=True)
+digest=hashlib.sha256((dest/'scanner-browser.js').read_bytes()).digest()
+html=(dest/'index.html').read_text()
+for placeholder,value in (
+    ('__SCANNER_SRI__','sha256-'+base64.b64encode(digest).decode()),
+    ('__SCANNER_SHA256__',digest.hex()),
+):
+    assert html.count(placeholder)==1,placeholder
+    html=html.replace(placeholder,value)
+(dest/'index.html').write_text(html)
 notices=[]
 for name in ('yaml','pathe'):
     package=root.parent/'node_modules'/name

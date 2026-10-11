@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import vm from "node:vm";
 import { parseWorkflowFile, scanWorkflowFiles } from "../dist/index.js";
@@ -8,6 +9,19 @@ const file = `${root}/.github/workflows/input.yml`;
 const bundle = await fs.readFile(
   new URL("./dist/scanner-browser.js", import.meta.url),
   "utf8",
+);
+const digest = createHash("sha256").update(bundle).digest();
+const html = await fs.readFile(
+  new URL("./dist/index.html", import.meta.url),
+  "utf8",
+);
+assert.ok(
+  html.includes(
+    `<script src="scanner-browser.js" integrity="sha256-${digest.toString("base64")}" defer></script>`,
+  ),
+);
+assert.ok(
+  html.includes(`<code id="scanner-digest">${digest.toString("hex")}</code>`),
 );
 assert.match(
   await fs.readFile(new URL("./dist/_headers", import.meta.url), "utf8"),
