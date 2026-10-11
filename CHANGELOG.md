@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A `run:` step that launches the `@anthropic-ai/claude-code` package through
+  `npx -y` is now recognized as an agent instead of silently returning a
+  complete scan with zero agent uses. The synthetic
+  `issue_comment`/write-token regression is covered by `tests/cli-run-flow.test.ts`.
+- `untrusted-input-in-prompt` now lists only the reachable events that supply
+  its matched prompt input, rather than every event of a multi-trigger job.
+  `tests/rules.test.ts` covers one-event, multiple-event, and wildcard sources.
+  The frozen 152-workflow behavioral comparison from `e4e7fd9` to `f67aad2`
+  found **32 → 32 critical, 36 → 36 high, 180 → 180 medium, and 0 of 152 cases
+  changed** under its finding/diagnostic/completeness signature; agent-use
+  counts also matched for all 152. The report does not compare finding
+  `reachable_events`; the synthetic tests cover that metadata correction.
+  These counts are scanner behavior, not measured precision or recall.
 - Literal `github.event.*` names in prompt text no longer count as GitHub
   expression interpolation. This classifier change has a workflow-level
   regression but has not been remeasured on the human corpus.
