@@ -227,6 +227,7 @@ const setAndScan = (raw) =>
     };
   })()`);
 const malformed = await setAndScan("on: [\njobs: {");
+assert.equal(malformed.heading, "Analysis incomplete for pasted YAML");
 assert.match(malformed.complete, /analysis_complete: false/);
 assert.match(malformed.usageText, /analysis is incomplete/);
 assert.ok(malformed.diagnostics > 0);
