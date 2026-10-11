@@ -25,15 +25,16 @@ semantic mistakes, including misclassifying `id-token: write`, treating an
 `if:` guard as a prompt sink, and assigning an unjustified severity to ordinary
 provider-key exposure. The empirical headline does not survive.
 
-v0.1.1 replaces the missing evidence with two distinct artifacts:
+Later work preserves two distinct inputs for a new evaluation, not a
+replacement for the missing 75-repository result:
 
 1. a public adversarial regression corpus for known failure modes; and
-2. a frozen real-workflow benchmark with fixed repository commits, blob hashes,
-   immutable snapshots, repo-disjoint splits, a full primary annotation pass,
-   deterministic independent review, adjudication, and reproducible metric
-   scripts.
+2. a frozen 152-workflow v3 candidate with fixed repository commits, blob
+   hashes, immutable snapshots, and blank annotation registries. Its former
+   evaluation split was used for rule tuning, so it cannot establish held-out
+   accuracy.
 
-The benchmark is intentionally unscored until the independent labels exist.
+There is no complete, validated human label set or measured accuracy result.
 AgentCI Guard remains an experimental workflow linter, not a production
 security product.
 

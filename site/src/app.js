@@ -111,7 +111,6 @@ fileInput.addEventListener('change', async () => {
   const revision = ++inputRevision;
   scanButton.disabled = true;
   fileInput.disabled = true;
-  yaml.value = '';
   resetResults('Reading the selected file locally.');
   if (file.size > maxChars) {
     showError(`File is too large. Choose a YAML file no larger than ${maxChars.toLocaleString()} bytes.`);

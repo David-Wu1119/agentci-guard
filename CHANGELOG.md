@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   patched `source-map-js` and `fast-uri` releases and aligned Vitest with its
   coverage plugin. Directory and symlink behavior is covered by a regression
   test.
+- The browser file picker now preserves existing pasted YAML when a selected
+  file is too large or cannot be read.
 
 ## [0.6.2] - 2026-09-09
 

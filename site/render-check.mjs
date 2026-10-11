@@ -185,6 +185,10 @@ assert.match(filePick.status, /loaded locally/);
 assert.equal(filePick.injectedImageCount, 0);
 checks.push({ filePick });
 const oversizeFile = await evaluate(`(async () => {
+  const pasted = "on: push";
+  const yaml = document.getElementById("workflow-yaml");
+  yaml.value = pasted;
+  yaml.dispatchEvent(new Event("input", { bubbles: true }));
   const selected = new File(["x".repeat(window.agentciScanWorkflow.maxChars + 1)], "oversized.yml");
   const transfer = new DataTransfer();
   transfer.items.add(selected);
@@ -192,11 +196,11 @@ const oversizeFile = await evaluate(`(async () => {
   input.files = transfer.files;
   input.dispatchEvent(new Event("change"));
   await new Promise((resolve) => setTimeout(resolve, 50));
-  return { yaml: document.getElementById("workflow-yaml").value,
+  return { pastedPreserved: yaml.value === pasted,
     error: document.getElementById("scan-error").textContent,
     outputHidden: document.getElementById("scan-output").hidden };
 })()`);
-assert.equal(oversizeFile.yaml, "");
+assert.equal(oversizeFile.pastedPreserved, true);
 assert.match(oversizeFile.error, /too large/);
 assert.equal(oversizeFile.outputHidden, true);
 checks.push({ oversizeFile });
