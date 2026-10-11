@@ -8,17 +8,74 @@ const repositoryRoot = path.resolve(
   path.dirname(new URL(import.meta.url).pathname),
   "../..",
 );
-const manifest = JSON.parse(
-  fs.readFileSync(
-    path.join(repositoryRoot, "benchmark", "manifest.json"),
-    "utf8",
-  ),
-);
-const outputPath = path.join(
+const [mode = "--check", manifestArgument, outputArgument, ...extra] =
+  process.argv.slice(2);
+if (
+  !["--check", "--write"].includes(mode) ||
+  extra.length > 0 ||
+  Boolean(manifestArgument) !== Boolean(outputArgument)
+) {
+  throw new Error(
+    "Usage: generate-annotation-sheet.mjs [--check|--write] [manifest.json annotation-sheet.csv]",
+  );
+}
+const frozenOutputPath = path.join(
   repositoryRoot,
   "benchmark",
   "annotation-sheet.csv",
 );
+const outputPath = outputArgument
+  ? path.resolve(outputArgument)
+  : frozenOutputPath;
+if (manifestArgument && outputPath === frozenOutputPath) {
+  throw new Error("Refusing to overwrite the frozen v3 annotation registry.");
+}
+const manifest = JSON.parse(
+  fs.readFileSync(
+    manifestArgument
+      ? path.resolve(manifestArgument)
+      : path.join(repositoryRoot, "benchmark", "manifest.json"),
+    "utf8",
+  ),
+);
+if (manifestArgument) {
+  const { RULES } = await import("../../dist/index.js");
+  const currentRules = Object.keys(RULES);
+  if (
+    !Array.isArray(manifest.rules) ||
+    manifest.rules.length !== currentRules.length ||
+    currentRules.some((rule) => !manifest.rules.includes(rule))
+  ) {
+    throw new Error(
+      "Custom manifest rule registry must match current scanner rules.",
+    );
+  }
+  if (manifest.agent_detection_task !== "agentci/agent-usage") {
+    throw new Error("Custom manifest has an invalid agent detection task.");
+  }
+  // Scanner rule metadata has no scope; pin the annotation contract in RULES.md.
+  const currentRuleScopes = {
+    "agentci/untrusted-ai-write-token": "job",
+    "agentci/gated-ai-write-token": "job",
+    "agentci/pull-request-target-ai": "job",
+    "agentci/ai-with-secrets": "job",
+    "agentci/untrusted-input-in-prompt": "step",
+    "agentci/ai-shell-access": "step",
+    "agentci/broad-write-permissions": "job",
+    "agentci/unpinned-ai-action": "step",
+    "agentci/unsafe-checkout": "step",
+  };
+  if (
+    Object.keys(currentRuleScopes).length !== currentRules.length ||
+    currentRules.some(
+      (rule) => manifest.task_granularity?.[rule] !== currentRuleScopes[rule],
+    )
+  ) {
+    throw new Error(
+      "Custom manifest task granularity must match current rule scopes.",
+    );
+  }
+}
 const columns = [
   "unit_id",
   "case_id",
@@ -51,6 +108,18 @@ const columns = [
 ];
 const rows = [columns];
 const allTasks = [manifest.agent_detection_task, ...manifest.rules];
+if (
+  new Set(allTasks).size !== allTasks.length ||
+  Object.keys(manifest.task_granularity).length !== allTasks.length ||
+  allTasks.some(
+    (task) => !["job", "step"].includes(manifest.task_granularity[task]),
+  ) ||
+  manifest.task_granularity[manifest.agent_detection_task] !== "step"
+) {
+  throw new Error(
+    "Manifest task granularity must cover each task exactly once.",
+  );
+}
 const jobTasks = manifest.rules.filter(
   (rule) => manifest.task_granularity[rule] === "job",
 );
@@ -62,7 +131,7 @@ const stepTasks = [
 ];
 
 for (const item of manifest.cases) {
-  const snapshot = path.join(repositoryRoot, item.snapshot_path);
+  const snapshot = path.resolve(repositoryRoot, item.snapshot_path);
   const raw = fs.readFileSync(snapshot, "utf8");
   const document = YAML.parseDocument(raw, { prettyErrors: true });
   const parsed = document.errors.length === 0 ? document.toJS() : undefined;
@@ -120,9 +189,13 @@ for (const item of manifest.cases) {
 }
 
 const rendered = renderCsv(rows);
-const mode = process.argv[2] ?? "--check";
 if (mode === "--write") {
-  fs.writeFileSync(outputPath, rendered);
+  if (manifestArgument && fs.existsSync(outputPath)) {
+    throw new Error(`Refusing to overwrite existing registry ${outputPath}.`);
+  }
+  fs.writeFileSync(outputPath, rendered, {
+    flag: manifestArgument ? "wx" : "w",
+  });
   console.log(`Wrote ${rows.length - 1} annotation units to ${outputPath}.`);
 } else if (mode === "--check") {
   const existing = fs.existsSync(outputPath)
@@ -130,7 +203,7 @@ if (mode === "--write") {
     : "";
   if (existing !== rendered) {
     console.error(
-      "benchmark/annotation-sheet.csv is stale; run node scripts/benchmark/generate-annotation-sheet.mjs --write",
+      `${outputPath} is stale; generate it with --write only before labels exist.`,
     );
     process.exitCode = 1;
   } else {
@@ -138,8 +211,6 @@ if (mode === "--write") {
       `Verified ${rows.length - 1} deterministic annotation units without consulting scanner predictions.`,
     );
   }
-} else {
-  throw new Error("Expected --check or --write.");
 }
 
 function annotationRow(

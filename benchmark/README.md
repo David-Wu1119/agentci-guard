@@ -51,3 +51,18 @@ they do not create independent review when one person supplies both files.
 Formal evaluation requires a fresh v4 sample, a nine-rule annotation registry,
 and a frozen human protocol. The v3 scorer rejects `eval` and `all` regardless
 of manifest status or label presence.
+
+The registry generator can be tested against a separate, synthetic manifest
+without changing v3: `pnpm vitest run tests/benchmark-registry.test.ts`. After
+`pnpm build`, a coordinator can pass a new manifest and a nonexistent output
+path to the generator, then use `--check` with the same paths:
+
+```bash
+node scripts/benchmark/generate-annotation-sheet.mjs --write \
+  path/to/manifest.json path/to/new-annotation-sheet.csv
+```
+
+The custom path requires exact parity with the bundled scanner's current rule
+IDs and refuses to overwrite existing files. This only prepares blank structural
+units; it does not collect or seal v4 repositories, validate their provenance,
+replace the human protocol, or produce accuracy evidence.
