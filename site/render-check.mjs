@@ -212,6 +212,7 @@ const setAndScan = (raw) =>
     button.click();
     return {
       heading: document.getElementById("scan-results-heading").textContent,
+      status: document.getElementById("scan-status").textContent,
       complete: document.getElementById("scan-completeness").textContent,
       error: document.getElementById("scan-error").textContent,
       outputHidden: document.getElementById("scan-output").hidden,
@@ -232,6 +233,17 @@ assert.match(malformed.complete, /analysis_complete: false/);
 assert.match(malformed.usageText, /analysis is incomplete/);
 assert.ok(malformed.diagnostics > 0);
 assert.equal(malformed.outputHidden, false);
+const partial = await setAndScan(
+  "on: pull_request_target\njobs:\n  delegated:\n    uses: owner/repo/.github/workflows/ai.yml@main\n  agent:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: anthropics/claude-code-action@v1\n        with:\n          prompt: ${{ github.event.pull_request.body }}\n",
+);
+assert.equal(
+  partial.heading,
+  "Analysis incomplete — 3 findings for pasted YAML",
+);
+assert.match(partial.status, /3 findings; analysis incomplete/);
+assert.match(partial.complete, /analysis_complete: false/);
+assert.match(partial.findingText, /agentci\/pull-request-target-ai/);
+assert.ok(partial.diagnostics > 0);
 const genericYaml = await setAndScan("foo: bar");
 assert.match(genericYaml.error, /not a GitHub Actions workflow/);
 assert.equal(genericYaml.outputHidden, true);
@@ -303,6 +315,7 @@ assert.match(tooManySteps.error, /browser limit of 500 steps/);
 assert.equal(tooManySteps.outputHidden, true);
 checks.push({
   malformed,
+  partial,
   genericYaml,
   clean,
   usageOnly,

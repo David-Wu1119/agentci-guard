@@ -108,10 +108,12 @@ function renderResult(result) {
   }
 
   const count = result.findings.length;
+  const findingLabel = `${count} finding${count === 1 ? '' : 's'}`;
   heading.textContent = result.analysis_complete
-    ? `${count} finding${count === 1 ? '' : 's'} for ${sourceLabel}`
-    : `Analysis incomplete for ${sourceLabel}`;
-  status.textContent = `Scanner v${scanWorkflow.version}: ${result.agent_usages.length} recognized agent-use step${result.agent_usages.length === 1 ? '' : 's'}; ${result.analysis_complete ? 'analysis complete' : 'analysis incomplete'} for ${sourceLabel}. Locations below are virtual scanner paths.`;
+    ? `${findingLabel} for ${sourceLabel}`
+    : `Analysis incomplete${count ? ` — ${findingLabel}` : ''} for ${sourceLabel}`;
+  const findingStatus = count ? `${findingLabel}; ` : '';
+  status.textContent = `Scanner v${scanWorkflow.version}: ${result.agent_usages.length} recognized agent-use step${result.agent_usages.length === 1 ? '' : 's'}; ${findingStatus}${result.analysis_complete ? 'analysis complete' : 'analysis incomplete'} for ${sourceLabel}. Locations below are virtual scanner paths.`;
   completeness.textContent = result.analysis_complete
     ? 'analysis_complete: true. This covers only supported static checks for the supplied file; it does not validate the full GitHub Actions schema or guarantee security.'
     : 'analysis_complete: false. The diagnostics below identify unsupported or failed analysis; do not treat this as a clean scan.';
