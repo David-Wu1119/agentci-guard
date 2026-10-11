@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 import { parseWorkflowFile, scanWorkflowFiles } from "../dist/index.js";
 
@@ -23,6 +25,39 @@ assert.ok(
 assert.ok(
   html.includes(`<code id="scanner-digest">${digest.toString("hex")}</code>`),
 );
+let sourceCommit = "";
+let sourceDirty = true;
+try {
+  const sourceRoot = await fs.realpath(
+    fileURLToPath(new URL("../", import.meta.url)),
+  );
+  const gitRoot = await fs.realpath(
+    execFileSync("git", ["rev-parse", "--show-toplevel"], {
+      cwd: sourceRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim(),
+  );
+  if (gitRoot !== sourceRoot)
+    throw new Error("Source is nested in an unrelated Git repository");
+  sourceCommit = execFileSync("git", ["rev-parse", "HEAD"], {
+    cwd: sourceRoot,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  }).trim();
+  sourceDirty = Boolean(
+    execFileSync("git", ["status", "--porcelain"], {
+      cwd: sourceRoot,
+      encoding: "utf8",
+    }).trim(),
+  );
+} catch {}
+const sourceLabel = !sourceCommit
+  ? "Source revision unavailable (non-Git build)"
+  : sourceDirty
+    ? "Uncommitted local build (no exact source commit)"
+    : `<a href="https://github.com/David-Wu1119/agentci-guard/tree/${sourceCommit}">${sourceCommit}</a> (clean checkout; publication not verified by this build)`;
+assert.ok(html.includes(`<span id="scanner-source">${sourceLabel}</span>`));
 assert.match(
   html,
   /<p class="evidence-status"><strong>Accuracy unmeasured\.<\/strong> No sealed human-labeled evaluation\./,

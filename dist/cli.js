@@ -13653,7 +13653,7 @@ var package_default = {
     agentci: "tsx src/cli.ts",
     "baseline:verify": "node scripts/verify-baseline.mjs",
     "benchmark:verify": "node scripts/benchmark/verify-snapshot.mjs && node scripts/benchmark/generate-annotation-sheet.mjs --check && node scripts/benchmark/generate-review-sheet.mjs --check && node scripts/benchmark/generate-pilot-sheet.mjs --check && node scripts/benchmark/candidate-pilot.mjs --check && node scripts/benchmark/validate-labels.mjs",
-    "benchmark:smoke": "node scripts/benchmark/smoke-annotation-toolchain.mjs && node scripts/benchmark/smoke-candidate-pilot.mjs",
+    "benchmark:smoke": "node scripts/benchmark/smoke-annotation-toolchain.mjs && node scripts/benchmark/smoke-candidate-pilot.mjs && node scripts/benchmark/replay-zizmor-dev.mjs --self-test",
     "benchmark:behavior": "node scripts/benchmark/report-behavior.mjs --out evidence/behavior",
     "site:build": "python3 site/build.py",
     "site:check": "npm run build && python3 site/build.py && node site/check-browser-scanner.mjs",

@@ -208,6 +208,8 @@ AGENTCI_BENCHMARK_SPLIT=dev \
 No v4 sample, annotation registry, labels, or accuracy results exist yet. The
 v3 `eval`/`all` commands intentionally fail; future formal evaluation needs a
 separate v4 manifest, nine-rule registry, versioned human protocol, and scorer.
+The [v4 intake gate](benchmark/v4/README.md) checks only future sample
+provenance and separation; its synthetic tests do not constitute a v4 sample.
 
 See [`REPRODUCIBILITY.md`](REPRODUCIBILITY.md) and
 [`DATA_CARD.md`](DATA_CARD.md) for provenance and limitations.

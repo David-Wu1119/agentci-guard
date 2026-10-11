@@ -27,3 +27,29 @@ sources. CI validates the metadata and exact scanner outcomes; it also directly
 checks job reachability for non-reusable workflows.
 
 Case definitions and expected outputs are in [`manifest.json`](manifest.json).
+
+## Replaying an external baseline locally
+
+With an already installed `zizmor` on `PATH`, run the offline, development-only
+replay from the repository root. The destination's parent must exist and the
+destination itself must not exist:
+
+```bash
+node scripts/benchmark/replay-zizmor-dev.mjs --self-test
+node scripts/benchmark/replay-zizmor-dev.mjs --out /absolute/path/to/new-zizmor-replay
+```
+
+The output manifest records the corpus-manifest hash, installed binary path,
+version and SHA-256, exact flags, and each workflow's input and output hashes,
+raw stdout, stderr, and exit status. A finding exit with valid JSON is an audit,
+not a crash; the deliberately malformed `parse-error` fixture is marked as an
+expected invalid input. Any other tool error makes the runner exit nonzero,
+while preserving its raw output for inspection. No tool is downloaded;
+`--offline` requests zizmor's offline mode.
+
+Zizmor audits are **not** assumed equivalent to AgentCI Guard rules. This
+replay is a reproducibility aid over developer-authored synthetic fixtures,
+not a precision/recall study, a fair comparative score, or evidence of unique
+coverage. A task-aligned comparison still needs a predeclared mapping and the
+same fresh, human-labeled evaluation workflows for both tools.
+The raw manifest includes the local executable path; review it before sharing.

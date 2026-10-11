@@ -12,10 +12,24 @@ for name in files:
 
 subprocess.run(['node','site/build-browser.mjs'],cwd=root.parent,check=True)
 digest=hashlib.sha256((dest/'scanner-browser.js').read_bytes()).digest()
+source_commit='';clean=False
+try:
+    git_root=Path(subprocess.check_output(['git','rev-parse','--show-toplevel'],cwd=root.parent,text=True,stderr=subprocess.DEVNULL).strip()).resolve()
+    if git_root == root.parent:
+        source_commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root.parent,text=True,stderr=subprocess.DEVNULL).strip()
+        clean=not subprocess.check_output(['git','status','--porcelain'],cwd=root.parent,text=True,stderr=subprocess.DEVNULL).strip()
+except (OSError,subprocess.CalledProcessError):
+    source_commit='';clean=False
+if clean:
+    assert len(source_commit)==40 and all(character in '0123456789abcdef' for character in source_commit)
+    provenance=f'<a href="https://github.com/David-Wu1119/agentci-guard/tree/{source_commit}">{source_commit}</a> (clean checkout; publication not verified by this build)'
+else:
+    provenance='Uncommitted local build (no exact source commit)' if source_commit else 'Source revision unavailable (non-Git build)'
 html=(dest/'index.html').read_text()
 for placeholder,value in (
     ('__SCANNER_SRI__','sha256-'+base64.b64encode(digest).decode()),
     ('__SCANNER_SHA256__',digest.hex()),
+    ('__SOURCE_PROVENANCE__',provenance),
 ):
     assert html.count(placeholder)==1,placeholder
     html=html.replace(placeholder,value)

@@ -79,10 +79,19 @@ assert.deepEqual(research.caseRows, [
 ]);
 checks.push({ research });
 const scanner = await evaluate(
-  '({ready:typeof window.agentciScanWorkflow==="function",version:window.agentciScanWorkflow?.version,maxChars:window.agentciScanWorkflow?.maxChars})',
+  '({ready:typeof window.agentciScanWorkflow==="function",version:window.agentciScanWorkflow?.version,maxChars:window.agentciScanWorkflow?.maxChars,source:document.getElementById("scanner-source")?.textContent,sourceHref:document.querySelector("#scanner-source a")?.href??null})',
 );
 assert.equal(scanner.ready, true);
 assert.equal(scanner.maxChars, 250000);
+assert.match(
+  scanner.source,
+  /Uncommitted local build|clean checkout|Source revision unavailable/,
+);
+if (scanner.sourceHref)
+  assert.match(
+    scanner.sourceHref,
+    /^https:\/\/github\.com\/David-Wu1119\/agentci-guard\/tree\/[a-f0-9]{40}$/,
+  );
 await evaluate('document.getElementById("load-example").click()');
 await evaluate('document.getElementById("scan-button").click()');
 const sample = await evaluate(
