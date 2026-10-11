@@ -45,8 +45,8 @@ if (
 for (const [source, destination] of [
   ["benchmark/pilot/PACKET_README.md", "README.md"],
   ["ANNOTATION_GUIDE.md", "ANNOTATION_GUIDE.md"],
-  ["RULES.md", "RULES.md"],
-  ["docs/analysis-model.md", "analysis-model.md"],
+  ["benchmark/pilot/contracts/v0.1.1/RULES.md", "RULES.md"],
+  ["benchmark/pilot/contracts/v0.1.1/analysis-model.md", "analysis-model.md"],
   ["benchmark/pilot/manifest.json", "manifest.json"],
   ["benchmark/pilot/annotation-sheet.csv", "annotation-sheet.csv"],
   ["benchmark/pilot/timing-sheet.csv", "timing-sheet.csv"],

@@ -69,7 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   owner identity is exact"), `tests/agent-gemini.test.ts`; corpus case
   `lookalike-prefixed-owner` (41 cases). Frozen benchmark and corpus contain
   no `uses:` value where a pattern matched anywhere but the start, so 0 of 152
-  cases changed. Detector precision changed, so this is a new candidate
+  cases changed. Detector matcher behavior changed, so this is a new candidate
   identity.
 
 ## [0.6.0] - 2026-09-05
@@ -454,9 +454,8 @@ permissions, shell access, or performs unsafe checkout.
 ### Changed
 
 - Recalibrated severities after a self-audit. The first scan of the 75-repo
-  corpus reported **59 criticals**; auditing those against well-configured
-  repositories exposed three false-positive classes in the tool itself, each
-  since fixed:
+  corpus reported **59 criticals**; selected workflow inspections exposed two
+  detection mistakes and one severity-calibration mistake, later changed:
   1. `id-token: write` was counted as repo-write. OIDC token minting cannot
      modify a repo; only `contents` / `pull-requests` / `issues` / `packages` /
      `deployments` now count toward write scope.
@@ -466,7 +465,9 @@ permissions, shell access, or performs unsafe checkout.
      key, so this is a baseline exposure to review rather than a vulnerability
      on its own. Recalibrated to medium.
 
-  After these fixes: **59 → 13 criticals.**
+  The historical reported critical count changed from **59 to 13**. Raw
+  pre/post scan outputs and human labels were not preserved, so this is not a
+  measured false-positive reduction.
 
 [Unreleased]: https://github.com/David-Wu1119/agentci-guard/compare/v0.1.1...HEAD
 [0.1.1]: https://github.com/David-Wu1119/agentci-guard/compare/v0.1.0...v0.1.1

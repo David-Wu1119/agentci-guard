@@ -26,7 +26,7 @@ precision or recall figure in any public material.
 What can truthfully be said today:
 
 - Nine rules, one threat model, documented in [`RULES.md`](../RULES.md).
-- Deterministic regression against a 41-case adversarial corpus and a frozen
+- Deterministic regression against the checked-in adversarial corpus and a frozen
   152-workflow real-world benchmark, both reproducible from the repository.
   The benchmark is **development and regression evidence**: its v3 evaluation
   split was opened during detector correction on 2–5 September 2026 and may
@@ -222,8 +222,9 @@ a defect. Recorded 2026-09-05 in `evidence/sprint-2026-09-05/day7/`.
   environment variable would flag configuration as execution. This is a floor
   on reading workflow files.
 - Conditions on runtime values (`steps.*`, `needs.*`, `env.*`) cannot be
-  resolved and are kept conservative, which errs toward more findings. Roughly
-  two thirds of real workflows carry one; it costs precision, not recall.
+  resolved and are kept conservative, which can produce extra findings. In the
+  v3 development sample, 94 of 152 workflows had an event-condition
+  diagnostic; the effect on precision and recall is unmeasured.
 - Runtime permission checks (a step that queries collaborator access and
   exports an `allowed` output) are not trusted as actor gates, because a static
   reader cannot prove they run before untrusted content is fetched. This is a

@@ -8,7 +8,8 @@ from another person or an earlier pass during blind annotation.
 
 - Primary blank sheet: `benchmark/annotation-sheet.csv`
 - Independent-review sheet: `benchmark/review-sheet.csv`
-- Rule contract: `RULES.md`
+- Rule contract for the frozen eight-rule registry:
+  `benchmark/pilot/contracts/v0.1.1/RULES.md`
 - Frozen provenance: `benchmark/manifest.json`
 - Snapshots: `benchmark/snapshots/<case-id>/`
 
@@ -16,7 +17,7 @@ The sheets are generated from YAML structure only. Their job/step units and
 configured triggers do not contain scanner predictions.
 
 The development-only feasibility pilot under `benchmark/pilot/` uses the same
-schema and decision rules. Because only one human annotator is available, that
+eight-rule registry and decision rules. Because only one human annotator is available, that
 person labels the same 168 units twice under the same stable pseudonym, with a
 minimum seven-day washout and no access to pass-1 decisions during pass 2. Its
 timing and test-retest results measure feasibility and intra-annotator

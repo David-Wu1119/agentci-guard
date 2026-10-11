@@ -463,8 +463,8 @@ function verifyPilotPacketPair(left, right) {
   for (const [name, source] of [
     ["README.md", "benchmark/pilot/PACKET_README.md"],
     ["ANNOTATION_GUIDE.md", "ANNOTATION_GUIDE.md"],
-    ["RULES.md", "RULES.md"],
-    ["analysis-model.md", "docs/analysis-model.md"],
+    ["RULES.md", "benchmark/pilot/contracts/v0.1.1/RULES.md"],
+    ["analysis-model.md", "benchmark/pilot/contracts/v0.1.1/analysis-model.md"],
     ["manifest.json", "benchmark/pilot/manifest.json"],
     ["annotation-sheet.csv", "benchmark/pilot/annotation-sheet.csv"],
     ["timing-sheet.csv", "benchmark/pilot/timing-sheet.csv"],

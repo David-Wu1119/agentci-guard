@@ -21,16 +21,21 @@ repeatability. It is not an accuracy benchmark or an inter-rater study.
 8. If this is pass 2, begin only after seven full days have elapsed since the
    latest pass-1 completion timestamp.
 
-For this v0.1.1 pilot, the rule-predicate table in `RULES.md` is the label
-contract. `analysis-model.md` also describes an unreleased scanner candidate;
-use it for general YAML semantics only where it agrees with that table. Do not
-apply its newer source-provenance or Action self-fetch rules to pilot labels.
+This packet carries the exact v0.1.1 eight-rule `RULES.md` and
+`analysis-model.md` instructions. They match its frozen annotation units, not
+the current nine-rule scanner. Use this historical contract for both passes;
+do not add the later `gated-ai-write-token` rule or apply later actor-gate and
+source-provenance changes to these labels.
 
-The generic guide names repository paths. In this packet, use
-`annotation-sheet.csv`, `manifest.json`, and
-`workflows/<case-id>/<original-workflow-path>` instead of its `benchmark/`
-sheet, manifest, and snapshot paths. There is no independent-review sheet here;
-follow this packet's two-pass instructions, not the guide's two-human workflow.
+The archived `RULES.md` ends with a repository-relative analysis-model link;
+in this packet, read the adjacent `analysis-model.md` instead.
+
+The generic guide names repository paths. In this packet, use `RULES.md`,
+`annotation-sheet.csv`, `manifest.json`, `analysis-model.md`, and
+`workflows/<case-id>/<original-workflow-path>` instead of its repository sheet,
+manifest, analysis model, and snapshot paths. There is no independent-review
+sheet here; follow this packet's two-pass instructions, not the guide's
+two-human workflow.
 
 ## Files to fill
 

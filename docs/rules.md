@@ -1,8 +1,9 @@
 # Rules
 
-The normative predicate and severity contract is
-[`../RULES.md`](../RULES.md). This shorter page is retained for package and
-historical links.
+The nine-rule working reference is [`../RULES.md`](../RULES.md). The frozen
+v0.1.1 eight-rule pilot contract is
+[`../benchmark/pilot/contracts/v0.1.1/RULES.md`](../benchmark/pilot/contracts/v0.1.1/RULES.md).
+This shorter page is retained for package and historical links.
 
 Rules are security hypotheses over an explicit workflow model. YAML parse
 failures, unknown permission defaults, unsupported reachability expressions,
@@ -22,7 +23,8 @@ this rating to content attributable to the actor that gate checks.
 
 ## `agentci/pull-request-target-ai`
 
-An AI agent runs on `pull_request_target`.
+An AI step is reachable on `pull_request_target` by an untrusted actor, with
+no recognized actor/provenance gate on the job or that step.
 
 ## `agentci/ai-with-secrets`
 

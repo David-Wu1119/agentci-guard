@@ -16,8 +16,9 @@ vendor Action actually runs on the fixture's event. The discussion cases
 distinguish a verified incompatible revision from unverified references.
 
 The corpus answers “did a known bug return?” It cannot answer “how accurate is
-AgentCI Guard on real workflows?” The frozen human-labeled benchmark under
-`benchmark/` serves that separate purpose.
+AgentCI Guard on real workflows?” The frozen workflows under `benchmark/` are
+development data, not a sealed evaluation. A fresh human-labeled sample is
+required to answer that question.
 
 The version-2 manifest records each case's target, subject location, reachable
 events, exact finding rule and severity, optional exact agent-usage evidence,

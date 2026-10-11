@@ -30,6 +30,14 @@ The predeclared mode is a two-pass, single-annotator test-retest:
 This design measures intra-annotator repeatability. It does not create an
 independent reviewer by renaming the same person.
 
+The packet now pins the exact v0.1.1 eight-rule instructions from commit
+`696697ec83ebc1ed58032d706c1254d5e894d21d`, matching its 168 units.
+Earlier exports copied later nine-rule instructions and are
+version-incompatible with this protocol. Preserve those old packets; do not
+combine an old pass with a corrected pass or reinterpret completed labels.
+If an old pass was filled, treat it as development notes and restart this
+pilot with two newly exported matching packets.
+
 ## Blind pilot procedure
 
 Create only the pass-1 packet at first:

@@ -1,13 +1,16 @@
 # AgentCI Guard Rule Contract
 
-This file defines the v0.1.1 rule predicates used for regression labels and
-human benchmark annotation. A finding is a scanner rating over supported static
-semantics. It is not proof of exploitability or workflow insecurity.
+This file describes the later nine-rule baseline and the unreleased candidate
+changes in this checkout. It is **not** the v0.1.1 annotation contract: that
+exact eight-rule contract is archived in
+[`benchmark/pilot/contracts/v0.1.1/RULES.md`](benchmark/pilot/contracts/v0.1.1/RULES.md).
+A finding rates supported static semantics, not proven exploitability or
+workflow insecurity.
 
-The table below is a **historical label contract**. Do not reinterpret or
-rewrite those labels using the unreleased source-provenance candidate described
-after the table. Its changed outputs require fresh, independently labeled
-evaluation before any accuracy claim.
+The table below records the nine-rule baseline before the candidate changes
+described after it. Neither this baseline nor the candidate may be scored as
+v0.1.1 pilot labels or as independent accuracy evidence. Current nine-rule
+accuracy requires a fresh, sealed, human-labeled evaluation.
 
 ## Shared terms
 
@@ -28,7 +31,7 @@ evaluation before any accuracy claim.
 
 ## Rule predicates
 
-| Rule                                | Granularity | Severity | Exact v0.1.1 predicate                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Rule                                | Granularity | Severity | Pre-candidate nine-rule predicate                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | ----------------------------------- | ----------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `agentci/untrusted-ai-write-token`  | Job         | Critical | At least one reachable AI step consumes a supported untrusted event field, that event is an untrusted trigger, and the job's effective permissions include a sensitive write scope.                                                                                                                                                                                                                                                                                                      |
 | `agentci/gated-ai-write-token`      | Job         | High     | Every condition of `untrusted-ai-write-token` holds, but every ingesting AI step is `anthropics/claude-code-action` with its default write-access gate intact (no `allowed_non_write_users` or `allowed_bots`), every reachable untrusted event is one the action's docs list as checked (issues, issue_comment, pull_request, pull_request_review, pull_request_review_comment), and no `run:` step in the job expands untrusted event text. `claude-code-base-action` never qualifies. |
@@ -69,7 +72,7 @@ paths are different sources: the opener need not have authored `head.ref`,
 `github.head_ref`, or the changed files. PR-head sources require a separate supported provenance
 guard. Other activity types remain conservative. These distinctions affect
 both `untrusted-input-in-prompt` and
-the write-token rules; they do not revise the v0.1.1 annotations above.
+the write-token rules; they do not revise the archived v0.1.1 pilot contract.
 
 `github.event.head_commit.message` on `push` is also independent of the
 triggering actor: a maintainer's squash merge can carry a contributor's PR
@@ -120,7 +123,7 @@ else's parent Issue/PR, the gate does not justify that downgrade and the
 modeled write-token rule stays critical. This is a static severity heuristic,
 not proof that the Action accepted or rejected a runtime trigger.
 
-Unlike the historical `pull-request-target-ai` predicate above, this candidate
+Unlike the pre-candidate `pull-request-target-ai` predicate above, this candidate
 does not treat same-repository PR-head provenance as an actor gate. It can
 constrain the head branch but not who authored the PR title or body.
 
@@ -147,8 +150,8 @@ and [App permissions](https://github.com/anthropics/claude-code-action/blob/1d6d
 ## Severity rationale
 
 Critical rules combine attacker-influenced input or privileged trigger context
-with an AI agent and repository-side authority. In the historical v0.1.1
-contract, `gated-ai-write-token` was the one deliberate exception: it lowered
+with an AI agent and repository-side authority. In the later nine-rule
+baseline, `gated-ai-write-token` was the one deliberate exception: it lowered
 the same pattern when the Action's documented default checked the triggering
 actor. The unreleased candidate narrows that downgrade to modeled content
 attributable to that actor. High rules expose a direct source-to-sink path,

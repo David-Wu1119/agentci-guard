@@ -40,7 +40,8 @@ grown with source-provenance cases. It is not an accuracy benchmark.
 
 The source-provenance behavior described below is an **unreleased candidate in
 this checkout**, not a property of the published `v0.6.2` Action or CLI. The
-historical v0.1.1 annotation contract remains unchanged in [`RULES.md`](RULES.md);
+historical v0.1.1 eight-rule annotation contract remains unchanged in
+[`benchmark/pilot/contracts/v0.1.1/RULES.md`](benchmark/pilot/contracts/v0.1.1/RULES.md);
 these edits do not retroactively validate its labels or establish accuracy for
 the new classifier. In particular, the candidate reverses the older
 literal-login shortcut: a hard-coded username does not prove that account has
@@ -335,7 +336,8 @@ security issues per [`SECURITY.md`](SECURITY.md).
 See also the [adversarial regression corpus](corpus/adversarial/README.md),
 the [benchmark protocol](BENCHMARK.md), and the retained
 [historical 75-repository scan](docs/real-world-findings.md), which is
-exploratory and not accuracy evidence.
+exploratory, not accuracy evidence, and not fully reproducible from retained
+raw inputs.
 
 ## License
 

@@ -2,7 +2,8 @@
 
 AgentCI Guard evaluates each AI step under an explicit effective context. This
 document describes the **unreleased source-provenance candidate in this
-checkout**. The published v0.1.1 annotation predicates in [`RULES.md`](../RULES.md)
+checkout**. The published v0.1.1 annotation predicates in
+[`benchmark/pilot/contracts/v0.1.1/RULES.md`](../benchmark/pilot/contracts/v0.1.1/RULES.md)
 remain a historical contract; changed candidate outcomes cannot be scored
 against those labels as independent accuracy evidence. The documented vendor
 mode assumptions below refer to a pinned Anthropic commit, not every future
@@ -55,19 +56,18 @@ configuration as execution, which the version/help exclusions exist to prevent.
 This is a floor on static workflow analysis, not a defect to be patched. Runtime
 monitoring of the runner observes this layer; a workflow reader cannot.
 
-## Why an uninterpretable condition is not a false negative
+## Conservative handling of uninterpretable conditions
 
-Roughly two thirds of real workflows carry at least one condition outside the
-supported subset, and the diagnostic count can look alarming. Auditing the
-frozen benchmark, the dominant constructs are runtime values: step outputs
-(`steps.*`), job outputs (`needs.*`), and `env.*`, `inputs.*`, `matrix.*`, and
-`vars.*` references, none of which a static reader can resolve even in
-principle.
+In the v3 development sample, 94 of 152 workflows had an event-condition
+diagnostic. Auditing those snapshots, the dominant constructs are runtime
+values: step outputs (`steps.*`), job outputs (`needs.*`), and `env.*`,
+`inputs.*`, `matrix.*`, and `vars.*` references, which this workflow-only
+reader cannot resolve without runtime state or external files.
 
 Conservative handling retains the event set, so an uninterpretable condition
-errs toward reporting more, never less. Actor-gate recognition is separate and
-also fails closed: an unrecognized guard leaves the job ungated. So this class
-costs precision and reporting noise, and does not hide findings.
+can produce extra findings. Actor-gate recognition is separate and also fails
+closed: an unrecognized guard leaves the job ungated. The impact on precision
+and recall has not been measured against human labels.
 
 The status functions `always()`, `success()`, `failure()`, and `cancelled()`
 are event-independent: they depend on prior step status, never on the trigger,
