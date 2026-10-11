@@ -116,6 +116,7 @@ function renderResult(result) {
   error.hidden = true;
   output.hidden = false;
   heading.focus();
+  heading.scrollIntoView({ behavior: 'instant', block: 'start' });
 }
 
 yaml.addEventListener('input', () => {

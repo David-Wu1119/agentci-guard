@@ -102,6 +102,12 @@ if (scanner.sourceHref)
     scanner.sourceHref,
     /^https:\/\/github\.com\/David-Wu1119\/agentci-guard\/tree\/[a-f0-9]{40}$/,
   );
+await send("Emulation.setDeviceMetricsOverride", {
+  width: 390,
+  height: 720,
+  deviceScaleFactor: 1,
+  mobile: true,
+});
 await evaluate('document.getElementById("load-example").click()');
 await evaluate('document.getElementById("scan-button").click()');
 const sample = await evaluate(
@@ -130,6 +136,48 @@ for (const [rule] of research.caseRows)
   );
 assert.equal(sample.errorHidden, true);
 checks.push({ scanner, sample });
+await new Promise((resolve) => setTimeout(resolve, 700));
+const findingViewport = await evaluate(
+  '({titleBottom:document.querySelector("#scan-findings li h5").getBoundingClientRect().bottom,viewportHeight:innerHeight,headingTop:document.getElementById("scan-results-heading").getBoundingClientRect().top,focus:document.activeElement.id,scrollY,provenance:document.getElementById("scanner-digest").textContent,provenanceClosed:!document.querySelector(".scanner-provenance").open,provenanceLabel:document.querySelector(".scanner-provenance summary").textContent,findingsBeforeUsages:!!(document.getElementById("scan-findings").compareDocumentPosition(document.getElementById("scan-agent-usages"))&Node.DOCUMENT_POSITION_FOLLOWING),warning:document.getElementById("scan-completeness").textContent})',
+);
+assert.ok(
+  findingViewport.headingTop >= 0 &&
+    findingViewport.titleBottom <= findingViewport.viewportHeight,
+  JSON.stringify(findingViewport),
+);
+assert.match(findingViewport.warning, /does not.*guarantee security/);
+assert.match(findingViewport.provenance, /^[a-f0-9]{64}$/);
+assert.equal(findingViewport.focus, "scan-results-heading");
+assert.equal(findingViewport.provenanceClosed, true);
+assert.match(findingViewport.provenanceLabel, /not accuracy evidence/);
+assert.equal(findingViewport.findingsBeforeUsages, true);
+checks.push({ findingViewport });
+await evaluate('document.querySelector(".scanner-provenance summary").focus()');
+await send("Input.dispatchKeyEvent", {
+  type: "keyDown",
+  key: "Enter",
+  code: "Enter",
+  text: "\r",
+  windowsVirtualKeyCode: 13,
+  nativeVirtualKeyCode: 13,
+});
+await send("Input.dispatchKeyEvent", {
+  type: "keyUp",
+  key: "Enter",
+  code: "Enter",
+  windowsVirtualKeyCode: 13,
+  nativeVirtualKeyCode: 13,
+});
+const disclosureAfterEnter = await evaluate(
+  '({focus:document.activeElement.tagName,open:document.querySelector(".scanner-provenance").open})',
+);
+assert.equal(
+  disclosureAfterEnter.open,
+  true,
+  JSON.stringify(disclosureAfterEnter),
+);
+checks.push({ provenanceKeyboardOpen: true });
+await evaluate('document.querySelector(".scanner-provenance summary").click()');
 for (const width of [1440, 1024, 768, 390, 320]) {
   await send("Emulation.setDeviceMetricsOverride", {
     width,
