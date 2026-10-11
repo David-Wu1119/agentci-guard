@@ -9680,7 +9680,11 @@ function analyzeWorkflow(workflow, repository, context) {
               stepIndex: index,
               evidence: shrink(sinkMaterial),
               line: stepLine,
-              events: stepReachability.events,
+              events: unionEvents(
+                sinkMatches.flatMap(
+                  (match) => match.event === "*" ? stepReachability.events : [match.event]
+                )
+              ),
               callChain: context.callChain
             })
           );

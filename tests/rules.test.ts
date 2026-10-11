@@ -72,6 +72,69 @@ jobs:
     expect(rules).toContain("agentci/untrusted-input-in-prompt");
   });
 
+  it("attributes a prompt finding only to events that supply its input", () => {
+    const raw = `
+on: [push, issue_comment]
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - run: claude -p "\${{ github.event.comment.body }}"
+`;
+    const file: WorkflowFile = {
+      path: `${ROOT}/.github/workflows/test.yml`,
+      raw,
+      document: YAML.parse(raw),
+    };
+    const prompt = scanWorkflow(file, ROOT).find(
+      (finding) => finding.rule_id === "agentci/untrusted-input-in-prompt",
+    );
+
+    expect(prompt?.reachable_events).toEqual(["issue_comment"]);
+  });
+
+  it("unions only the events matched by multiple prompt inputs", () => {
+    const raw = `
+on: [push, issue_comment, workflow_dispatch]
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - run: claude -p "\${{ github.event.comment.body }} \${{ github.event.head_commit.message }}"
+`;
+    const file: WorkflowFile = {
+      path: `${ROOT}/.github/workflows/test.yml`,
+      raw,
+      document: YAML.parse(raw),
+    };
+    const prompt = scanWorkflow(file, ROOT).find(
+      (finding) => finding.rule_id === "agentci/untrusted-input-in-prompt",
+    );
+
+    expect(prompt?.reachable_events).toEqual(["issue_comment", "push"]);
+  });
+
+  it("keeps every reachable event for a wildcard prompt source", () => {
+    const raw = `
+on: [push, issue_comment]
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - run: claude -p "\${{ github.ref_name }}"
+`;
+    const file: WorkflowFile = {
+      path: `${ROOT}/.github/workflows/test.yml`,
+      raw,
+      document: YAML.parse(raw),
+    };
+    const prompt = scanWorkflow(file, ROOT).find(
+      (finding) => finding.rule_id === "agentci/untrusted-input-in-prompt",
+    );
+
+    expect(prompt?.reachable_events).toEqual(["issue_comment", "push"]);
+  });
+
   it("does not treat a dynamic step name as agent input", () => {
     const rules = rulesFor(`
 on: issue_comment
