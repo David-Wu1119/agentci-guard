@@ -1,6 +1,6 @@
 # Browser-local scanner deployment — 2026-10-11
 
-Source: local branch `codex/guard-research-site-20261011`, commit `102cc92a0a24e69c67acf95c03dd2a98c97fca23` (not pushed to GitHub). Project: Cloudflare Pages `axiom-console`.
+Source: commit `102cc92a0a24e69c67acf95c03dd2a98c97fca23` (local at deployment time). Project: Cloudflare Pages `axiom-console`.
 
 - Preview: `f3b2aa55-9bb9-4a71-9c1c-43c0199c7607` at <https://f3b2aa55.axiom-console.pages.dev/>.
 - Production: `dcec7408-ccaa-4f35-be0c-272b5142f0c4` at <https://cryptoaxiom.net/> and <https://dcec7408.axiom-console.pages.dev/>.
@@ -19,4 +19,4 @@ Build: `pnpm site:check`; deploy: `npx --yes wrangler@4.147.0 pages deploy site/
 
 Verification: `pnpm check` passed under Node 22 with 239 tests; `pnpm site:check` matched the Node scanner on 46 adversarial YAML files; `node site/render-check.mjs` passed at five viewport widths and tested sample, error states, file input, and keyboard focus. The production domain returned HTTP 200 with CSP `connect-src 'none'`, `X-Content-Type-Options`, `Referrer-Policy`, and `Permissions-Policy`; it had no `X-Robots-Tag: noindex`. A real production-browser run of the pinned synthetic sample returned three expected findings, no diagnostics, and `analysis_complete: true` for the one-file input.
 
-Limits: the browser interface is single-file only and not a GitHub Actions schema validator or proof of security. It does not upload YAML or collect user feedback. The deployment is not evidence of scanner precision/recall, external adoption, or a production security gate; no human labels exist. The source branch still needs a reviewed public PR before an outsider can rebuild this exact website from GitHub.
+Limits: the browser interface is single-file only and not a GitHub Actions schema validator or proof of security. It does not upload YAML or collect user feedback. The deployment is not evidence of scanner precision/recall, external adoption, or a production security gate; no human labels exist. Public access to the exact source commit is required before an outsider can rebuild this website from GitHub.

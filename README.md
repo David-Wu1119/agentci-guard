@@ -2,7 +2,7 @@
 
 [![npm](https://img.shields.io/npm/v/agentci-guard)](https://www.npmjs.com/package/agentci-guard) [![CI](https://github.com/David-Wu1119/agentci-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/David-Wu1119/agentci-guard/actions/workflows/ci.yml) [![license: MIT](https://img.shields.io/npm/l/agentci-guard)](LICENSE)
 
-[Research site](https://cryptoaxiom.net/) · [Site source](site/README.md) (static explanation and synthetic fixture, not a hosted scanner)
+[Research site](https://cryptoaxiom.net/) · [Site source](site/README.md) (browser-local, single-file scanner; no YAML upload or hosted analysis API)
 
 AgentCI Guard is a static analyzer for GitHub Actions workflows that answers
 one question before a workflow runs: **can text a stranger controls reach an
@@ -44,16 +44,18 @@ freeze proves the snapshots are immutable, not that they were unseen. Its
 annotation registry also predates the ninth rule. Any future accuracy claim
 needs a fresh, sealed sample.
 
-On the same 152 workflows, [zizmor](https://github.com/zizmorcore/zizmor)
-1.30.0 flags 146 repositories to this tool's 77 and covers classes this tool
-does not model. This tool raises a top-severity finding on 8 repositories where
-zizmor reports nothing equivalent, all of them agent reachability. Run both.
+An earlier numeric comparison with [zizmor](https://github.com/zizmorcore/zizmor)
+is withdrawn: this repository does not preserve the per-workflow zizmor output
+or rule-equivalence mapping needed to replay it. The 152 workflows are
+development data, not evidence of relative accuracy or unique coverage.
 
-The academic treatment of this vulnerability class is Wang et al.,
+Prior research on this vulnerability class includes Wang et al.,
 [_Demystifying and Detecting Agentic Workflow Injection Vulnerabilities in
-GitHub Actions_](https://arxiv.org/abs/2605.07135), whose taint analysis
-covers 13,392 workflows with confirmed exploitability. If you need a
-production-grade detector, start there.
+GitHub Actions_](https://arxiv.org/abs/2605.07135). Its TaintAWI models
+untrusted event data reaching agents and AI-derived output reaching later
+scripts; it analyzed 13,392 workflows and judged 496 of 519 reviewed alerts
+exploitable under its threat model. Those are not 496 demonstrated attacks.
+AgentCI Guard has not demonstrated a novel detector or comparative advantage.
 
 ## What it detects
 

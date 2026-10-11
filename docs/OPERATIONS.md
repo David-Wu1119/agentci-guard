@@ -25,24 +25,26 @@ precision or recall figure in any public material.
 
 What can truthfully be said today:
 
-- Eight rules, one threat model, documented in [`RULES.md`](../RULES.md).
+- Nine rules, one threat model, documented in [`RULES.md`](../RULES.md).
 - Deterministic regression against a 41-case adversarial corpus and a frozen
   152-workflow real-world benchmark, both reproducible from the repository.
   The benchmark is **development and regression evidence**: its v3 evaluation
   split was opened during detector correction on 2–5 September 2026 and may
   not be cited as held out (see `BENCHMARK.md`, "Status change, 2026-09-05").
 - Every critical finding on the benchmark was hand-read during development,
-  and four detection defects were found and fixed by that process; the
+  and six detection defects were found and fixed by that process; the
   defects and their measured effects are recorded in
   [`CHANGELOG.md`](../CHANGELOG.md).
-- On the same 152 workflows, zizmor 1.30.0 flags 146 repositories to this
-  tool's 77, and catches classes this tool does not model. This tool raises a
-  top-severity finding on 8 repositories where zizmor reports nothing
-  equivalent, all of them agent-reachability. Both facts belong together.
+- The earlier numeric comparison with zizmor is withdrawn. This repository
+  lacks the per-workflow zizmor output and rule-equivalence mapping needed to
+  replay it. Do not claim relative accuracy or unique coverage from the
+  152-workflow development corpus.
 - The academic prior art is Wang et al., "Demystifying and Detecting Agentic
   Workflow Injection Vulnerabilities in GitHub Actions" (arXiv 2605.07135),
-  whose TaintAWI analyzes the same class at far larger scale with confirmed
-  exploitability. Cite it; do not compete with it.
+  whose TaintAWI analyzes the same class, including prompt-to-agent and
+  prompt-to-script paths, at far larger scale. Its 496 cases were judged
+  exploitable among 519 reviewed alerts, not demonstrated live attacks. Cite
+  it; do not claim this tool invented the problem or has measured superiority.
 
 ## Running an organization audit
 
