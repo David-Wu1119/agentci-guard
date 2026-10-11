@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Implicit Issue/PR/comment ingestion now requires evidence for the exact AI
+  Action revision and event path. Unverified Action refs with write capability
+  produce `analysis-agent-implicit-ingestion-unknown` instead of a definite
+  write-token finding solely from their trigger. Explicit event expressions
+  remain analyzable. The high-severity actor-gate downgrade now requires an
+  inspected immutable gate for every ingesting step and no other reachable
+  path with unresolved implicit ingestion, tool fetch, or CLI input flow.
+  Synthetic tests and adversarial fixtures pin these boundaries; accuracy on
+  human labels is not yet measured.
+  Against clean `5ad017c` on the fixed 152-workflow development corpus, 51
+  case signatures changed: critical findings 32→4, high 36→36, medium
+  180→180, and complete scans 57→48. The candidate added 52
+  implicit-ingestion-unknown diagnostics. This is a coverage/behavior change,
+  not evidence that the removed alerts were false positives.
+
 ### Fixed
 
 - The verified Anthropic Action revision `1d6de8c` no longer produces AI
@@ -14,8 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   before Claude starts, or when a PR path has no prompt and progress tracking
   is off. Caller PR activities are preserved through local reusable workflows.
   Synthetic regressions cover accepted and rejected paths. This does not
-  establish implicit-ingestion behavior for mutable or unverified Action refs;
-  the stricter D2 unknown policy remains pending. A scanner-bundle comparison
+  establish implicit-ingestion behavior for mutable or unverified Action refs.
+  A scanner-bundle comparison
   against clean `b63ac94` changed 0 of 152 public development workflows
   (critical 32→32, high 36→36, medium 180→180); those counts are behavior, not
   accuracy, and the new pinned-version edge cases are synthetic.

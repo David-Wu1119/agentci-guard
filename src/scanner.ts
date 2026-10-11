@@ -91,11 +91,17 @@ const EMPTY_REUSABLE_CONTEXT: ReusableContext = {
 // Source: https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/github/context.ts#L250-L251
 const ANTHROPIC_ACTION_WITHOUT_DISCUSSION =
   "1d6de8cb0c237e7c15e9e1bdf973826ebae490cc";
+// This revision's inspected detector selects agent mode for a static prompt;
+// agent mode forwards that prompt without an automatic Issue-body fetch.
+// Sources: https://github.com/anthropics/claude-code-action/blob/787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251/src/modes/detector.ts#L20-L84
+// https://github.com/anthropics/claude-code-action/blob/787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251/src/modes/agent/index.ts#L78-L90
+const ANTHROPIC_ACTION_AGENT_PROMPT_VERIFIED =
+  "787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251";
 // Only these immutable revisions have an inspected triggering-actor write gate.
 // Sources: https://github.com/anthropics/claude-code-action/blob/787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251/src/github/validation/permissions.ts
 // https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/docs/security.md
 const VERIFIED_ANTHROPIC_WRITE_GATES = new Set([
-  "787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251",
+  ANTHROPIC_ACTION_AGENT_PROMPT_VERIFIED,
   ANTHROPIC_ACTION_WITHOUT_DISCUSSION,
 ]);
 
@@ -376,8 +382,10 @@ function analyzeWorkflow(
       sourceMayDifferFromTrigger: boolean;
       potentialAppWrite: boolean;
       ingestionEvents: string[];
-      /** anthropics/claude-code-action with its default write-access gate intact. */
-      selfGated: boolean;
+      implicitIngestionUnknown: boolean;
+      toolFetchUnknown: boolean;
+      /** An inspected immutable Anthropic Action with its default write gate intact. */
+      verifiedSelfGate: boolean;
       /** The job or this step carries a recognized actor/provenance gate. */
       actorGated: boolean;
       events: string[];
@@ -742,23 +750,24 @@ function analyzeWorkflow(
         });
       }
       const hasUntrustedSink = sinkMatches.length > 0;
-      const fetchedMatches = stepUsesAiAction
-        ? selfFetchedSources(
-            materializeInputs(stepUses, context.inputValues),
-            effectiveWith,
-            stepReachability.events,
-            creationOnlyEvents,
-          ).filter(
-            (match) =>
-              !sourceTrustedByGate(
-                match.source,
-                match.event,
-                stepActorGate,
-                stepPrGate,
-                creationOnlyEvents,
-              ),
-          )
-        : [];
+      const fetchedMatches =
+        stepUsesAiAction &&
+        pinnedAnthropicRef === ANTHROPIC_ACTION_WITHOUT_DISCUSSION
+          ? selfFetchedSources(
+              effectiveWith,
+              stepReachability.events,
+              creationOnlyEvents,
+            ).filter(
+              (match) =>
+                !sourceTrustedByGate(
+                  match.source,
+                  match.event,
+                  stepActorGate,
+                  stepPrGate,
+                  creationOnlyEvents,
+                ),
+            )
+          : [];
       if (
         stepRun.trim().length > 0 &&
         activeMatches(materializeInputs(stepRun, context.inputValues)).length >
@@ -791,6 +800,31 @@ function analyzeWorkflow(
       const verifiedSelfGate =
         selfGated &&
         VERIFIED_ANTHROPIC_WRITE_GATES.has(pinnedAnthropicRef ?? "");
+      const knownAgentModeWithoutImplicitFetch =
+        pinnedAnthropicRef === ANTHROPIC_ACTION_AGENT_PROMPT_VERIFIED &&
+        isRecord(effectiveWith) &&
+        String(effectiveWith.prompt ?? "").length > 0 &&
+        !/^\$\{\{[\s\S]*\}\}$/.test(String(effectiveWith.prompt)) &&
+        String(effectiveWith.track_progress ?? "") !== "true" &&
+        !String(effectiveWith.track_progress ?? "").includes("${{");
+      const implicitIngestionUnknown =
+        stepUsesAiAction &&
+        pinnedAnthropicRef !== ANTHROPIC_ACTION_WITHOUT_DISCUSSION &&
+        !knownAgentModeWithoutImplicitFetch &&
+        stepReachability.events.some((event) => UNTRUSTED_EVENTS.has(event)) &&
+        (hasSensitiveWrite(jobPermissions) || potentialAppWrite);
+      if (implicitIngestionUnknown) {
+        output.diagnostics.push({
+          code: "agentci/analysis-agent-implicit-ingestion-unknown",
+          kind: "analysis",
+          severity: "warning",
+          file,
+          job: jobName,
+          line: stepLine,
+          message:
+            "This AI Action ref/event has no verified contract for implicit Issue, PR, or comment ingestion; explicit input flow is analyzed separately.",
+        });
+      }
       const ingestionEvents = unionEvents(
         [...sinkMatches, ...fetchedMatches].flatMap((match) =>
           match.event === "*" ? stepReachability.events : [match.event],
@@ -821,8 +855,7 @@ function analyzeWorkflow(
           );
 
       if (stepUsesAi) {
-        if (
-          !hasUntrustedIngestion &&
+        const toolFetchUnknown = Boolean(
           ["issues", "issue_comment"].some(
             (event) =>
               stepReachability.events.includes(event) &&
@@ -841,8 +874,9 @@ function analyzeWorkflow(
             ) ||
             (isRecord(effectiveWith) &&
               String(effectiveWith.github_token ?? "").trim())) &&
-          mayFetchIssueViaTool(actionReference, effectiveWith)
-        ) {
+          mayFetchIssueViaTool(actionReference, effectiveWith),
+        );
+        if (toolFetchUnknown) {
           output.diagnostics.push({
             code: "agentci/analysis-agent-tool-fetch-unknown",
             kind: "analysis",
@@ -883,7 +917,9 @@ function analyzeWorkflow(
           sourceMayDifferFromTrigger,
           ingestionEvents,
           potentialAppWrite,
-          selfGated,
+          implicitIngestionUnknown,
+          toolFetchUnknown,
+          verifiedSelfGate,
           actorGated: stepActorGate,
           events: stepReachability.events,
         });
@@ -1008,29 +1044,42 @@ function analyzeWorkflow(
       // action's docs say it checks, no parent content may have a different
       // author, and no run: step expands untrusted text outside that gate.
       const gated =
-        ingesting.every((step) => step.selfGated) &&
+        ingesting.every((step) => step.verifiedSelfGate) &&
         reachableUntrusted.every((event) => SELF_GATED_EVENTS.has(event)) &&
         !ingesting.some((step) => step.sourceMayDifferFromTrigger) &&
         !untrustedInRun;
-      output.findings.push(
-        makeFinding(
-          gated
-            ? "agentci/gated-ai-write-token"
-            : "agentci/untrusted-ai-write-token",
-          {
-            file,
-            job: jobName,
-            evidence: gated
-              ? "actor-authored event content + AI usage + effective write permission; anthropics/claude-code-action normally checks the triggering actor for repository write access, with no configured allowlist bypass or untrusted run: expansion"
-              : untrustedViaInterpolation
-                ? "reachable untrusted event content + AI usage + workflow or potential Action App write capability"
-                : "AI agent action may ingest reachable event content through its runtime context + workflow or potential Action App write capability",
-            line: jobLine,
-            events: reachableUntrusted,
-            callChain: context.callChain,
-          },
-        ),
-      );
+      // An unknown second path disproves neither the gate nor its bypass.
+      if (
+        !gated ||
+        (!aiSteps.some(
+          (step) => step.implicitIngestionUnknown || step.toolFetchUnknown,
+        ) &&
+          !output.diagnostics.some(
+            (diagnostic) =>
+              diagnostic.file === file &&
+              diagnostic.job === jobName &&
+              diagnostic.code === "agentci/analysis-run-dataflow-unknown",
+          ))
+      )
+        output.findings.push(
+          makeFinding(
+            gated
+              ? "agentci/gated-ai-write-token"
+              : "agentci/untrusted-ai-write-token",
+            {
+              file,
+              job: jobName,
+              evidence: gated
+                ? "actor-authored event content + AI usage + effective write permission; anthropics/claude-code-action normally checks the triggering actor for repository write access, with no configured allowlist bypass or untrusted run: expansion"
+                : untrustedViaInterpolation
+                  ? "reachable untrusted event content + AI usage + workflow or potential Action App write capability"
+                  : "AI agent action may ingest reachable event content through its runtime context + workflow or potential Action App write capability",
+              line: jobLine,
+              events: reachableUntrusted,
+              callChain: context.callChain,
+            },
+          ),
+        );
     }
     if (aiSteps.some((step) => step.hasSecret)) {
       output.findings.push(
@@ -1264,17 +1313,10 @@ function sourceMayDifferFromTriggerActor(
 }
 
 function selfFetchedSources(
-  uses: string,
   withBlock: unknown,
   events: string[],
   creationOnlyEvents: Set<string>,
 ): Array<{ event: string; source: ContextSource }> {
-  if (/^anthropics\/claude-code-base-action(?:@|$)/i.test(uses)) return [];
-  if (!isSelfGatingAgentAction(uses)) {
-    return events
-      .filter((event) => UNTRUSTED_EVENTS.has(event))
-      .map((event) => ({ event, source: "other" }));
-  }
   const inputs = isRecord(withBlock) ? withBlock : {};
   const prompt = String(inputs.prompt ?? "");
   // A lone unresolved expression can evaluate to empty and select tag mode.

@@ -20,9 +20,11 @@ does not establish remote write capability; that path emits
 
 ## `agentci/gated-ai-write-token`
 
-Untrusted content reaches a write-capable Claude Code Action whose default
-actor write-access gate is modeled as intact. The unreleased candidate narrows
-this rating to content attributable to the actor that gate checks.
+Untrusted content reaches a write-capable, inspected immutable Claude Code
+Action revision whose default actor write-access gate is modeled as intact.
+Every relevant text source must be attributable to the checked actor, with no
+unresolved implicit ingestion, tool fetch, or CLI input flow in another
+reachable AI path.
 
 ## `agentci/pull-request-target-ai`
 

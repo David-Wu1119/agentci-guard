@@ -13,7 +13,11 @@ describe("Markdown report", () => {
     expect(markdown).toContain("# AgentCI Guard Scan");
     expect(markdown).toContain(`- Findings: ${result.findings.length}`);
     expect(markdown).toContain(`- Critical: ${result.summary.critical}`);
-    expect(markdown).toContain("- Analysis complete: yes");
+    expect(markdown).toContain("- Analysis complete: no");
+    expect(markdown).toContain("## Diagnostics");
+    expect(markdown).toContain(
+      "agentci/analysis-agent-implicit-ingestion-unknown",
+    );
 
     for (const finding of result.findings) {
       expect(markdown).toContain(
@@ -22,7 +26,6 @@ describe("Markdown report", () => {
       expect(markdown).toContain(`**File:** ${finding.file}`);
       for (const fix of finding.fix) expect(markdown).toContain(`- ${fix}`);
     }
-    expect(markdown).not.toContain("## Diagnostics");
   });
 
   it("escapes backticks in evidence so the Markdown stays well formed", () => {

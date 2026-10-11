@@ -13,6 +13,7 @@ const rulesOf = (raw: string) => new Set(findings(raw).map((f) => f.rule_id));
 
 const CRITICAL = "agentci/untrusted-ai-write-token";
 const GATED = "agentci/gated-ai-write-token";
+const VERIFIED_TAG_REF = "1d6de8cb0c237e7c15e9e1bdf973826ebae490cc";
 
 // The Action's actor check cannot authenticate a parent Issue written by
 // someone else. A direct prompt containing only the triggering comment can
@@ -28,7 +29,7 @@ jobs:
     if: contains(github.event.comment.body, '@claude')
     runs-on: ubuntu-latest
     steps:
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@${VERIFIED_TAG_REF}
         with:
           claude_code_oauth_token: \${{ secrets.TOKEN }}${extra}
 `;
@@ -87,7 +88,7 @@ jobs:
   claude:
     runs-on: ubuntu-latest
     steps:
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@${VERIFIED_TAG_REF}
         with:
           prompt: "Reply: \${{ github.event.comment.body }}"
 `;
@@ -143,6 +144,9 @@ jobs:
       BARE(
         '\n          prompt: "${{ github.event.discussion.body }}"',
         "discussion_comment:\n    types: [created]",
+      ).replace(
+        `anthropics/claude-code-action@${VERIFIED_TAG_REF}`,
+        "anthropics/claude-code-action@v1",
       ),
     );
     expect(rules).toContain(CRITICAL);
@@ -160,7 +164,7 @@ jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@${VERIFIED_TAG_REF}
         with:
           prompt: "Review \${{ github.event.pull_request.title }}"
 `);
@@ -180,7 +184,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo "\${{ github.event.issue.title }}" > /tmp/title
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@${VERIFIED_TAG_REF}
 `);
     expect(rules).toContain(CRITICAL);
     expect(rules).not.toContain(GATED);
@@ -190,7 +194,7 @@ jobs:
     const raw = BARE(
       '\n          prompt: "${{ github.event.comment.body }}"',
     ).replace(
-      "anthropics/claude-code-action@v1",
+      `anthropics/claude-code-action@${VERIFIED_TAG_REF}`,
       "anthropics/claude-code-base-action@beta",
     );
     const rules = rulesOf(raw);
@@ -198,13 +202,13 @@ jobs:
     expect(rules).not.toContain(GATED);
   });
 
-  it("stays critical for a non-Anthropic agent whose default is not verified", () => {
+  it("does not assert implicit ingestion for a non-Anthropic agent without vendor evidence", () => {
     const raw = BARE().replace(
-      "anthropics/claude-code-action@v1",
+      `anthropics/claude-code-action@${VERIFIED_TAG_REF}`,
       "OpenHands/extensions/plugins/pr-review@main",
     );
     const rules = rulesOf(raw);
-    expect(rules).toContain(CRITICAL);
+    expect(rules).not.toContain(CRITICAL);
     expect(rules).not.toContain(GATED);
   });
 

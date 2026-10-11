@@ -104,8 +104,12 @@ try {
   if (sarif?.runs?.[0]?.results?.length !== 9) {
     throw new Error("Packed Action did not emit the 9-fixture SARIF baseline.");
   }
-  if (!fs.readFileSync(outputPath, "utf8").includes("analysis-complete=true")) {
-    throw new Error("Packed Action did not emit complete GitHub outputs.");
+  const actionOutputs = fs.readFileSync(outputPath, "utf8");
+  if (
+    !actionOutputs.includes("analysis-complete=false") ||
+    !actionOutputs.includes("diagnostics=1")
+  ) {
+    throw new Error("Packed Action did not expose incomplete GitHub outputs.");
   }
 
   const cliOutput = execFileSync(
@@ -123,7 +127,7 @@ try {
   }
 
   check(
-    "packed Action: examples/vulnerable emits the 9-finding SARIF baseline, analysis complete",
+    "packed Action: examples/vulnerable emits the 9-finding SARIF baseline and incomplete-analysis outputs",
     true,
   );
   check(

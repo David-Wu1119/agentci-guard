@@ -30,7 +30,7 @@ describe("agent vendors that renamed their organization", () => {
     expect(looksLikeAiAction("opendevin/opendevin-action@v1")).toBe(true);
   });
 
-  it("flags the corpus shape: PR-triggered review agent with write scopes", () => {
+  it("recognizes the corpus shape without asserting undocumented implicit ingestion", () => {
     const rules = ruleIds(`
 on:
   pull_request:
@@ -48,7 +48,8 @@ jobs:
         with:
           llm-model: openhands/claude-sonnet-4-5
 `);
-    expect(rules).toContain("agentci/untrusted-ai-write-token");
+    expect(rules).toContain("agentci/broad-write-permissions");
+    expect(rules).not.toContain("agentci/untrusted-ai-write-token");
   });
 
   it("does not match a repository merely named after the vendor", () => {

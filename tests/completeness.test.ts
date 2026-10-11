@@ -77,7 +77,7 @@ describe("SARIF carries completeness and diagnostics", () => {
 
   it("keeps findings and diagnostics distinct when both are present", async () => {
     const result = await scanRepository("examples/vulnerable");
-    // The vulnerable example is complete; add an incomplete workflow beside it.
+    // The vulnerable example is already incomplete; add another diagnostic workflow.
     const root = await repoWith({
       "agent.yml": await fs.readFile(
         "examples/vulnerable/.github/workflows/ai-agent.yml",

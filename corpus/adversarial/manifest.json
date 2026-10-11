@@ -682,6 +682,15 @@
               "job": "agent",
               "line_min": 2
             }
+          },
+          {
+            "code": "agentci/analysis-agent-implicit-ingestion-unknown",
+            "severity": "warning",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
           }
         ],
         "analysis_complete": false
@@ -878,12 +887,13 @@
         ],
         "analysis_complete": true
       },
-      "rationale": "Caller event, permission, untrusted input, and explicit capability context must propagate through a nested local reusable-workflow call chain. The literal prompt prefix guarantees agent mode while retaining transitive input taint. Contract change 2026-09-05, by owner decision after review of anthropics/claude-code-action docs/security.md: the callee is that action with its default write-access gate intact (no allowed_non_write_users or allowed_bots, no pull_request_target or discussion trigger, no untrusted text in a run: step), so the write-token finding is agentci/gated-ai-write-token at high rather than critical. See docs/analysis-model.md, 'The agent's own gate'.",
+      "rationale": "Caller event, permission, untrusted input, and explicit capability context must propagate through a nested local reusable-workflow call chain. The callee pins an inspected Anthropic revision and passes the caller's comment as an explicit prompt. Its verified default actor gate is intact, and no other untrusted source or ungated run: path is modeled, so the write-token finding is high rather than critical.",
       "assumption_sources": [
         "reusable-workflows",
         "permissions",
         "event-security",
-        "project-rule-contract"
+        "project-rule-contract",
+        "anthropic-action-access"
       ]
     },
     {
@@ -1304,7 +1314,7 @@
         "diagnostics": [],
         "analysis_complete": true
       },
-      "rationale": "The bare action uses tag mode. A trusted commenter may trigger it on an attacker-authored parent Issue or PR; checking the commenter does not authenticate the fetched parent body. The write-token path remains critical despite the action's default trigger-user gate.",
+      "rationale": "This fixture pins the inspected Action revision in tag mode. A trusted commenter may trigger it on an attacker-authored parent Issue or PR; checking the commenter does not authenticate the fetched parent body. The write-token path remains critical despite the verified trigger-user gate.",
       "assumption_sources": [
         "event-security",
         "anthropic-action-modes",
@@ -1875,10 +1885,20 @@
             }
           }
         ],
-        "diagnostics": [],
-        "analysis_complete": true
+        "diagnostics": [
+          {
+            "code": "agentci/analysis-agent-implicit-ingestion-unknown",
+            "severity": "warning",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          }
+        ],
+        "analysis_complete": false
       },
-      "rationale": "Review finding 3 (2026-09-05): the Gemini CLI action was absent from the detector, so untrusted comment text reaching Gemini in a write-token job scanned as no agent, no findings, complete. The action operates on the triggering event's issue or PR (its github_issue_number and github_pr_number inputs default to the payload) and documents no write-access gate, so it is treated like the other agent actions.",
+      "rationale": "The Gemini Action is an agent and this workflow explicitly passes an untrusted comment body into its prompt under write permissions, proving the write-token path. Implicit Issue/PR ingestion at this exact Action revision and event is not verified, so that additional path remains unknown rather than assumed.",
       "assumption_sources": ["event-security", "project-rule-contract"]
     },
     {

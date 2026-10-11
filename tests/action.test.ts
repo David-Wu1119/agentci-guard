@@ -73,7 +73,7 @@ describe("JavaScript Action entrypoint", () => {
     expect(npmSmoke).toContain('"$consumer_dir/node_modules/.bin/agentci"');
   });
 
-  it("reads inputs, writes SARIF and outputs, and succeeds with fail-on none", async () => {
+  it("writes SARIF and incomplete-analysis outputs for an unverified Action ref", async () => {
     const temporary = await temporaryOutput();
     const io = captureIo();
     const code = await runAction(
@@ -95,7 +95,8 @@ describe("JavaScript Action entrypoint", () => {
     const outputs = await fs.readFile(temporary.output, "utf8");
     expect(outputs).toMatch(/findings=[1-9]\d*/);
     expect(outputs).toContain(`sarif-path=${temporary.sarif}`);
-    expect(outputs).toContain("analysis-complete=true");
+    expect(outputs).toContain("diagnostics=1");
+    expect(outputs).toContain("analysis-complete=false");
     expect(io.errors).toEqual([]);
   });
 

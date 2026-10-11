@@ -121,19 +121,23 @@ When the untrusted-trigger, agent, write-token pattern is present and **all** of
 the following hold, the finding is `agentci/gated-ai-write-token` at high rather
 than `agentci/untrusted-ai-write-token` at critical:
 
-- every AI step that ingests untrusted content is `anthropics/claude-code-action`
-  (not `-base-action`) with neither `allowed_non_write_users` nor `allowed_bots`
-  set to a non-empty value;
+- every AI step that ingests untrusted content is an inspected immutable
+  `anthropics/claude-code-action` revision (not `-base-action`) with neither
+  `allowed_non_write_users` nor `allowed_bots` set to a non-empty value;
 - every reachable untrusted event is one the docs list as checked — `issues`,
   `issue_comment`, `pull_request`, `pull_request_review`,
   `pull_request_review_comment`; `pull_request_target` and the discussion events
   are not listed and keep potential critical findings when Action event support
   is unverified;
-- every **modeled** ingested source belongs to the actor checked by that gate. Parent Issue,
+- every relevant text source belongs to the actor checked by that gate, and
+  no other reachable AI path has unresolved implicit, tool-fetch, or CLI input
+  flow. Parent Issue,
   PR, or discussion content may have a different author on comment, review, or
   label activity and therefore prevents the downgrade;
 - no `run:` step in the job expands untrusted event text, because that path
-  bypasses the agent's gate entirely.
+  bypasses the agent's gate entirely. If another agent's inherited input is
+  unresolved, neither the high nor the critical write-token finding is
+  asserted from that unknown path.
 
 The Action's gate answers "who activated this run?", not "who authored every
 piece of text the agent reads?" A trusted maintainer can label an attacker
@@ -184,11 +188,19 @@ into the Action's inputs or effective environment.
 
 On a PR, the [pinned tag prompt](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/create-prompt/index.ts) also includes changed-file paths. An owner can open a PR from an attacker-authored fork, so the actor gate does not authenticate those paths. Because `issue_comment` can target a PR, the candidate conservatively keeps that path possible there too.
 
-`claude-code-base-action` has no modeled self-fetch route. Other recognized
-agent Actions still use a conservative event-ingestion heuristic; their modes
-have not been verified to this specificity. A `run:` invocation of an agent
-CLI or HTTP dispatch is treated differently: it only receives what the shell
-passes, so untrusted content requires interpolation.
+`claude-code-base-action` has no modeled self-fetch route. For other Action
+refs, including a mutable Anthropic tag, the candidate does not infer
+implicit ingestion from the event alone. When the Action is reachable on an
+untrusted event with a modeled write capability, it emits
+`analysis-agent-implicit-ingestion-unknown` instead of a definite write-token
+finding for that route; explicit interpolation is still judged separately.
+At the other [inspected Anthropic revision](https://github.com/anthropics/claude-code-action/blob/787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251/src/modes/detector.ts),
+a nonempty static prompt with `track_progress` off selects
+[agent mode](https://github.com/anthropics/claude-code-action/blob/787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251/src/modes/agent/index.ts),
+which does not automatically fetch the parent Issue body. Other modes at that
+revision are not modeled as verified. A `run:` invocation of an agent CLI or
+HTTP dispatch is treated differently: it only receives what the shell passes,
+so untrusted content requires interpolation.
 
 Anthropic tag mode's [data fetcher](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/github/data/fetcher.ts)
 also loads pre-trigger comments and reviews. The candidate attributes its

@@ -74,29 +74,34 @@ documented in [`RULES.md`](RULES.md), with the reasoning in
 [`THREAT_MODEL.md`](THREAT_MODEL.md). A current nine-rule human annotation
 contract has not been frozen.
 
-| Rule                        | Severity | Fires when                                                                                                                                                                                  |
-| --------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `untrusted-ai-write-token`  | critical | Untrusted event content reaches an agent with a modeled sensitive write capability, including a narrow Anthropic App-token path in this candidate                                           |
-| `gated-ai-write-token`      | high     | The same pattern, but only when `anthropics/claude-code-action` checks the actor tied to all modeled input sources, its default gate is intact, and no untrusted text reaches a `run:` step |
-| `pull-request-target-ai`    | critical | An agent is reachable on `pull_request_target` without a recognized actor gate; that event runs in base-repo context with secrets                                                           |
-| `untrusted-input-in-prompt` | high     | Attacker-controlled context is interpolated into an agent's prompt or inputs                                                                                                                |
-| `ai-shell-access`           | high     | A local AI CLI runs through the runner shell, or an AI Action explicitly enables a command tool                                                                                             |
-| `unsafe-checkout`           | high     | Untrusted PR head code is checked out without GitHub's built-in protection                                                                                                                  |
-| `ai-with-secrets`           | medium   | An AI step's inputs or environment reference a secret — baseline exposure, not a vulnerability alone                                                                                        |
-| `broad-write-permissions`   | medium   | An AI job has an effective sensitive write scope in its workflow token                                                                                                                      |
-| `unpinned-ai-action`        | medium   | The agent action is referenced by tag rather than commit SHA                                                                                                                                |
+| Rule                        | Severity | Fires when                                                                                                                                                                   |
+| --------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `untrusted-ai-write-token`  | critical | Untrusted event content reaches an agent with a modeled sensitive write capability, including a narrow Anthropic App-token path in this candidate                            |
+| `gated-ai-write-token`      | high     | The same pattern, but only when an inspected immutable Anthropic Action revision verifies its gate for every relevant text source and path, with no untrusted text in `run:` |
+| `pull-request-target-ai`    | critical | An agent is reachable on `pull_request_target` without a recognized actor gate; that event runs in base-repo context with secrets                                            |
+| `untrusted-input-in-prompt` | high     | Attacker-controlled context is interpolated into an agent's prompt or inputs                                                                                                 |
+| `ai-shell-access`           | high     | A local AI CLI runs through the runner shell, or an AI Action explicitly enables a command tool                                                                              |
+| `unsafe-checkout`           | high     | Untrusted PR head code is checked out without GitHub's built-in protection                                                                                                   |
+| `ai-with-secrets`           | medium   | An AI step's inputs or environment reference a secret — baseline exposure, not a vulnerability alone                                                                         |
+| `broad-write-permissions`   | medium   | An AI job has an effective sensitive write scope in its workflow token                                                                                                       |
+| `unpinned-ai-action`        | medium   | The agent action is referenced by tag rather than commit SHA                                                                                                                 |
 
-Two things the unreleased source-aware model checks beyond the event name:
+Two things the source-aware model checks beyond the event name:
 whether a guard authenticates the author of the **specific text** being read,
 and whether the Action actually fetches event content in its selected mode. An
 owner-only `issues: [opened]` event can authenticate its original Issue body;
 an owner applying `labeled` to someone else's Issue cannot. A PR opener also
 need not be the author of its head branch or changed-file paths; the candidate
-tracks PR title/body separately from PR-head context. For Anthropic's Action,
-tag mode can fetch the parent Issue or PR and changed-file paths without a `${{ }}` expression,
-while a nonempty static `prompt` normally uses agent mode and does not automatically
-fetch that event unless `track_progress` forces tag mode. A lone unresolved `${{ ... }}` prompt may evaluate to empty,
-so the candidate keeps tag-mode ingestion possible.
+tracks PR title/body separately from PR-head context. At inspected Anthropic
+Action revision `1d6de8c`, tag mode can fetch the parent Issue or PR and
+changed-file paths without a `${{ }}` expression, while a nonempty static
+`prompt` normally uses agent mode and does not automatically fetch that event
+unless `track_progress` forces tag mode. A lone unresolved `${{ ... }}` prompt
+may evaluate to empty, so the candidate keeps tag-mode ingestion possible.
+Mutable and unverified
+Action refs do not inherit this revision's implicit-fetch model: without
+explicit event-text flow, write-token risk is reported as unknown, not a
+confirmed finding or a clean negative.
 `contains(github.event.comment.body, '@claude')` is merely a trigger phrase,
 not an actor gate — anyone can type it. Details in
 [`docs/analysis-model.md`](docs/analysis-model.md).
@@ -291,7 +296,7 @@ Concretely:
 - Direct hosted-agent `curl` POSTs are analyzed at request-body level; opaque
   shell flow is reported as incomplete. Runner `GITHUB_TOKEN` permissions do
   not establish the hosted agent's write capability.
-- The unreleased source-aware candidate only lowers Anthropic's default-gated
+- The source-aware candidate only lowers an inspected immutable Anthropic Action
   Action to `gated-ai-write-token` at **high** when its modeled input sources
   belong to the checked triggering actor. A maintainer comment or label can
   activate tag mode on an attacker-authored parent Issue or PR; with a modeled

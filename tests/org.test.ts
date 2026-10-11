@@ -23,6 +23,10 @@ async function exampleWorkflow(
   return fs.readFile(path.join(dir, file), "utf8");
 }
 const VULNERABLE = await exampleWorkflow("vulnerable");
+const VERIFIED_VULNERABLE = VULNERABLE.replace(
+  "anthropics/claude-code-action@v1",
+  "anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc",
+);
 const HARDENED = await exampleWorkflow("hardened");
 const CALLER = `
 on:
@@ -43,7 +47,7 @@ jobs:
   agent:
     runs-on: ubuntu-latest
     steps:
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc
         with:
           prompt: "Triage: \${{ github.event.issue.title }}"
 `;
@@ -193,7 +197,7 @@ describe("scanOrganization", () => {
     const reusableRules = new Set(
       byName["acme/reusable"].result?.findings.map((f) => f.rule_id),
     );
-    // Bare claude-code-action on issues with the default gate intact: high, not critical.
+    // This inspected revision's actor gate covers the explicitly passed Issue title.
     expect(reusableRules).toContain("agentci/gated-ai-write-token");
 
     // Aggregated findings are prefixed with the repository.
@@ -392,11 +396,14 @@ describe("scanOrganization completeness categories", () => {
     },
     {
       full_name: "acme/findings-complete",
-      workflows: { "agent.yml": VULNERABLE },
+      workflows: { "agent.yml": VERIFIED_VULNERABLE },
     },
     {
       full_name: "acme/findings-incomplete",
-      workflows: { "agent.yml": VULNERABLE, "d.yml": REMOTE_REUSABLE },
+      workflows: {
+        "agent.yml": VERIFIED_VULNERABLE,
+        "d.yml": REMOTE_REUSABLE,
+      },
     },
     { full_name: "acme/no-workflows", workflows: "404" },
     { full_name: "acme/broken-fetch", workflows: "500" },

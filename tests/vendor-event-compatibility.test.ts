@@ -89,6 +89,7 @@ jobs:
     );
     expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
       "agentci/analysis-agent-event-unknown",
+      "agentci/analysis-agent-implicit-ingestion-unknown",
     ]);
     expect(result.analysis_complete).toBe(false);
   });
@@ -129,7 +130,10 @@ jobs:
     expect(result.findings.map((finding) => finding.rule_id)).toContain(
       "agentci/untrusted-ai-write-token",
     );
-    expect(result.diagnostics).toEqual([]);
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+      "agentci/analysis-agent-implicit-ingestion-unknown",
+    ]);
+    expect(result.analysis_complete).toBe(false);
   });
 });
 
@@ -168,11 +172,14 @@ jobs:
     expect(result.diagnostics).toEqual([]);
   });
 
-  it("does not extrapolate this revision's rejection to a mutable ref", () => {
+  it("does not claim implicit ingestion for an unverified mutable ref", () => {
     const result = scan(workflow("v1", "closed"));
     expect(result.agent_usages).toHaveLength(1);
-    expect(result.findings.map((finding) => finding.rule_id)).toContain(
+    expect(result.findings.map((finding) => finding.rule_id)).not.toContain(
       "agentci/untrusted-ai-write-token",
+    );
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+      "agentci/analysis-agent-implicit-ingestion-unknown",
     );
   });
 

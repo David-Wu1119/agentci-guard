@@ -50,6 +50,7 @@ try {
       "original_stratum",
       "selection_reason",
       "analysis-agent-tool-fetch-unknown",
+      "analysis-agent-implicit-ingestion-unknown",
       scannerCommit,
     ]) {
       if (text.includes(forbidden))
