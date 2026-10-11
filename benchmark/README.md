@@ -1,6 +1,7 @@
 # AgentCI Guard Real-Workflow Benchmark
 
-**Status: v3 corpus frozen; human labels absent; no accuracy claim is valid.**
+**Status: v3 corpus frozen and development-only; human labels absent; no
+accuracy claim is valid.**
 
 The reader-facing protocol is [`../BENCHMARK.md`](../BENCHMARK.md). This
 directory contains the machine-verifiable research artifacts:
@@ -11,8 +12,8 @@ directory contains the machine-verifiable research artifacts:
 - `archive/agentci-real-workflows-v1/` and `agentci-real-workflows-v2/`:
   superseded unlabeled candidate manifests.
 - `annotation-sheet.csv`: 7,056 blank workflow/job/step/task units.
-- `review-sheet.csv`: deterministic 5,676-unit second-human plan.
-- `pilot/`: deterministic development-only, two-human feasibility pilot; never
+- `review-sheet.csv`: deterministic 5,676-unit candidate secondary-pass plan.
+- `pilot/`: deterministic development-only, single-annotator test-retest pilot; never
   counted as accuracy evidence.
 - `schemas/`: manifest and annotation JSON Schemas.
 - `labels/`: human source labels, adjudicated labels, and post-evaluation error
@@ -22,8 +23,9 @@ directory contains the machine-verifiable research artifacts:
 V1 lacked agent-family diversity and contained 15 mis-cased control paths. V2
 fixed those defects, but its 16 diversity snapshots were later inspected during
 pre-label detector correction. V3 keeps those 16 as development data and adds
-16 mechanically selected, unseen evaluation replacements. Both superseded
-manifests remain available for audit.
+16 mechanically selected replacements. The v3 evaluation partition was later
+used for detector tuning, so it is development data. Both superseded manifests
+remain available for audit.
 
 The benchmark is targeted and enriched. It is not a prevalence sample.
 
@@ -42,34 +44,10 @@ synthetic labels only.
 
 ## Human workflow
 
-Follow [`../ANNOTATION_GUIDE.md`](../ANNOTATION_GUIDE.md). The independent
-annotators must not run AgentCI Guard or view its predictions.
-
-Before committing to the full 12,732 primary/review decisions, run the
-development-only [`pilot/README.md`](pilot/README.md) procedure to measure
-active annotation time and protocol disagreement. Any protocol revision must be
-frozen before evaluation labels are opened.
-
-```bash
-node scripts/benchmark/import-annotation-csv.mjs \
-  annotator-a-filled.csv reviewer-a benchmark/labels/annotator-a.jsonl \
-  --coverage all
-
-node scripts/benchmark/import-annotation-csv.mjs \
-  annotator-b-filled.csv reviewer-b benchmark/labels/annotator-b.jsonl \
-  --coverage review-plan
-
-node scripts/benchmark/compare-annotations.mjs \
-  benchmark/labels/annotator-a.jsonl \
-  benchmark/labels/annotator-b.jsonl \
-  disagreements.csv
-
-node scripts/benchmark/adjudicate.mjs \
-  benchmark/labels/annotator-a.jsonl \
-  benchmark/labels/annotator-b.jsonl \
-  disagreements.csv \
-  benchmark/labels/adjudicated.jsonl \
-  reviewer-c
-```
-
-The eval scorer remains sealed while `manifest.json` status is `unlabeled`.
+Follow the development-only [`pilot/README.md`](pilot/README.md) procedure to
+measure annotation time and single-annotator test-retest agreement. The current
+two-human import/adjudication scripts remain for historical toolchain smoke;
+they do not create independent review when one person supplies both files.
+Formal evaluation requires a fresh v4 sample, a nine-rule annotation registry,
+and a frozen human protocol. The v3 scorer rejects `eval` and `all` regardless
+of manifest status or label presence.

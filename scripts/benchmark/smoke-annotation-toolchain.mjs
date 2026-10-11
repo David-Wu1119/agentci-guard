@@ -189,6 +189,13 @@ try {
     throw new Error("Smoke adjudication did not preserve its human pseudonym.");
   }
   const resultDirectory = path.join(temporary, "results");
+  for (const split of ["eval", "all"]) {
+    expectFailure(
+      ["scripts/benchmark/score.mjs", finalJsonl],
+      `Refusing ${split} scoring: v3 evaluation workflows were used for detector tuning`,
+      { AGENTCI_BENCHMARK_SPLIT: split },
+    );
+  }
   run(["scripts/benchmark/score.mjs", finalJsonl], {
     AGENTCI_BENCHMARK_SPLIT: "dev",
     AGENTCI_BENCHMARK_OUTPUT_DIR: resultDirectory,
@@ -201,6 +208,17 @@ try {
     if (!fs.existsSync(path.join(resultDirectory, required))) {
       throw new Error(`Score smoke did not create ${required}.`);
     }
+  }
+  const developmentReport = JSON.parse(
+    fs.readFileSync(path.join(resultDirectory, "metrics-dev.json"), "utf8"),
+  );
+  if (
+    developmentReport.study_validity?.status !== "development-only" ||
+    !developmentReport.study_validity.missing_scanner_rules.includes(
+      "agentci/gated-ai-write-token",
+    )
+  ) {
+    throw new Error("Development scores did not disclose the v3 rule gap.");
   }
   console.log(
     "Annotation and scoring toolchain smoke passed with synthetic temporary labels; no benchmark labels or metrics were created.",
@@ -387,9 +405,9 @@ function run(arguments_, environment = {}) {
   });
 }
 
-function expectFailure(arguments_, expectedMessage) {
+function expectFailure(arguments_, expectedMessage, environment = {}) {
   try {
-    run(arguments_);
+    run(arguments_, environment);
   } catch (error) {
     const message = `${error.message ?? ""}\n${error.stderr?.toString() ?? ""}`;
     if (message.includes(expectedMessage)) return;

@@ -1,7 +1,8 @@
 # AgentCI Guard Reproducibility
 
-This document reproduces the v0.1.1 candidate implementation, frozen benchmark,
-annotation toolchain, and—once human labels exist—every reported metric.
+This document reproduces the current scanner, the frozen v3 development corpus,
+and its annotation toolchain. No human-labeled accuracy metric exists. Formal
+evaluation requires a separate, fresh v4 sample and nine-rule registry.
 
 ## Environment
 
@@ -11,7 +12,8 @@ annotation toolchain, and—once human labels exist—every reported metric.
 - Lockfile: `pnpm-lock.yaml`
 - Benchmark inputs: checked-in snapshots and `benchmark/manifest.json`
 
-Use a clean checkout of the exact scanner commit recorded in the metric JSON.
+For any development diagnostic, use a clean checkout of the exact scanner
+commit recorded in its metric JSON.
 The checkout must include full history and tags so the frozen v0.1.0 baseline
 can be checked against its recorded Git objects.
 
@@ -92,7 +94,7 @@ This command:
 - validates every snapshot byte count, SHA-256, and computed Git blob SHA;
 - verifies fixed commits, blob SHAs, exact workflow paths, unique repositories,
   licenses, and attribution;
-- checks the archived v1/v2 provenance and v3 holdout correction;
+- checks the archived v1/v2 provenance and v3 historical split correction;
 - regenerates the 7,056-unit blank annotation registry in memory and compares
   it byte-for-byte with the checked-in CSV;
 - regenerates the 5,676-unit secondary-pass candidate plan, which the current
@@ -116,10 +118,11 @@ pnpm benchmark:smoke
 ```
 
 The smoke test fills temporary synthetic labels, runs import, comparison,
-adjudication, dev scoring, and schema validation, then deletes the temporary
-directory. Its pilot path uses one stable pseudonym across two passes and
-enforces the predeclared washout; its formal path remains a synthetic test of
-the existing two-human code. It never writes benchmark labels or metrics.
+adjudication, development scoring, and schema validation; it also verifies that
+v3 `eval` and `all` scoring fail. It then deletes the temporary directory. Its
+pilot path uses one stable pseudonym across two passes and enforces the
+predeclared washout; its formal path remains a synthetic test of the existing
+two-human code. It never writes benchmark labels or metrics.
 
 ## Human label import
 
@@ -139,16 +142,15 @@ benchmark/labels/annotator-b.jsonl
 benchmark/labels/adjudicated.jsonl
 ```
 
-If a genuine two-human protocol is used, update `benchmark/manifest.json`
-status from `unlabeled` to `adjudicated` in the same reviewed commit that
-freezes the label files. Otherwise, wait for the versioned single-annotator
-replacement. Do not run the evaluation split before the applicable protocol is
-frozen and completed.
+Even a genuine two-human review of v3 would produce development evidence, not
+held-out accuracy. Do not change the v3 manifest status to bypass the scorer's
+`eval`/`all` rejection. Wait for a separate v4 sample and a versioned human
+protocol before formal evaluation.
 
 ## Metrics and error analysis
 
-After the formal protocol blocker above is resolved, development scoring may be
-run while refining only against development data:
+After the human protocol blocker above is resolved, v3 development diagnostics
+may be produced with genuine labels:
 
 ```bash
 pnpm build
@@ -156,53 +158,12 @@ AGENTCI_BENCHMARK_SPLIT=dev \
   node scripts/benchmark/score.mjs benchmark/labels/adjudicated.jsonl
 ```
 
-Generate the first sealed evaluation and error template outside the repository:
-
-```bash
-eval_tmp="$(mktemp -d)"
-AGENTCI_BENCHMARK_SPLIT=eval \
-  AGENTCI_BENCHMARK_OUTPUT_DIR="$eval_tmp" \
-  node scripts/benchmark/score.mjs benchmark/labels/adjudicated.jsonl
-
-cp "$eval_tmp/errors-eval.csv" \
-  benchmark/labels/error-analysis-eval.csv
-```
-
-This temporary run writes:
-
-```text
-$eval_tmp/metrics-eval.json
-$eval_tmp/metrics-eval.md
-$eval_tmp/errors-eval.csv
-```
-
-Fill `error_type`, `explanation`, and `reviewer` for every row. Without changing
-scanner code, review that file, set the manifest status to `evaluated`, and
-commit both. The final public run must begin from that clean commit and write to
-a temporary directory so result files do not falsify the worktree-clean check:
-
-```bash
-git status --short # must print nothing
-final_eval_tmp="$(mktemp -d)"
-AGENTCI_BENCHMARK_SPLIT=eval \
-  AGENTCI_BENCHMARK_OUTPUT_DIR="$final_eval_tmp" \
-  node scripts/benchmark/score.mjs \
-  benchmark/labels/adjudicated.jsonl \
-  benchmark/labels/error-analysis-eval.csv
-
-mkdir -p benchmark/results
-cp "$final_eval_tmp/metrics-eval.json" benchmark/results/
-cp "$final_eval_tmp/metrics-eval.md" benchmark/results/
-cp "$final_eval_tmp/errors-eval.csv" benchmark/results/
-```
-
-The scorer refuses missing labels, wrong review coverage, duplicate units,
-modified provenance, invalid evidence lines, or an unadjudicated evaluation
-status. Final qualification also requires a clean scanner worktree and complete
-error classification. Review and commit the copied result artifacts without
-changing scanner code. The metric JSON records the exact clean scanner commit
-used before any result file was written; schema validation rejects published
-metrics under any status earlier than `evaluated`.
+This output is explicitly development-only and lists scanner rules absent from
+the v3 registry. The scorer rejects v3 `eval` and `all` even if labels exist or
+the v3 manifest status changes. A future v4 scoring path must be built around
+new repository-disjoint snapshots, a registry for every current rule, a frozen
+human review protocol, and complete error classification before any formal
+accuracy claim.
 
 ## Historical 75-repository claim
 
@@ -211,5 +172,6 @@ repository list, commits, snapshots, raw outputs, and durable aggregation
 artifact are missing. The recovered evidence and explicit retraction are under
 `studies/v0.1.0-baseline/` and `docs/real-world-findings.md`.
 
-Do not reconstruct a new corpus and call it the old study. The truthful
-replacement is the fixed v3 benchmark.
+Do not reconstruct a new corpus and call it the old study. The v3 corpus is
+reproducible development evidence; a new v4 evaluation is still required for
+accuracy measurement.

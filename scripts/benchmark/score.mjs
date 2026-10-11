@@ -24,6 +24,15 @@ const evaluationSplit = process.env.AGENTCI_BENCHMARK_SPLIT ?? "eval";
 if (!["dev", "eval", "all"].includes(evaluationSplit)) {
   throw new Error("AGENTCI_BENCHMARK_SPLIT must be dev, eval, or all.");
 }
+const registeredRules = new Set(manifest.rules);
+const missingScannerRules = Object.keys(RULES).filter(
+  (rule) => !registeredRules.has(rule),
+);
+if (evaluationSplit !== "dev") {
+  throw new Error(
+    `Refusing ${evaluationSplit} scoring: v3 evaluation workflows were used for detector tuning, and its annotation registry omits ${missingScannerRules.join(", ") || "current scanner rules"}. A fresh v4 sample and registry are required.`,
+  );
+}
 const outputDirectory = path.resolve(
   process.env.AGENTCI_BENCHMARK_OUTPUT_DIR ??
     path.join(benchmarkRoot, "results"),
@@ -175,6 +184,11 @@ const report = {
   benchmark_id: manifest.benchmark_id,
   benchmark_status: manifest.status,
   split: evaluationSplit,
+  study_validity: {
+    status: "development-only",
+    missing_scanner_rules: missingScannerRules,
+    note: "The v3 evaluation split was used for detector tuning. These scores cannot establish held-out accuracy or calibrate all current rules.",
+  },
   dataset_frozen_at: manifest.frozen_at,
   scanner: provenance,
   workflow_count: coverageByWorkflow.length,
@@ -686,6 +700,9 @@ function scannerProvenance() {
 function markdownReport(report) {
   const lines = [
     `# ${report.benchmark_id} metrics (${report.split})`,
+    "",
+    `Study validity: **${report.study_validity.status}**. ${report.study_validity.note}`,
+    `Scanner rules missing from this registry: ${report.study_validity.missing_scanner_rules.join(", ") || "none"}.`,
     "",
     `Measurement status: **${report.error_analysis.status === "complete" ? "complete" : "preliminary; error classification pending"}**`,
     "",
