@@ -124,6 +124,45 @@ describe("local CLI run-step input flow", () => {
     );
   });
 
+  it("recognizes npx yes flags before an agent package without promoting prose", () => {
+    for (const launcher of [
+      "npx -y",
+      "npx --yes",
+      "sudo npx -y",
+      "env CI=1 npx --yes",
+    ]) {
+      for (const packageRef of [
+        "@anthropic-ai/claude-code",
+        "@anthropic-ai/claude-code@latest",
+        "@anthropic-ai/claude-code@2.1.296",
+      ]) {
+        const run = `${launcher} ${packageRef} -p "\${{ github.event.issue.body }}"`;
+        const result = scan(run);
+        expect(result.agent_usages, run).toHaveLength(1);
+        expect(rules(result), run).toContain(
+          "agentci/untrusted-input-in-prompt",
+        );
+        expect(rules(result), run).toContain(
+          "agentci/untrusted-ai-write-token",
+        );
+        expect(result.diagnostics, run).toEqual([]);
+        expect(result.analysis_complete, run).toBe(true);
+      }
+    }
+    for (const run of [
+      "echo npx -y @anthropic-ai/claude-code -p fixed",
+      "npx -y echo @anthropic-ai/claude-code -p fixed",
+      "npx --yes @anthropic-ai/claude-code --help",
+      "npx --yes @anthropic-ai/claude-code@latest --version",
+      "npx --yes @anthropic-ai/claude-code-fork -p fixed",
+      'npx --yes claude -p "\${{ github.event.issue.body }}"',
+    ]) {
+      const result = scan(run);
+      expect(result.agent_usages, run).toEqual([]);
+      expect(result.findings, run).toEqual([]);
+    }
+  });
+
   it("marks an env-launched shell -c agent as unresolved, not a proven direct sink", () => {
     for (const shell of ["sh", "bash", "/bin/sh", "/bin/bash"]) {
       const nested = scan(
