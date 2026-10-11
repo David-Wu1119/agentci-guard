@@ -97,6 +97,8 @@ describe("local CLI run-step input flow", () => {
       'CI=1 env claude -p "\${{ github.event.issue.body }}"',
       'time claude -p "\${{ github.event.issue.body }}"',
       'time -p claude -p "\${{ github.event.issue.body }}"',
+      'command -p claude -p "\${{ github.event.issue.body }}"',
+      'command -- claude -p "\${{ github.event.issue.body }}"',
     ]) {
       const result = scan(run);
       expect(result.agent_usages).toHaveLength(1);
@@ -274,14 +276,22 @@ describe("local CLI run-step input flow", () => {
       `top() { outer() { inner() { false() { true; }; }; inner; }; outer; }; top; if false; then ${dispatch}; fi`,
       `outer() { false() { true; }; }; time outer; if false; then ${dispatch}; fi`,
       `outer() { false() { true; }; }; time -p outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; time eval outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; time CI=1 eval outer; if false; then ${dispatch}; fi`,
       `outer() { false() { true; }; }; time ! outer || :; if false; then ${dispatch}; fi`,
       `outer() { false() { true; }; }; time -p ! outer || :; if false; then ${dispatch}; fi`,
       `outer() { false() { true; }; }; F=1 outer; if false; then ${dispatch}; fi`,
       `outer() { false() { true; }; }; eval outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; ! eval outer; if false; then ${dispatch}; fi`,
       `outer() { false() { true; }; }; builtin eval outer; if false; then ${dispatch}; fi`,
       `outer() { false() { true; }; }; command eval outer; if false; then ${dispatch}; fi`,
       `outer() { false() { true; }; }; builtin command eval outer; if false; then ${dispatch}; fi`,
       `outer() { false() { true; }; }; command builtin eval outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; command -p eval outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; command -- eval outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; command -p -- eval outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; builtin -- eval outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; builtin command -- eval outer; if false; then ${dispatch}; fi`,
       `outer() { false() { true; }; }; eval time outer; if false; then ${dispatch}; fi`,
       `outer() { false() { true; }; }; eval eval outer; if false; then ${dispatch}; fi`,
       `outer() { false() { true; }; }; f=outer; $f; if false; then ${dispatch}; fi`,
@@ -334,6 +344,10 @@ describe("local CLI run-step input flow", () => {
       "F=1 time outer || :",
       "command outer || :",
       "builtin outer || :",
+      "env eval outer || :",
+      "builtin env eval outer || :",
+      "builtin time eval outer || :",
+      "command time eval outer || :",
       "if time outer; then :; fi",
       "while time outer; do break; done",
     ]) {
@@ -425,7 +439,14 @@ describe("local CLI run-step input flow", () => {
   it("abstains on literal eval and shell-stdin agent execution", () => {
     for (const run of [
       'eval "claude -p fixed"',
+      '! eval "claude -p fixed"',
+      'time CI=1 eval "claude -p fixed"',
       'builtin eval "claude -p fixed"',
+      'command -p eval "claude -p fixed"',
+      'command -- eval "claude -p fixed"',
+      'command -p -- eval "claude -p fixed"',
+      'builtin -- eval "claude -p fixed"',
+      'builtin command -- eval "claude -p fixed"',
       'bash <<< "claude -p fixed"',
       'bash -s <<< "claude -p fixed"',
       'bash -e <<< "claude -p fixed"',
@@ -446,6 +467,13 @@ describe("local CLI run-step input flow", () => {
     }
     for (const run of [
       'eval "echo claude -p fixed"',
+      'command -p -v eval "claude -p fixed"',
+      'builtin -p eval "claude -p fixed"',
+      'env eval "claude -p fixed"',
+      'builtin env eval "claude -p fixed"',
+      'builtin time eval "claude -p fixed"',
+      'command time eval "claude -p fixed"',
+      'command -p echo "claude -p fixed"',
       'bash <<< "echo claude -p fixed"',
       String.raw`printf 'claude -p fixed\n' | cat`,
     ]) {

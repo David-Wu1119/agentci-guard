@@ -964,13 +964,11 @@ function shellExecutableSegments(value: string): Array<{
         while (words[index]?.raw === "!") index++;
       }
       const call = words[index];
-      let evalIndex = index;
-      while (["builtin", "command"].includes(words[evalIndex]?.text ?? ""))
-        evalIndex++;
-      const evalCall = words[evalIndex]?.text === "eval";
+      const evalWords = evalLaunchedCommand(words);
+      const evalCall = evalWords[0]?.text === "eval";
       const evalScript = evalCall
-        ? words
-            .slice(evalIndex + 1)
+        ? evalWords
+            .slice(1)
             .map((word) => word.text)
             .join(" ")
         : "";
@@ -1065,7 +1063,12 @@ function envLaunchedCommand(words: ShellWord[]): {
   let index = 0;
   while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[index]?.raw ?? "")) index++;
   while (["sudo", "command", "exec", "time"].includes(words[index]?.text)) {
-    if (words[index++].text === "time" && words[index]?.text === "-p") index++;
+    const launcher = words[index++].text;
+    if (launcher === "time" && words[index]?.text === "-p") index++;
+    if (launcher === "command") {
+      while (words[index]?.text === "-p") index++;
+      if (words[index]?.text === "--") index++;
+    }
   }
   if (!["env", "/usr/bin/env"].includes(words[index]?.text)) {
     return {
@@ -1106,6 +1109,26 @@ function envLaunchedCommand(words: ShellWord[]): {
     commandWords: words.slice(index),
     prefixWords: words.slice(0, index),
   };
+}
+
+// shortcut: literal same-shell wrappers only; extend for measured eval misses.
+function evalLaunchedCommand(words: ShellWord[]): ShellWord[] {
+  let index = 0;
+  while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[index]?.raw ?? "")) index++;
+  if (index === 0 && words[index]?.raw === "time") {
+    index++;
+    if (words[index]?.raw === "-p") index++;
+    if (words[index]?.raw === "!") index++;
+    while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[index]?.raw ?? "")) index++;
+  }
+  while (["builtin", "command"].includes(words[index]?.text ?? "")) {
+    const launcher = words[index++].text;
+    if (launcher === "command") {
+      while (words[index]?.text === "-p") index++;
+    }
+    if (words[index]?.text === "--") index++;
+  }
+  return words.slice(index);
 }
 
 /** Direct local CLI commands, excluding sibling commands and shell comments. */
@@ -1220,11 +1243,8 @@ function hasOpaqueAiShellCommand(
   // shortcut: common literal shell strings only, extend for measured dynamic misses.
   return shellExecutableSegments(value).some((segment) => {
     if (segment.reach === false) return false;
-    const { commandWords } = envLaunchedCommand(shellWords(segment.command));
-    const evalWords =
-      commandWords[0]?.text === "builtin"
-        ? commandWords.slice(1)
-        : commandWords;
+    const words = shellWords(segment.command);
+    const evalWords = evalLaunchedCommand(words);
     if (evalWords[0]?.text === "eval")
       return matches(
         evalWords
@@ -1232,6 +1252,7 @@ function hasOpaqueAiShellCommand(
           .map((word) => word.text)
           .join(" "),
       );
+    const { commandWords } = envLaunchedCommand(words);
     if (
       ![
         "sh",
