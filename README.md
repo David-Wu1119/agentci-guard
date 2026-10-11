@@ -69,8 +69,10 @@ AgentCI Guard has not demonstrated a novel detector or comparative advantage.
 
 ## What it detects
 
-Nine rules, one threat model — the full contract is in [`RULES.md`](RULES.md)
-and the reasoning in [`THREAT_MODEL.md`](THREAT_MODEL.md).
+Nine rules, one threat model — the baseline and unreleased candidate are
+documented in [`RULES.md`](RULES.md), with the reasoning in
+[`THREAT_MODEL.md`](THREAT_MODEL.md). A current nine-rule human annotation
+contract has not been frozen.
 
 | Rule                        | Severity | Fires when                                                                                                                                                                                  |
 | --------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

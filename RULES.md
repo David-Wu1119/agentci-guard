@@ -18,7 +18,8 @@ accuracy requires a fresh, sealed, human-labeled evaluation.
   conditions.
 - **AI usage:** a step's structured `uses` value matches a documented
   coding-agent Action, or its structured `run` value contains an executable
-  coding-agent CLI invocation. Provider credentials, model names, prose,
+  coding-agent CLI invocation or recognized hosted agent-dispatch HTTP call.
+  Plain inference API calls, provider credentials, model names, prose,
   comments, install commands, and version/help checks are not sufficient.
 - **Untrusted source:** a supported GitHub event field whose associated event is
   in the step's reachable event set.
@@ -73,6 +74,15 @@ paths are different sources: the opener need not have authored `head.ref`,
 guard. Other activity types remain conservative. These distinctions affect
 both `untrusted-input-in-prompt` and
 the write-token rules; they do not revise the archived v0.1.1 pilot contract.
+
+Direct interpolation is checked in `uses`, `run`, `with`, `shell`,
+`working-directory`, and the effective workflow → job → step environment.
+Step `name`, `id`, `if`, and other display/control metadata do not pass text
+to the agent and are not direct-input sinks. This does not prove that every
+value in `with` or the environment is consumed by the agent.
+
+For hosted-agent HTTP dispatch, `ai-shell-access` denotes the runner's `run:`
+shell, not verified command-tool access inside the remote agent.
 
 `github.event.head_commit.message` on `push` is also independent of the
 triggering actor: a maintainer's squash merge can carry a contributor's PR
@@ -173,6 +183,8 @@ The following are not security findings:
 - `agentci/analysis-checkout-protection-unknown`
 - `agentci/analysis-permissions-unknown`
 - `agentci/analysis-agent-tool-fetch-unknown`
+- `agentci/analysis-agent-event-unknown`
+- `agentci/analysis-agent-event-unsupported`
 - `agentci/analysis-remote-reusable-workflow`
 - `agentci/org-fetch-failed` — an organization scan could not fetch a repository's workflows (error; the repository and reason are in the message; archived and fork exclusions are not diagnostics)
 - `agentci/analysis-local-reusable-missing`

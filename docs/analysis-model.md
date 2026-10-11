@@ -363,10 +363,12 @@ Remote reusable workflows are not downloaded. They emit
 
 ## Shell semantics
 
-An AI CLI invoked in `run:` executes through the runner shell and receives the
-`ai-shell-access` rule. For an AI Action, the rule requires an explicit shell or
-command-tool capability in its inputs. Incidental prompt prose such as
-“Python,” “node,” or “bash” does not itself establish shell capability.
+An AI CLI or hosted-agent HTTP dispatch invoked in `run:` executes through the
+runner shell and receives the `ai-shell-access` rule. For an AI Action, the rule
+requires an explicit shell or command-tool capability in its inputs. An HTTP
+dispatch finding describes the runner step; it does not establish which tools
+the remote agent has. Incidental prompt prose such as “Python,” “node,” or
+“bash” does not itself establish shell capability.
 
 ## Pull-request checkout protection
 

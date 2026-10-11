@@ -24,7 +24,8 @@ this rating to content attributable to the actor that gate checks.
 ## `agentci/pull-request-target-ai`
 
 An AI step is reachable on `pull_request_target` by an untrusted actor, with
-no recognized actor/provenance gate on the job or that step.
+no recognized actor gate on the job or that step. PR-head provenance alone
+does not authenticate the triggering actor.
 
 ## `agentci/ai-with-secrets`
 
@@ -33,13 +34,16 @@ secret.
 
 ## `agentci/untrusted-input-in-prompt`
 
-Raw PR, issue, comment, review, branch, or commit text is passed into an AI
-prompt, shell command, or the AI step's effective environment.
+Raw PR, issue, comment, review, branch, or commit text is interpolated into an
+AI step's inputs, command, shell, working directory, or effective environment.
+Display metadata such as the step name is not an input sink.
 
 ## `agentci/ai-shell-access`
 
-An AI CLI executes through `run:`, or an AI Action explicitly enables a shell
-or command tool. Incidental prose such as “Python” is not shell capability.
+An AI CLI or hosted-agent HTTP dispatch executes through runner `run:`, or an
+AI Action explicitly enables a shell or command tool. For HTTP dispatch, this
+does not prove the remote agent has shell tools. Incidental prose such as
+“Python” is not shell capability.
 
 ## `agentci/broad-write-permissions`
 

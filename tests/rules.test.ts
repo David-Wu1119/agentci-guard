@@ -72,6 +72,22 @@ jobs:
     expect(rules).toContain("agentci/untrusted-input-in-prompt");
   });
 
+  it("does not treat a dynamic step name as agent input", () => {
+    const rules = rulesFor(`
+on: issue_comment
+permissions:
+  contents: write
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Comment: \${{ github.event.comment.body }}"
+        run: claude -p 'Review this issue'
+`);
+    expect(rules).not.toContain("agentci/untrusted-input-in-prompt");
+    expect(rules).not.toContain("agentci/untrusted-ai-write-token");
+  });
+
   it("does not treat a literal event-field name as interpolated input", () => {
     const rules = rulesFor(`
 on: issues

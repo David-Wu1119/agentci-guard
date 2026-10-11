@@ -12041,11 +12041,12 @@ function analyzeWorkflow(workflow, repository, context) {
       );
       const materialized = materializeInputs(
         JSON.stringify({
-          name: rawStep.name,
           uses: rawStep.uses,
           run: rawStep.run,
           with: rawStep.with,
-          env: effectiveEnvironment
+          env: effectiveEnvironment,
+          shell: rawStep.shell,
+          "working-directory": rawStep["working-directory"]
         }),
         context.inputValues
       );
@@ -12067,15 +12068,7 @@ function analyzeWorkflow(workflow, repository, context) {
           creationOnlyEvents
         )
       );
-      const sinkMatches = activeMatches(
-        materializeInputs(
-          JSON.stringify({
-            step: stripGuards(rawStep),
-            effectiveEnvironment
-          }),
-          context.inputValues
-        )
-      );
+      const sinkMatches = activeMatches(materialized);
       const hasUntrustedSink = sinkMatches.length > 0;
       const fetchedMatches = stepUsesAiAction ? selfFetchedSources(
         materializeInputs(stepUses, context.inputValues),
@@ -12558,18 +12551,6 @@ function toStringMap(value, parentInputs = {}) {
       )
     ])
   );
-}
-function stripGuards(value) {
-  if (Array.isArray(value)) return value.map(stripGuards);
-  if (isRecord2(value)) {
-    const out = {};
-    for (const [key, val] of Object.entries(value)) {
-      if (key === "if") continue;
-      out[key] = stripGuards(val);
-    }
-    return out;
-  }
-  return value;
 }
 function locateJobLine(raw, jobName) {
   const lines = raw.split("\n");
