@@ -67,11 +67,20 @@ checks.push({
   hero: { label: hero.label, status: hero.status, marker: hero.marker },
 });
 const research = await evaluate(
-  '({canonical:document.querySelector("link[rel=canonical]")?.href,robots:document.querySelector("meta[name=robots]")!==null,caseRows:Array.from(document.querySelectorAll("#research tbody tr")).map(row=>Array.from(row.cells).map(cell=>cell.textContent.trim())),pinned:document.querySelector("#research .case-links a")?.href.includes("blob/5c045e0469f412aecd0f9d5f32876bf10c7fc66b/"),localPreview:document.body.textContent.includes("Local preview")})',
+  '({canonical:document.querySelector("link[rel=canonical]")?.href,robots:document.querySelector("meta[name=robots]")!==null,caseRows:Array.from(document.querySelectorAll("#research tbody tr")).map(row=>Array.from(row.cells).map(cell=>cell.textContent.trim())),pinned:document.querySelector("#research .case-links a")?.href.includes("blob/5c045e0469f412aecd0f9d5f32876bf10c7fc66b/"),methodsText:document.querySelector("#study-methods")?.textContent,methodsLinks:Array.from(document.querySelectorAll("#study-methods a")).map(link=>link.href),localPreview:document.body.textContent.includes("Local preview")})',
 );
 assert.equal(research.canonical, "https://cryptoaxiom.net/");
 assert.equal(research.robots, false);
 assert.equal(research.pinned, true);
+assert.match(
+  research.methodsText,
+  /v3.*development-only.*human evaluation.*pending/i,
+);
+assert.deepEqual(research.methodsLinks, [
+  "https://github.com/David-Wu1119/agentci-guard/blob/07537106d6557db9262ba0d506f1dfb8f3ce3123/BENCHMARK.md",
+  "https://github.com/David-Wu1119/agentci-guard/blob/07537106d6557db9262ba0d506f1dfb8f3ce3123/DATA_CARD.md",
+  "https://github.com/David-Wu1119/agentci-guard/blob/07537106d6557db9262ba0d506f1dfb8f3ce3123/REPRODUCIBILITY.md",
+]);
 assert.equal(research.localPreview, false);
 assert.deepEqual(research.caseRows, [
   ["agentci/pull-request-target-ai", "critical", "critical"],
