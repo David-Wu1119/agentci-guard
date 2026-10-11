@@ -193,7 +193,8 @@ Detection is a hand-maintained list in `src/detect.ts` with three shapes:
 - `AI_AGENT_CLI_PATTERNS` — `run:` invocations at a command boundary. Keep
   the boundary and the `--version` / `--help` exclusion; installation and
   version checks are not executions.
-- `AI_AGENT_API_PATTERNS` — HTTP calls to hosted **agent-dispatch** routes.
+- `AI_AGENT_API_PATTERNS` — documented hosted-agent creation/follow-up routes;
+  the detector also requires a direct `curl` POST command.
   Require a scheme so prose does not match. Do not add inference endpoints:
   a `chat/completions` call returns text and holds no tools, so it cannot
   reach the repository, and the `misleading-non-agent` corpus case will

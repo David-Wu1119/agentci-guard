@@ -11,6 +11,7 @@ import {
   isSelfGatingAgentAction,
   looksLikeAiAction,
   looksLikeAiCli,
+  looksLikeAiHttpDispatch,
   SELF_GATED_EVENTS,
   untrustedGitHubContextMatches,
 } from "./detect.js";
@@ -62,7 +63,6 @@ type ReusableContext = {
   prGate?: boolean;
   permissionCeiling?: EffectivePermissions;
   inputValues: Record<string, string>;
-  inheritedSecrets: boolean;
   stack: string[];
   callChain: string[];
 };
@@ -76,7 +76,6 @@ type RepositoryAnalysis = {
 
 const EMPTY_REUSABLE_CONTEXT: ReusableContext = {
   inputValues: {},
-  inheritedSecrets: false,
   stack: [],
   callChain: [],
 };
@@ -377,6 +376,7 @@ function analyzeWorkflow(
     }> = [];
     /** Untrusted event text expanded into a `run:` step anywhere in the job. */
     let untrustedInRun = false;
+    const secretEnvTransferEvents = new Set<string>();
 
     for (const [index, rawStep] of steps.entries()) {
       if (!isRecord(rawStep)) continue;
@@ -458,9 +458,38 @@ function analyzeWorkflow(
         context.inputValues,
       );
       const stepUsesAiAction = looksLikeAiAction(actionReference);
+      const materializedRun = materializeInputs(stepRun, context.inputValues);
+      const stepUsesAiCli = looksLikeAiCli(materializedRun);
       const stepUsesAi =
         stepUsesAiAction ||
-        looksLikeAiCli(materializeInputs(stepRun, context.inputValues));
+        stepUsesAiCli ||
+        looksLikeAiHttpDispatch(materializedRun);
+      if (
+        stepUsesAi &&
+        stepReachability.events.some((event) =>
+          secretEnvTransferEvents.has(event),
+        )
+      ) {
+        output.diagnostics.push({
+          code: "agentci/analysis-secret-env-transfer-unknown",
+          kind: "analysis",
+          severity: "warning",
+          file,
+          job: jobName,
+          line: stepLine,
+          message:
+            "An earlier step may write a secret to GITHUB_ENV; exposure to this AI step is not modeled.",
+        });
+      }
+      if (
+        /\bGITHUB_ENV\b/.test(materializedRun) &&
+        (containsSecretReference(materializedRun) ||
+          containsSecretReference(JSON.stringify(effectiveEnvironment)))
+      ) {
+        for (const event of stepReachability.events) {
+          secretEnvTransferEvents.add(event);
+        }
+      }
       const stepActorGate = jobActorGate || hasTrustedActorGate(rawStep.if);
       const stepPrGate = jobPrGate || hasTrustedPrProvenanceGate(rawStep.if);
       const activeMatches = (value: string) =>
@@ -530,7 +559,6 @@ function analyzeWorkflow(
         ),
       );
       const hasSecret =
-        context.inheritedSecrets ||
         containsSecretReference(JSON.stringify(effectiveEnvironment)) ||
         containsSecretReference(
           materializeInputs(
@@ -623,17 +651,16 @@ function analyzeWorkflow(
             }),
           );
         }
-        if (stepRun.trim().length > 0 || containsShellAccess(effectiveWith)) {
+        if (stepUsesAiCli || containsShellAccess(effectiveWith)) {
           output.findings.push(
             makeFinding("agentci/ai-shell-access", {
               file,
               job: jobName,
               step: stepName,
               stepIndex: index,
-              evidence:
-                stepRun.trim().length > 0
-                  ? `AI CLI executes through run: ${shrink(stepRun)}`
-                  : shrink(JSON.stringify(effectiveWith)),
+              evidence: stepUsesAiCli
+                ? `AI CLI executes through run: ${shrink(stepRun)}`
+                : shrink(JSON.stringify(effectiveWith)),
               line: stepLine,
               events: stepReachability.events,
               callChain: context.callChain,
@@ -871,9 +898,6 @@ function analyzeReusableCall(
     prGate: Boolean(context.prGate) || hasTrustedPrProvenanceGate(rawJob.if),
     permissionCeiling: permissions,
     inputValues: toStringMap(rawJob.with, context.inputValues),
-    inheritedSecrets:
-      rawJob.secrets === "inherit" ||
-      containsSecretReference(JSON.stringify(rawJob.secrets ?? {})),
     stack: [...context.stack, path.resolve(caller.path), targetPath],
     callChain: [...context.callChain, `${callerFile}#${jobName}`],
   });

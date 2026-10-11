@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  containsSecretReference,
   containsShellAccess,
   looksLikeAiAction,
   looksLikeAiCli,
@@ -42,6 +43,15 @@ describe("precision", () => {
     expect(
       containsShellAccess({ prompt: "Do not enable shell or commands." }),
     ).toBe(false);
+  });
+
+  it("recognizes secret expression forms without treating prose as exposure", () => {
+    expect(containsSecretReference("${{ toJSON(secrets) }}")).toBe(true);
+    expect(containsSecretReference("${{ secrets['BOT_TOKEN'] }}")).toBe(true);
+    expect(containsSecretReference("${{ secrets[vars.KEY_NAME] }}")).toBe(true);
+    expect(containsSecretReference("echo 'toJSON(secrets)' to the log")).toBe(
+      false,
+    );
   });
 
   it("produces zero findings on ordinary CI (no AI agent present)", async () => {

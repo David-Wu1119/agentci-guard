@@ -7528,14 +7528,15 @@ var AI_AGENT_CLI_PATTERNS = [
   /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|npx|uvx)\s+)*codex[ \t]+(?:exec|run)(?:[\s]|$)/im
 ];
 var AI_AGENT_API_PATTERNS = [
-  /https?:\/\/api\.cursor\.com\/v\d+\/agents\b/i,
-  /https?:\/\/api\.devin\.ai\/v\d+\/sessions\b/i,
-  /https?:\/\/api\.githubcopilot\.com\/[^\s"']*agents?\b/i
+  /https?:\/\/api\.cursor\.com\/v1\/agents(?:\/[^/\s"'?#]+\/runs)?(?=$|[\s"'?#\\])/i,
+  /https?:\/\/api\.cursor\.com\/v0\/agents(?:\/[^/\s"'?#]+\/followup)?(?=$|[\s"'?#\\])/i,
+  /https?:\/\/api\.devin\.ai\/v1\/sessions(?=$|[\s"'?#\\])/i,
+  /https?:\/\/api\.devin\.ai\/v3\/organizations\/[^/\s"'?#]+\/sessions(?=$|[\s"'?#\\])/i,
+  /https?:\/\/api\.github\.com\/agents\/repos\/[^/\s"'?#]+\/[^/\s"'?#]+\/tasks(?=$|[\s"'?#\\])/i
 ];
 var AI_AGENT_PATTERNS = [
   ...AI_AGENT_ACTION_PATTERNS,
-  ...AI_AGENT_CLI_PATTERNS,
-  ...AI_AGENT_API_PATTERNS
+  ...AI_AGENT_CLI_PATTERNS
 ];
 var UNTRUSTED_CONTEXT_PATTERNS = [
   {
@@ -7609,6 +7610,8 @@ var UNTRUSTED_CONTEXT_PATTERNS = [
 ];
 var SECRET_PATTERNS = [
   /secrets\.[A-Za-z0-9_]+/i,
+  /\$\{\{[^}]*\bsecrets\s*\[[^\]]+\]/i,
+  /\$\{\{[^}]*\btoJSON\s*\(\s*secrets\s*\)/i,
   /github\.token/i,
   /\$\{\{\s*(?:env\.)?[A-Z0-9_]*(?:TOKEN|KEY)\s*\}\}/
 ];
@@ -7644,9 +7647,56 @@ function looksLikeAiAction(value) {
   );
 }
 function looksLikeAiCli(value) {
-  return [...AI_AGENT_CLI_PATTERNS, ...AI_AGENT_API_PATTERNS].some(
-    (pattern) => pattern.test(value)
-  );
+  return AI_AGENT_CLI_PATTERNS.some((pattern) => pattern.test(value));
+}
+function looksLikeAiHttpDispatch(value) {
+  let heredoc = "";
+  const script = value.replace(/\\\r?\n/g, " ").split("\n").filter((line) => {
+    if (heredoc) {
+      if (line.trim() === heredoc) heredoc = "";
+      return false;
+    }
+    heredoc = /<<-?\s*(['"]?)([A-Za-z_][\w-]*)\1/.exec(line)?.[2] ?? "";
+    return true;
+  }).join("\n");
+  for (const match of script.matchAll(
+    /(?:^|[\n;&|()])\s*curl\b([^\n;&|]*)/gim
+  )) {
+    const words = match[1].match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) ?? [];
+    let method = "";
+    let hasBody = false;
+    let getOverride = false;
+    let hasRoute = false;
+    for (const [index, word] of words.entries()) {
+      if (word === "-G" || word === "--get") getOverride = true;
+      if (word === "-X" || word === "--request") {
+        method = words[index + 1]?.replace(/^["']|["']$/g, "").toUpperCase() ?? "";
+      } else if (word.startsWith("--request=")) {
+        method = word.slice("--request=".length).replace(/^["']|["']$/g, "").toUpperCase();
+      } else if (/^-X[A-Za-z]+$/.test(word)) {
+        method = word.slice(2).toUpperCase();
+      }
+      if (/^(?:-d|-F|--data(?:-raw|-binary|-urlencode)?(?:=|$)|--json(?:=|$)|--form(?:=|$))/.test(
+        word
+      )) {
+        hasBody = true;
+      }
+      if (/^(?:-d|--data(?:-raw|-binary|-urlencode)?|--json|-F|--form)$/i.test(
+        words[index - 1] ?? ""
+      )) {
+        continue;
+      }
+      const candidate = word.replace(/^--url=/, "").replace(/^(["'])(.*)\1$/, "$2");
+      if (AI_AGENT_API_PATTERNS.some(
+        (pattern) => pattern.exec(candidate)?.index === 0
+      )) {
+        hasRoute = true;
+      }
+    }
+    if (hasRoute && !getOverride && (method === "POST" || !method && hasBody))
+      return true;
+  }
+  return false;
 }
 function matchingGitHubContextPatterns(value) {
   const matches = /* @__PURE__ */ new Set();
@@ -7769,9 +7819,9 @@ var RULES = {
   },
   "agentci/ai-with-secrets": {
     id: "agentci/ai-with-secrets",
-    title: "AI agent job has access to secrets",
+    title: "AI step references a secret or token",
     severity: "medium",
-    why: "Secrets mounted into an AI-agent job can be exfiltrated if untrusted prompt content influences tool use, shell commands, or generated output. Most AI actions require a provider key, so this is a baseline exposure to review rather than a vulnerability on its own \u2014 it becomes high-risk when combined with untrusted input or write permissions (see agentci/untrusted-ai-write-token).",
+    why: "Secrets passed into an AI step can be exfiltrated if untrusted prompt content influences tool use, shell commands, or generated output. Most AI actions require a provider key, so this is a baseline exposure to review rather than a vulnerability on its own \u2014 it becomes high-risk when combined with untrusted input or write permissions (see agentci/untrusted-ai-write-token).",
     fix: [
       "Do not expose secrets to agent jobs that process untrusted content.",
       "Use short-lived scoped tokens.",
@@ -7792,9 +7842,9 @@ var RULES = {
   },
   "agentci/ai-shell-access": {
     id: "agentci/ai-shell-access",
-    title: "AI agent has shell or arbitrary command access",
+    title: "Local AI CLI runs through shell or Action enables command tool",
     severity: "high",
-    why: "Shell access allows a compromised agent prompt to inspect the workspace, call network endpoints, or alter build artifacts.",
+    why: "A local AI CLI is launched from a runner shell; an Action's explicit command-tool setting is separate evidence of agent command access. A remote HTTP dispatch does not establish either capability inside the hosted agent.",
     fix: [
       "Disable shell tools for untrusted events.",
       "Run in a sandbox with no secrets.",
@@ -8333,7 +8383,6 @@ function splitTopLevel(value, operator) {
 // src/scanner.ts
 var EMPTY_REUSABLE_CONTEXT = {
   inputValues: {},
-  inheritedSecrets: false,
   stack: [],
   callChain: []
 };
@@ -8536,6 +8585,7 @@ function analyzeWorkflow(workflow, repository, context) {
     const jobEnvironment = mergeEnvironment(workflowEnvironment, rawJob.env);
     const aiSteps = [];
     let untrustedInRun = false;
+    const secretEnvTransferEvents = /* @__PURE__ */ new Set();
     for (const [index, rawStep] of steps.entries()) {
       if (!isRecord2(rawStep)) continue;
       const stepName = typeof rawStep.name === "string" ? rawStep.name : `step ${index + 1}`;
@@ -8601,7 +8651,27 @@ function analyzeWorkflow(workflow, repository, context) {
         context.inputValues
       );
       const stepUsesAiAction = looksLikeAiAction(actionReference);
-      const stepUsesAi = stepUsesAiAction || looksLikeAiCli(materializeInputs(stepRun, context.inputValues));
+      const materializedRun = materializeInputs(stepRun, context.inputValues);
+      const stepUsesAiCli = looksLikeAiCli(materializedRun);
+      const stepUsesAi = stepUsesAiAction || stepUsesAiCli || looksLikeAiHttpDispatch(materializedRun);
+      if (stepUsesAi && stepReachability.events.some(
+        (event) => secretEnvTransferEvents.has(event)
+      )) {
+        output.diagnostics.push({
+          code: "agentci/analysis-secret-env-transfer-unknown",
+          kind: "analysis",
+          severity: "warning",
+          file,
+          job: jobName,
+          line: stepLine,
+          message: "An earlier step may write a secret to GITHUB_ENV; exposure to this AI step is not modeled."
+        });
+      }
+      if (/\bGITHUB_ENV\b/.test(materializedRun) && (containsSecretReference(materializedRun) || containsSecretReference(JSON.stringify(effectiveEnvironment)))) {
+        for (const event of stepReachability.events) {
+          secretEnvTransferEvents.add(event);
+        }
+      }
       const stepActorGate = jobActorGate || hasTrustedActorGate(rawStep.if);
       const stepPrGate = jobPrGate || hasTrustedPrProvenanceGate(rawStep.if);
       const activeMatches = (value) => untrustedGitHubContextMatches(value).filter(
@@ -8651,7 +8721,7 @@ function analyzeWorkflow(workflow, repository, context) {
           creationOnlyEvents
         )
       );
-      const hasSecret = context.inheritedSecrets || containsSecretReference(JSON.stringify(effectiveEnvironment)) || containsSecretReference(
+      const hasSecret = containsSecretReference(JSON.stringify(effectiveEnvironment)) || containsSecretReference(
         materializeInputs(
           JSON.stringify({
             uses: rawStep.uses,
@@ -8720,14 +8790,14 @@ function analyzeWorkflow(workflow, repository, context) {
             })
           );
         }
-        if (stepRun.trim().length > 0 || containsShellAccess(effectiveWith)) {
+        if (stepUsesAiCli || containsShellAccess(effectiveWith)) {
           output.findings.push(
             makeFinding("agentci/ai-shell-access", {
               file,
               job: jobName,
               step: stepName,
               stepIndex: index,
-              evidence: stepRun.trim().length > 0 ? `AI CLI executes through run: ${shrink(stepRun)}` : shrink(JSON.stringify(effectiveWith)),
+              evidence: stepUsesAiCli ? `AI CLI executes through run: ${shrink(stepRun)}` : shrink(JSON.stringify(effectiveWith)),
               line: stepLine,
               events: stepReachability.events,
               callChain: context.callChain
@@ -8922,7 +8992,6 @@ function analyzeReusableCall(caller, jobName, rawJob, jobLine, events, creationO
     prGate: Boolean(context.prGate) || hasTrustedPrProvenanceGate(rawJob.if),
     permissionCeiling: permissions,
     inputValues: toStringMap(rawJob.with, context.inputValues),
-    inheritedSecrets: rawJob.secrets === "inherit" || containsSecretReference(JSON.stringify(rawJob.secrets ?? {})),
     stack: [...context.stack, path2.resolve(caller.path), targetPath],
     callChain: [...context.callChain, `${callerFile}#${jobName}`]
   });

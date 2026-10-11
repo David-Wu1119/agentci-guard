@@ -79,10 +79,23 @@ Direct interpolation is checked in `uses`, `run`, `with`, `shell`,
 `working-directory`, and the effective workflow → job → step environment.
 Step `name`, `id`, `if`, and other display/control metadata do not pass text
 to the agent and are not direct-input sinks. This does not prove that every
-value in `with` or the environment is consumed by the agent.
+value in `with` or the environment is consumed by the agent. A `run:` step
+with multiple commands is still treated as one sink: text interpolated only
+into an unrelated command can cause a false positive. Command-level flow
+must be resolved before freezing the nine-rule evaluation.
 
-For hosted-agent HTTP dispatch, `ai-shell-access` denotes the runner's `run:`
-shell, not verified command-tool access inside the remote agent.
+The candidate recognizes documented hosted-agent creation/follow-up routes
+only when a direct `curl` command sends POST. GET list/status calls and URL
+mentions are not agent usage. A hosted HTTP dispatch does not receive
+`ai-shell-access` merely because `curl` runs in the runner shell: that would
+not prove command-tool access inside the remote agent. Supported route and
+method pairs are pinned to the [Cursor v1](https://prod.cursor.com/docs/cloud-agent/api/endpoints),
+[Cursor v0](https://prod.cursor.com/docs/cloud-agent/api/v0),
+[Devin v1](https://docs.devin.ai/api-reference/v1/sessions/create-a-new-devin-session),
+[Devin v3](https://docs.devin.ai/api-reference/v3/sessions/post-organizations-sessions),
+and [GitHub Copilot task API](https://docs.github.com/en/rest/agent-tasks/agent-tasks?apiVersion=2026-03-10#start-a-task)
+references. Dynamic or wrapped HTTP requests are outside this direct-call
+detector; absence of a finding is not proof that no agent was launched.
 
 `github.event.head_commit.message` on `push` is also independent of the
 triggering actor: a maintainer's squash merge can carry a contributor's PR
@@ -156,6 +169,22 @@ analysis cannot prove App installation or exchange success, and other Action
 credentials remain unmodeled. A negative finding is not proof of no write
 authority. See the pinned [token setup](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/github/token.ts)
 and [App permissions](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/docs/security.md#github-app-permissions).
+
+## Unreleased reusable-secret correction
+
+The pre-candidate table above and archived v0.1.1 contract count inherited
+secrets as `ai-with-secrets` exposure. The candidate instead requires a
+supported secret/token reference in the AI step's effective environment or
+`uses`, `run`, or `with` material. `secrets: inherit` makes secrets available
+to the called workflow, but does not by itself pass them to every Action;
+GitHub requires an [Action input or environment mapping](https://docs.github.com/en/actions/concepts/security/secrets).
+The built-in `GITHUB_TOKEN` is modeled separately through permissions. This
+change does not retroactively alter historical pilot labels or prove a
+referenced secret is nonempty at runtime.
+The candidate recognizes bracket secret references and `toJSON(secrets)`.
+A prior step that may export a secret through `GITHUB_ENV` produces an
+analysis-incomplete diagnostic at a later AI step; that cross-step flow is not
+yet modeled as a positive finding.
 
 ## Severity rationale
 

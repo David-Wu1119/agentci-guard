@@ -49,9 +49,9 @@ export const RULES: Record<string, RuleDefinition> = {
   },
   "agentci/ai-with-secrets": {
     id: "agentci/ai-with-secrets",
-    title: "AI agent job has access to secrets",
+    title: "AI step references a secret or token",
     severity: "medium",
-    why: "Secrets mounted into an AI-agent job can be exfiltrated if untrusted prompt content influences tool use, shell commands, or generated output. Most AI actions require a provider key, so this is a baseline exposure to review rather than a vulnerability on its own — it becomes high-risk when combined with untrusted input or write permissions (see agentci/untrusted-ai-write-token).",
+    why: "Secrets passed into an AI step can be exfiltrated if untrusted prompt content influences tool use, shell commands, or generated output. Most AI actions require a provider key, so this is a baseline exposure to review rather than a vulnerability on its own — it becomes high-risk when combined with untrusted input or write permissions (see agentci/untrusted-ai-write-token).",
     fix: [
       "Do not expose secrets to agent jobs that process untrusted content.",
       "Use short-lived scoped tokens.",
@@ -73,9 +73,9 @@ export const RULES: Record<string, RuleDefinition> = {
   },
   "agentci/ai-shell-access": {
     id: "agentci/ai-shell-access",
-    title: "AI agent has shell or arbitrary command access",
+    title: "Local AI CLI runs through shell or Action enables command tool",
     severity: "high",
-    why: "Shell access allows a compromised agent prompt to inspect the workspace, call network endpoints, or alter build artifacts.",
+    why: "A local AI CLI is launched from a runner shell; an Action's explicit command-tool setting is separate evidence of agent command access. A remote HTTP dispatch does not establish either capability inside the hosted agent.",
     fix: [
       "Disable shell tools for untrusted events.",
       "Run in a sandbox with no secrets.",

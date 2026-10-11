@@ -12,6 +12,9 @@ async function repository(
   callerPermissions: string,
   calleePermissions: string,
   callerJobCondition = "",
+  callerSecrets = "    secrets: inherit",
+  agentInputs = "",
+  precedingSteps = "",
 ): Promise<string> {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "agentci-reusable-"));
   const workflows = path.join(root, ".github", "workflows");
@@ -27,7 +30,7 @@ jobs:
   delegate:
 ${callerJobCondition}
     uses: ./.github/workflows/agent.yml
-    secrets: inherit
+${callerSecrets}
 `,
     "utf8",
   );
@@ -36,14 +39,19 @@ ${callerJobCondition}
     `
 on:
   workflow_call:
+    secrets:
+      BOT_TOKEN:
+        required: false
 jobs:
   agent:
     runs-on: ubuntu-latest
 ${calleePermissions}
     steps:
+${precedingSteps}
       - uses: anthropics/claude-code-action@v1
         with:
           prompt: "Triage: \${{ github.event.issue.title }}"
+${agentInputs}
 `,
     "utf8",
   );
@@ -54,6 +62,75 @@ const ruleIds = async (root: string) =>
   new Set((await scanRepository(root)).findings.map((f) => f.rule_id));
 
 describe("reusable-workflow permission ceiling", () => {
+  it("does not expose inherited secrets to an AI step that never references them", async () => {
+    const root = await repository("permissions:\n  contents: read", "");
+    expect(await ruleIds(root)).not.toContain("agentci/ai-with-secrets");
+  });
+
+  it("does not expose a named caller secret without a callee reference", async () => {
+    const root = await repository(
+      "permissions:\n  contents: read",
+      "",
+      "",
+      "    secrets:\n      BOT_TOKEN: ${{ secrets.BOT_TOKEN }}",
+    );
+    expect(await ruleIds(root)).not.toContain("agentci/ai-with-secrets");
+  });
+
+  it("reports an inherited secret explicitly passed to the AI Action", async () => {
+    const root = await repository(
+      "permissions:\n  contents: read",
+      "",
+      "",
+      "    secrets: inherit",
+      "          github_token: ${{ secrets.BOT_TOKEN }}",
+    );
+    expect(await ruleIds(root)).toContain("agentci/ai-with-secrets");
+  });
+
+  it("detects an inherited secret object passed through toJSON", async () => {
+    const root = await repository(
+      "permissions:\n  contents: read",
+      "",
+      "",
+      "    secrets: inherit",
+      "          claude_args: \${{ toJSON(secrets) }}",
+    );
+    expect(await ruleIds(root)).toContain("agentci/ai-with-secrets");
+  });
+
+  it("marks earlier secret exports to GITHUB_ENV incomplete", async () => {
+    const root = await repository(
+      "permissions:\n  contents: read",
+      "",
+      "",
+      "    secrets: inherit",
+      "",
+      '      - run: echo "BOT_TOKEN=\${{ secrets.BOT_TOKEN }}" >> "$GITHUB_ENV"',
+    );
+    const result = await scanRepository(root);
+    expect(result.analysis_complete).toBe(false);
+    expect(result.diagnostics.map((d) => d.code)).toContain(
+      "agentci/analysis-secret-env-transfer-unknown",
+    );
+  });
+
+  it("marks env-mapped secret exports to GITHUB_ENV incomplete", async () => {
+    const root = await repository(
+      "permissions:\n  contents: read",
+      "",
+      "",
+      "    secrets: inherit",
+      "",
+      '      - env:\n          BOT_TOKEN: \${{ secrets.BOT_TOKEN }}\n        run: echo "BOT_TOKEN=$BOT_TOKEN" >> "$GITHUB_ENV"',
+    );
+    const result = await scanRepository(root);
+    expect(result.analysis_complete).toBe(false);
+    expect(result.diagnostics.map((d) => d.code)).toContain(
+      "agentci/analysis-secret-env-transfer-unknown",
+    );
+  });
+
   it("preserves a caller owner gate for an opened Issue in the callee", async () => {
     const root = await repository(
       "permissions:\n  contents: write",

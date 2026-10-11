@@ -56,18 +56,19 @@ export const AI_AGENT_CLI_PATTERNS = [
 // the repository, and the threat this project models requires that reach.
 // See the misleading-non-agent adversarial case.
 //
-// A scheme is required so prose, comments, and documentation naming these
-// hosts do not become observations.
+// Exact documented create routes. A matching URL alone is not an invocation;
+// looksLikeAiHttpDispatch also requires a curl POST command.
 export const AI_AGENT_API_PATTERNS = [
-  /https?:\/\/api\.cursor\.com\/v\d+\/agents\b/i,
-  /https?:\/\/api\.devin\.ai\/v\d+\/sessions\b/i,
-  /https?:\/\/api\.githubcopilot\.com\/[^\s"']*agents?\b/i,
+  /https?:\/\/api\.cursor\.com\/v1\/agents(?:\/[^/\s"'?#]+\/runs)?(?=$|[\s"'?#\\])/i,
+  /https?:\/\/api\.cursor\.com\/v0\/agents(?:\/[^/\s"'?#]+\/followup)?(?=$|[\s"'?#\\])/i,
+  /https?:\/\/api\.devin\.ai\/v1\/sessions(?=$|[\s"'?#\\])/i,
+  /https?:\/\/api\.devin\.ai\/v3\/organizations\/[^/\s"'?#]+\/sessions(?=$|[\s"'?#\\])/i,
+  /https?:\/\/api\.github\.com\/agents\/repos\/[^/\s"'?#]+\/[^/\s"'?#]+\/tasks(?=$|[\s"'?#\\])/i,
 ];
 
 export const AI_AGENT_PATTERNS = [
   ...AI_AGENT_ACTION_PATTERNS,
   ...AI_AGENT_CLI_PATTERNS,
-  ...AI_AGENT_API_PATTERNS,
 ];
 
 const UNTRUSTED_CONTEXT_PATTERNS: Array<{
@@ -156,6 +157,8 @@ const UNTRUSTED_CONTEXT_PATTERNS: Array<{
 
 const SECRET_PATTERNS = [
   /secrets\.[A-Za-z0-9_]+/i,
+  /\$\{\{[^}]*\bsecrets\s*\[[^\]]+\]/i,
+  /\$\{\{[^}]*\btoJSON\s*\(\s*secrets\s*\)/i,
   /github\.token/i,
   /\$\{\{\s*(?:env\.)?[A-Z0-9_]*(?:TOKEN|KEY)\s*\}\}/,
 ];
@@ -210,7 +213,10 @@ export const SELF_GATED_EVENTS = new Set([
 ]);
 
 export function looksLikeAiUsage(value: string): boolean {
-  return AI_AGENT_PATTERNS.some((pattern) => pattern.test(value));
+  return (
+    AI_AGENT_PATTERNS.some((pattern) => pattern.test(value)) ||
+    looksLikeAiHttpDispatch(value)
+  );
 }
 
 /**
@@ -234,15 +240,78 @@ export function looksLikeAiAction(value: string): boolean {
 }
 
 /**
- * A shell-driven agent invocation: a local CLI, or an HTTP call to a hosted
- * agent endpoint. Both are grouped here rather than with actions because they
- * receive only what the surrounding script hands them, so untrusted content
- * still has to be interpolated for it to reach the agent.
+ * A local CLI invocation, separate from an HTTP dispatch to a remote agent.
  */
 export function looksLikeAiCli(value: string): boolean {
-  return [...AI_AGENT_CLI_PATTERNS, ...AI_AGENT_API_PATTERNS].some((pattern) =>
-    pattern.test(value),
-  );
+  return AI_AGENT_CLI_PATTERNS.some((pattern) => pattern.test(value));
+}
+
+export function looksLikeAiHttpDispatch(value: string): boolean {
+  // shortcut: direct curl commands only; extend with a shell parser if a
+  // measured miss shows dispatch through wrappers or generated scripts.
+  let heredoc = "";
+  const script = value
+    .replace(/\\\r?\n/g, " ")
+    .split("\n")
+    .filter((line) => {
+      if (heredoc) {
+        if (line.trim() === heredoc) heredoc = "";
+        return false;
+      }
+      heredoc = /<<-?\s*(['"]?)([A-Za-z_][\w-]*)\1/.exec(line)?.[2] ?? "";
+      return true;
+    })
+    .join("\n");
+  for (const match of script.matchAll(
+    /(?:^|[\n;&|()])\s*curl\b([^\n;&|]*)/gim,
+  )) {
+    const words = match[1].match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) ?? [];
+    let method = "";
+    let hasBody = false;
+    let getOverride = false;
+    let hasRoute = false;
+    for (const [index, word] of words.entries()) {
+      if (word === "-G" || word === "--get") getOverride = true;
+      if (word === "-X" || word === "--request") {
+        method =
+          words[index + 1]?.replace(/^["']|["']$/g, "").toUpperCase() ?? "";
+      } else if (word.startsWith("--request=")) {
+        method = word
+          .slice("--request=".length)
+          .replace(/^["']|["']$/g, "")
+          .toUpperCase();
+      } else if (/^-X[A-Za-z]+$/.test(word)) {
+        method = word.slice(2).toUpperCase();
+      }
+      if (
+        /^(?:-d|-F|--data(?:-raw|-binary|-urlencode)?(?:=|$)|--json(?:=|$)|--form(?:=|$))/.test(
+          word,
+        )
+      ) {
+        hasBody = true;
+      }
+      if (
+        /^(?:-d|--data(?:-raw|-binary|-urlencode)?|--json|-F|--form)$/i.test(
+          words[index - 1] ?? "",
+        )
+      ) {
+        continue;
+      }
+      const candidate = word
+        .replace(/^--url=/, "")
+        .replace(/^(["'])(.*)\1$/, "$2");
+      if (
+        AI_AGENT_API_PATTERNS.some(
+          (pattern) => pattern.exec(candidate)?.index === 0,
+        )
+      ) {
+        hasRoute = true;
+      }
+    }
+    if (hasRoute && !getOverride && (method === "POST" || (!method && hasBody)))
+      return true;
+  }
+  return false;
 }
 
 export function containsUntrustedGitHubContext(value: string): boolean {

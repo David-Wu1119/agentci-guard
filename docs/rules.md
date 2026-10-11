@@ -30,7 +30,9 @@ does not authenticate the triggering actor.
 ## `agentci/ai-with-secrets`
 
 An AI step's effective workflow → job → step environment or inputs reference a
-secret.
+secret. `secrets: inherit` makes secrets available to a called workflow but
+does not alone expose them to each Action; the built-in workflow token is
+modeled through permissions.
 
 ## `agentci/untrusted-input-in-prompt`
 
@@ -40,10 +42,11 @@ Display metadata such as the step name is not an input sink.
 
 ## `agentci/ai-shell-access`
 
-An AI CLI or hosted-agent HTTP dispatch executes through runner `run:`, or an
-AI Action explicitly enables a shell or command tool. For HTTP dispatch, this
-does not prove the remote agent has shell tools. Incidental prose such as
-“Python” is not shell capability.
+A local AI CLI executes through runner `run:`, or an AI Action explicitly
+enables a shell or command tool. This does not prove every local CLI agent has
+its own shell tool. An HTTP dispatch does not satisfy the rule merely because
+`curl` runs on the runner. Incidental prose such as “Python” is not shell
+capability.
 
 ## `agentci/broad-write-permissions`
 

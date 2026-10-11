@@ -99,6 +99,12 @@
       "url": "https://docs.github.com/en/actions/how-tos/sharing-automations/reusing-workflows",
       "claim": "Local reusable workflows inherit caller context subject to explicit inputs, secrets, and permissions."
     },
+    "secrets-to-action": {
+      "type": "primary",
+      "title": "Secrets in GitHub Actions",
+      "url": "https://docs.github.com/en/actions/concepts/security/secrets",
+      "claim": "A secret must be set as an Action input or environment variable to make it available to that Action."
+    },
     "project-analysis-contract": {
       "type": "project",
       "title": "AgentCI Guard analysis contract",
@@ -843,7 +849,7 @@
       "path": "cases/local-reusable-secret",
       "targets": [
         "reusable workflow secret propagation",
-        "inherited secret exposure"
+        "inherited secret availability without Action exposure"
       ],
       "subject": {
         "file": ".github/workflows/reusable.yml",
@@ -851,17 +857,7 @@
       },
       "expected": {
         "reachable_events": ["push"],
-        "findings": [
-          {
-            "rule_id": "agentci/ai-with-secrets",
-            "severity": "medium",
-            "location": {
-              "file": ".github/workflows/reusable.yml",
-              "job": "agent",
-              "line_min": 2
-            }
-          }
-        ],
+        "findings": [],
         "diagnostics": [],
         "agent_usages": [
           {
@@ -876,9 +872,10 @@
         ],
         "analysis_complete": true
       },
-      "rationale": "A caller's secrets inherit declaration exposes inherited secrets to a reachable AI job in the local reusable workflow.",
+      "rationale": "The caller makes secrets available to the reusable workflow, but the AI Action has no explicit secret input or environment reference. Inheritance alone is not an ai-with-secrets finding; the built-in workflow token is modeled separately.",
       "assumption_sources": [
         "reusable-workflows",
+        "secrets-to-action",
         "project-analysis-contract",
         "project-rule-contract"
       ]

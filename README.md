@@ -80,9 +80,9 @@ contract has not been frozen.
 | `gated-ai-write-token`      | high     | The same pattern, but only when `anthropics/claude-code-action` checks the actor tied to all modeled input sources, its default gate is intact, and no untrusted text reaches a `run:` step |
 | `pull-request-target-ai`    | critical | An agent is reachable on `pull_request_target` without a recognized actor gate; that event runs in base-repo context with secrets                                                           |
 | `untrusted-input-in-prompt` | high     | Attacker-controlled context is interpolated into an agent's prompt or inputs                                                                                                                |
-| `ai-shell-access`           | high     | The agent step can execute shell commands                                                                                                                                                   |
+| `ai-shell-access`           | high     | A local AI CLI runs through the runner shell, or an AI Action explicitly enables a command tool                                                                                             |
 | `unsafe-checkout`           | high     | Untrusted PR head code is checked out without GitHub's built-in protection                                                                                                                  |
-| `ai-with-secrets`           | medium   | An agent job's environment references a secret — baseline exposure, not a vulnerability alone                                                                                               |
+| `ai-with-secrets`           | medium   | An AI step's inputs or environment reference a secret — baseline exposure, not a vulnerability alone                                                                                        |
 | `broad-write-permissions`   | medium   | An AI job has an effective sensitive write scope in its workflow token                                                                                                                      |
 | `unpinned-ai-action`        | medium   | The agent action is referenced by tag rather than commit SHA                                                                                                                                |
 

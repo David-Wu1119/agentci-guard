@@ -156,6 +156,10 @@ them is visible as an expression.
 The first is interpolation: `${{ github.event.issue.title }}` and its siblings
 expanded into a prompt, an input, or a `run:` block. This is what
 `agentci/untrusted-input-in-prompt` reports.
+The current candidate conservatively treats a whole `run:` step as one sink.
+It can therefore attribute text in an unrelated command of the same step to
+the AI invocation. This is an unresolved false-positive path, not a verified
+agent prompt input; command-level flow needs correction before evaluation.
 
 The second route is Action self-fetching, which depends on vendor and mode.
 At the pinned Anthropic revision, [tag mode fetches parent Issue/PR data](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/modes/tag/index.ts)
@@ -347,9 +351,16 @@ finding is not a proof of no write authority.
 
 Job-level local calls such as
 `./.github/workflows/review.yml` are resolved recursively. Caller events,
-inputs, secret exposure, and token permissions are propagated; input
+inputs, and token permissions are propagated; secret references inside the
+called workflow are scanned syntactically, while input
 expressions are materialized transitively through nested calls into the called
 workflow. Cycles and missing local targets are diagnostics.
+`secrets: inherit` alone does not create `ai-with-secrets` for every AI step:
+the candidate requires a supported secret/token reference in that step's
+effective environment or inputs. The built-in `GITHUB_TOKEN` is handled by
+the permissions model.
+An earlier step that may write a secret to `GITHUB_ENV` marks a later AI step's
+analysis incomplete; cross-step secret flow is not a positive finding yet.
 `workflow_call` entrypoints with no reachable local caller are also marked
 incomplete because their caller-supplied context is unavailable; any separate
 direct trigger is still analyzed on its own event set.
@@ -363,12 +374,12 @@ Remote reusable workflows are not downloaded. They emit
 
 ## Shell semantics
 
-An AI CLI or hosted-agent HTTP dispatch invoked in `run:` executes through the
-runner shell and receives the `ai-shell-access` rule. For an AI Action, the rule
-requires an explicit shell or command-tool capability in its inputs. An HTTP
-dispatch finding describes the runner step; it does not establish which tools
-the remote agent has. Incidental prompt prose such as “Python,” “node,” or
-“bash” does not itself establish shell capability.
+A local AI CLI invoked in `run:` receives `ai-shell-access` because the CLI
+process is launched through the runner shell; this does not prove which tools
+the agent itself can call. An AI Action needs an explicit shell or command-tool
+setting in its inputs. A hosted-agent HTTP dispatch is not a shell finding:
+`curl` running locally says nothing about the remote agent's tools. Incidental
+prompt prose such as “Python,” “node,” or “bash” is not capability evidence.
 
 ## Pull-request checkout protection
 
