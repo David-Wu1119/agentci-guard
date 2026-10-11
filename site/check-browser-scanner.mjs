@@ -209,6 +209,15 @@ const duplicateKey = scan("on: push\non: pull_request\njobs: {}\n");
 assert.equal(duplicateKey.analysis_complete, false);
 assert.equal(duplicateKey.diagnostics[0]?.code, "agentci/parse-error");
 assert.equal(duplicateKey.findings.length, 0);
+const opaqueRun = scan(
+  'on: push\njobs:\n  agent:\n    runs-on: ubuntu-latest\n    steps:\n      - run: eval "claude -p fixed"\n',
+);
+assert.equal(opaqueRun.analysis_complete, false);
+assert.ok(
+  opaqueRun.diagnostics.some(
+    ({ code }) => code === "agentci/analysis-run-dataflow-unknown",
+  ),
+);
 let aliases = "on: push\njobs:\n  a0: &a0 [x]\n";
 for (let index = 1; index <= 8; index++) {
   aliases += `  a${index}: &a${index} [${Array(10)
