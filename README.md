@@ -134,7 +134,7 @@ The npm registry may lag the Action release (publication is a separate,
 human-authorized step; see [`docs/OPERATIONS.md`](docs/OPERATIONS.md)). To
 evaluate exactly the tested candidate, install the tarball attached to the
 release — its SHA-256 is in the release notes and in
-`evidence/sprint-2026-09-05/day4/`:
+`evidence/sprint-2026-09-05/day9/SHA256SUMS-v0.6.2.txt`:
 
 ```bash
 npm install -g https://github.com/David-Wu1119/agentci-guard/releases/download/v0.6.2/agentci-guard-0.6.2.tgz

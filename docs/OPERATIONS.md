@@ -202,8 +202,8 @@ Actions are presumed to fetch the triggering event's content themselves; CLIs
 and HTTP calls are not, because a shell hands them only what the script puts
 in. Preserve that distinction when adding a pattern.
 
-A quick audit for stale patterns: run the 16 held-out diversity cases
-(`benchmark/snapshots/holdout-*`) and confirm each reports at least one agent
+A quick audit for stale patterns: run the 16 former evaluation diversity cases
+(`benchmark/snapshots/holdout-*`, now development data) and confirm each reports at least one agent
 usage or an explicit unresolvable-workflow diagnostic. A confident clean scan
 on a workflow that visibly names an agent is the failure to look for. Two of
 the sixteen are expected negatives and stay that way: `holdout-aider-003` only
