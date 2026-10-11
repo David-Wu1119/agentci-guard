@@ -2,6 +2,8 @@
 
 [![npm](https://img.shields.io/npm/v/agentci-guard)](https://www.npmjs.com/package/agentci-guard) [![CI](https://github.com/David-Wu1119/agentci-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/David-Wu1119/agentci-guard/actions/workflows/ci.yml) [![license: MIT](https://img.shields.io/npm/l/agentci-guard)](LICENSE)
 
+[Research site](https://cryptoaxiom.net/) · [Site source](site/README.md) (static explanation and synthetic fixture, not a hosted scanner)
+
 AgentCI Guard is a static analyzer for GitHub Actions workflows that answers
 one question before a workflow runs: **can text a stranger controls reach an
 AI coding agent that holds a write token or secrets?**

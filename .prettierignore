@@ -7,3 +7,7 @@ benchmark/snapshots/
 corpus/adversarial/cases/parse-error/
 schemas/sarif-schema-2.1.0.json
 evidence/
+site/BUILD_MANIFEST.json
+site/dist/
+site/VISUAL_CHECKS.json
+site/screenshots/
