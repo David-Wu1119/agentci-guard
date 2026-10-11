@@ -108,7 +108,9 @@ function renderResult(result) {
   }
 
   const count = result.findings.length;
-  heading.textContent = `${count} finding${count === 1 ? '' : 's'} for ${sourceLabel}`;
+  heading.textContent = result.analysis_complete
+    ? `${count} finding${count === 1 ? '' : 's'} for ${sourceLabel}`
+    : `Analysis incomplete for ${sourceLabel}`;
   status.textContent = `Scanner v${scanWorkflow.version}: ${result.agent_usages.length} recognized agent-use step${result.agent_usages.length === 1 ? '' : 's'}; ${result.analysis_complete ? 'analysis complete' : 'analysis incomplete'} for ${sourceLabel}. Locations below are virtual scanner paths.`;
   completeness.textContent = result.analysis_complete
     ? 'analysis_complete: true. This covers only supported static checks for the supplied file; it does not validate the full GitHub Actions schema or guarantee security.'
