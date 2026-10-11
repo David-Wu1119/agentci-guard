@@ -247,8 +247,65 @@ export function looksLikeAiCli(value: string): boolean {
 }
 
 export function looksLikeAiHttpDispatch(value: string): boolean {
+  return aiHttpDispatches(value).length > 0;
+}
+
+type ShellWord = { text: string; expandableText: string };
+type AiHttpDispatch = {
+  command: string;
+  payload: string;
+  expandablePayload: string;
+  expandableCommand: string;
+  opaquePayload: boolean;
+};
+
+function shellWords(value: string): ShellWord[] {
+  const words: ShellWord[] = [];
+  let text = "";
+  let expandableText = "";
+  let quote = "";
+  let started = false;
+  let escaped = false;
+  const push = () => {
+    if (started) words.push({ text, expandableText });
+    text = "";
+    expandableText = "";
+    started = false;
+  };
+  for (const character of value) {
+    if (escaped) {
+      text += character;
+      if (character !== "$") expandableText += character;
+      escaped = false;
+    } else if (character === "\\" && quote !== "'") {
+      escaped = true;
+    } else if (quote) {
+      if (character === quote) quote = "";
+      else {
+        text += character;
+        if (quote !== "'") expandableText += character;
+      }
+    } else if (character === "'" || character === '"') {
+      quote = character;
+    } else if (character === "#" && !started) {
+      break;
+    } else if (/\s/.test(character)) {
+      push();
+      continue;
+    } else {
+      text += character;
+      expandableText += character;
+    }
+    started = true;
+  }
+  push();
+  return words;
+}
+
+export function aiHttpDispatches(value: string): AiHttpDispatch[] {
   // shortcut: direct curl commands only; extend with a shell parser if a
   // measured miss shows dispatch through wrappers or generated scripts.
+  const dispatches: AiHttpDispatch[] = [];
   let heredoc = "";
   const script = value
     .replace(/\\\r?\n/g, " ")
@@ -265,41 +322,66 @@ export function looksLikeAiHttpDispatch(value: string): boolean {
   for (const match of script.matchAll(
     /(?:^|[\n;&|()])\s*curl\b([^\n;&|]*)/gim,
   )) {
-    const words = match[1].match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) ?? [];
+    const words = shellWords(match[1]);
     let method = "";
-    let hasBody = false;
     let getOverride = false;
     let hasRoute = false;
-    for (const [index, word] of words.entries()) {
+    const payloads: ShellWord[] = [];
+    for (let index = 0; index < words.length; index++) {
+      const word = words[index].text;
       if (word === "-G" || word === "--get") getOverride = true;
       if (word === "-X" || word === "--request") {
-        method =
-          words[index + 1]?.replace(/^["']|["']$/g, "").toUpperCase() ?? "";
+        method = words[index + 1]?.text.toUpperCase() ?? "";
+        index++;
+        continue;
       } else if (word.startsWith("--request=")) {
-        method = word
-          .slice("--request=".length)
-          .replace(/^["']|["']$/g, "")
-          .toUpperCase();
+        method = word.slice("--request=".length).toUpperCase();
+        continue;
       } else if (/^-X[A-Za-z]+$/.test(word)) {
         method = word.slice(2).toUpperCase();
+        continue;
       }
       if (
-        /^(?:-d|-F|--data(?:-raw|-binary|-urlencode)?(?:=|$)|--json(?:=|$)|--form(?:=|$))/.test(
+        /^(?:-d|-F|--data(?:-raw|-binary|-urlencode)?|--json|--form)$/.test(
           word,
         )
       ) {
-        hasBody = true;
-      }
-      if (
-        /^(?:-d|--data(?:-raw|-binary|-urlencode)?|--json|-F|--form)$/i.test(
-          words[index - 1] ?? "",
-        )
-      ) {
+        if (words[index + 1]) payloads.push(words[++index]);
         continue;
       }
-      const candidate = word
-        .replace(/^--url=/, "")
-        .replace(/^(["'])(.*)\1$/, "$2");
+      const attached =
+        /^(?:-d|-F)(.+)$|^--(?:data(?:-raw|-binary|-urlencode)?|json|form)=(.*)$/.exec(
+          word,
+        );
+      if (attached) {
+        payloads.push({
+          text: attached[1] ?? attached[2],
+          expandableText: words[index].expandableText.replace(
+            /^(?:-d|-F|--(?:data(?:-raw|-binary|-urlencode)?|json|form)=)/,
+            "",
+          ),
+        });
+        continue;
+      }
+      if (word === "-H" || word === "--header") {
+        index++;
+        continue;
+      }
+      if (word === "--url") {
+        index++;
+      } else if (word.startsWith("-") && !word.startsWith("--url=")) {
+        // shortcut: unknown curl options followed by a URL take that URL as
+        // an option value; expand the no-value list when a real call is missed.
+        if (
+          !/^(?:-[sSLfkvi]+|--(?:silent|show-error|location|fail|fail-with-body|insecure|verbose|compressed|include|http1\.1|http2))$/.test(
+            word,
+          ) &&
+          /^https?:\/\//i.test(words[index + 1]?.text ?? "")
+        )
+          index++;
+        continue;
+      }
+      const candidate = words[index]?.text.replace(/^--url=/, "") ?? "";
       if (
         AI_AGENT_API_PATTERNS.some(
           (pattern) => pattern.exec(candidate)?.index === 0,
@@ -308,10 +390,23 @@ export function looksLikeAiHttpDispatch(value: string): boolean {
         hasRoute = true;
       }
     }
-    if (hasRoute && !getOverride && (method === "POST" || (!method && hasBody)))
-      return true;
+    if (
+      hasRoute &&
+      !getOverride &&
+      (method === "POST" || (!method && payloads.length > 0))
+    ) {
+      dispatches.push({
+        command: `curl ${words.map((word) => word.text).join(" ")}`,
+        payload: payloads.map((word) => word.text).join(" "),
+        expandablePayload: payloads
+          .map((word) => word.expandableText)
+          .join(" "),
+        expandableCommand: words.map((word) => word.expandableText).join(" "),
+        opaquePayload: payloads.some((word) => /^@|\$\(|`/.test(word.text)),
+      });
+    }
   }
-  return false;
+  return dispatches;
 }
 
 export function containsUntrustedGitHubContext(value: string): boolean {

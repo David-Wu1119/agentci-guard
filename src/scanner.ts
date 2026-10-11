@@ -4,6 +4,7 @@ import YAML from "yaml";
 import { loadConfig, matchesPath, parseInlineIgnores } from "./config.js";
 import type { AgentciConfig } from "./config.js";
 import {
+  aiHttpDispatches,
   containsSecretReference,
   containsShellAccess,
   hasAgentGateBypass,
@@ -11,7 +12,6 @@ import {
   isSelfGatingAgentAction,
   looksLikeAiAction,
   looksLikeAiCli,
-  looksLikeAiHttpDispatch,
   SELF_GATED_EVENTS,
   untrustedGitHubContextMatches,
 } from "./detect.js";
@@ -365,6 +365,7 @@ function analyzeWorkflow(
       hasSecret: boolean;
       hasUntrustedSink: boolean;
       hasUntrustedIngestion: boolean;
+      remoteHttp: boolean;
       sourceMayDifferFromTrigger: boolean;
       potentialAppWrite: boolean;
       ingestionEvents: string[];
@@ -460,10 +461,57 @@ function analyzeWorkflow(
       const stepUsesAiAction = looksLikeAiAction(actionReference);
       const materializedRun = materializeInputs(stepRun, context.inputValues);
       const stepUsesAiCli = looksLikeAiCli(materializedRun);
+      const httpDispatches = aiHttpDispatches(materializedRun);
       const stepUsesAi =
-        stepUsesAiAction ||
-        stepUsesAiCli ||
-        looksLikeAiHttpDispatch(materializedRun);
+        stepUsesAiAction || stepUsesAiCli || httpDispatches.length > 0;
+      const httpOnly =
+        httpDispatches.length > 0 && !stepUsesAiCli && !stepUsesAiAction;
+      const httpCommands = httpDispatches
+        .map((dispatch) => dispatch.command)
+        .join("\n");
+      const payload = httpDispatches
+        .map((dispatch) => dispatch.payload)
+        .join("\n");
+      const referencedEnvironment = (
+        expressionText: string,
+        shellText: string,
+      ) =>
+        Object.fromEntries(
+          Object.entries(effectiveEnvironment).filter(([name]) => {
+            const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            return (
+              new RegExp(
+                `\\$\\{\\{\\s*env(?:\\.${escaped}|\\[\\s*['\"]${escaped}['\"]\\s*\\])\\s*\\}\\}`,
+                "i",
+              ).test(expressionText) ||
+              new RegExp(
+                `\\$(?:\\{${escaped}\\}|${escaped}(?![A-Za-z0-9_]))`,
+              ).test(shellText)
+            );
+          }),
+        );
+      const sinkMaterial = httpOnly
+        ? JSON.stringify({
+            payload,
+            env: referencedEnvironment(
+              payload,
+              httpDispatches
+                .map((dispatch) => dispatch.expandablePayload)
+                .join("\n"),
+            ),
+          })
+        : materialized;
+      const secretMaterial = httpOnly
+        ? JSON.stringify({
+            command: httpCommands,
+            env: referencedEnvironment(
+              httpCommands,
+              httpDispatches
+                .map((dispatch) => dispatch.expandableCommand)
+                .join("\n"),
+            ),
+          })
+        : "";
       if (
         stepUsesAi &&
         stepReachability.events.some((event) =>
@@ -504,7 +552,39 @@ function analyzeWorkflow(
               creationOnlyEvents,
             ),
         );
-      const sinkMatches = activeMatches(materialized);
+      const sinkMatches = activeMatches(sinkMaterial);
+      if (
+        httpOnly &&
+        ((activeMatches(materializedRun).length > 0 &&
+          activeMatches(sinkMaterial).length === 0) ||
+          (containsSecretReference(materializedRun) &&
+            !containsSecretReference(secretMaterial)) ||
+          httpDispatches.some((dispatch) =>
+            [
+              ...dispatch.expandablePayload.matchAll(
+                /\$(?:\{([A-Za-z_]\w*)\}|([A-Za-z_]\w*))/g,
+              ),
+            ].some(
+              (match) =>
+                !Object.prototype.hasOwnProperty.call(
+                  effectiveEnvironment,
+                  match[1] ?? match[2],
+                ),
+            ),
+          ) ||
+          httpDispatches.some((dispatch) => dispatch.opaquePayload))
+      ) {
+        output.diagnostics.push({
+          code: "agentci/analysis-run-dataflow-unknown",
+          kind: "analysis",
+          severity: "warning",
+          file,
+          job: jobName,
+          line: stepLine,
+          message:
+            "The HTTP request body or another command has unresolved input/secret flow; only direct payload references are findings.",
+        });
+      }
       const hasUntrustedSink = sinkMatches.length > 0;
       const fetchedMatches = stepUsesAiAction
         ? selfFetchedSources(
@@ -532,6 +612,18 @@ function analyzeWorkflow(
       }
       const hasUntrustedIngestion =
         hasUntrustedSink || fetchedMatches.length > 0;
+      if (httpOnly && hasUntrustedIngestion) {
+        output.diagnostics.push({
+          code: "agentci/analysis-remote-agent-capability-unknown",
+          kind: "analysis",
+          severity: "warning",
+          file,
+          job: jobName,
+          line: stepLine,
+          message:
+            "The HTTP request reaches a hosted agent, but this job's GITHUB_TOKEN permissions do not establish the remote agent's repository write capability.",
+        });
+      }
       const potentialAppWrite =
         isSelfGatingAgentAction(actionReference) &&
         permissionLevel(jobPermissions, "id-token") === "write" &&
@@ -558,18 +650,19 @@ function analyzeWorkflow(
           creationOnlyEvents,
         ),
       );
-      const hasSecret =
-        containsSecretReference(JSON.stringify(effectiveEnvironment)) ||
-        containsSecretReference(
-          materializeInputs(
-            JSON.stringify({
-              uses: rawStep.uses,
-              run: rawStep.run,
-              with: rawStep.with,
-            }),
-            context.inputValues,
-          ),
-        );
+      const hasSecret = httpOnly
+        ? containsSecretReference(secretMaterial)
+        : containsSecretReference(JSON.stringify(effectiveEnvironment)) ||
+          containsSecretReference(
+            materializeInputs(
+              JSON.stringify({
+                uses: rawStep.uses,
+                run: rawStep.run,
+                with: rawStep.with,
+              }),
+              context.inputValues,
+            ),
+          );
 
       if (stepUsesAi) {
         if (
@@ -630,6 +723,7 @@ function analyzeWorkflow(
           hasSecret,
           hasUntrustedSink,
           hasUntrustedIngestion,
+          remoteHttp: httpOnly,
           sourceMayDifferFromTrigger,
           ingestionEvents,
           potentialAppWrite,
@@ -644,7 +738,7 @@ function analyzeWorkflow(
               job: jobName,
               step: stepName,
               stepIndex: index,
-              evidence: shrink(materialized),
+              evidence: shrink(sinkMaterial),
               line: stepLine,
               events: stepReachability.events,
               callChain: context.callChain,
@@ -725,6 +819,7 @@ function analyzeWorkflow(
     const ingesting = aiSteps.filter(
       (step) =>
         step.hasUntrustedIngestion &&
+        !step.remoteHttp &&
         step.ingestionEvents.some((event) => UNTRUSTED_EVENTS.has(event)) &&
         (jobHasWrite || step.potentialAppWrite),
     );

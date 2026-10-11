@@ -232,6 +232,14 @@ declare function looksLikeAiAction(value: string): boolean;
  */
 declare function looksLikeAiCli(value: string): boolean;
 declare function looksLikeAiHttpDispatch(value: string): boolean;
+type AiHttpDispatch = {
+    command: string;
+    payload: string;
+    expandablePayload: string;
+    expandableCommand: string;
+    opaquePayload: boolean;
+};
+declare function aiHttpDispatches(value: string): AiHttpDispatch[];
 declare function containsUntrustedGitHubContext(value: string): boolean;
 type ContextPattern = (typeof UNTRUSTED_CONTEXT_PATTERNS)[number];
 declare function untrustedGitHubContextMatches(value: string): Array<{
@@ -399,4 +407,4 @@ declare function narrowEvents(events: string[], rawCondition: unknown): Reachabi
 declare function hasTrustedActorGate(rawCondition: unknown): boolean;
 declare function hasTrustedPrProvenanceGate(rawCondition: unknown): boolean;
 
-export { AI_AGENT_ACTION_PATTERNS, AI_AGENT_API_PATTERNS, AI_AGENT_CLI_PATTERNS, AI_AGENT_PATTERNS, type AgentUsage, type AgentciConfig, type Diagnostic, type EffectivePermissions, type FailOn, type Finding, type OrgCategories, type OrgRepository, type OrgRepositoryResult, type OrgScanOptions, type OrgScanResult, type PermissionDefault, type PermissionLevel, RULES, type Reachability, type RuleDefinition, SELF_GATED_EVENTS, SENSITIVE_WRITE_SCOPES, SEVERITY_ORDER, type SarifLog, type SarifNotification, type SarifScanInput, type ScanOptions, type ScanResult, type Severity, UNTRUSTED_EVENTS, type WorkflowFile, containsSecretReference, containsShellAccess, containsUntrustedGitHubContext, describePermissions, formatGithubOutputs, hasAgentGateBypass, hasFindingAtOrAbove, hasSensitiveWrite, hasTrustedActorGate, hasTrustedPrProvenanceGate, hasUnknownSensitivePermission, isPinnedAction, isSelfGatingAgentAction, loadConfig, loadWorkflowFiles, looksLikeAiAction, looksLikeAiCli, looksLikeAiHttpDispatch, looksLikeAiUsage, matchesPath, mergeEnvironment, narrowEvents, normalizeTriggers, parseFailOn, parseInlineIgnores, parseWorkflowFile, permissionLevel, renderMarkdownReport, renderOrgMarkdownReport, renderTextReport, resolvePermissions, scanOrganization, scanRepository, scanWorkflow, scanWorkflowFiles, toSarif, untrustedGitHubContextEvents, untrustedGitHubContextMatches };
+export { AI_AGENT_ACTION_PATTERNS, AI_AGENT_API_PATTERNS, AI_AGENT_CLI_PATTERNS, AI_AGENT_PATTERNS, type AgentUsage, type AgentciConfig, type Diagnostic, type EffectivePermissions, type FailOn, type Finding, type OrgCategories, type OrgRepository, type OrgRepositoryResult, type OrgScanOptions, type OrgScanResult, type PermissionDefault, type PermissionLevel, RULES, type Reachability, type RuleDefinition, SELF_GATED_EVENTS, SENSITIVE_WRITE_SCOPES, SEVERITY_ORDER, type SarifLog, type SarifNotification, type SarifScanInput, type ScanOptions, type ScanResult, type Severity, UNTRUSTED_EVENTS, type WorkflowFile, aiHttpDispatches, containsSecretReference, containsShellAccess, containsUntrustedGitHubContext, describePermissions, formatGithubOutputs, hasAgentGateBypass, hasFindingAtOrAbove, hasSensitiveWrite, hasTrustedActorGate, hasTrustedPrProvenanceGate, hasUnknownSensitivePermission, isPinnedAction, isSelfGatingAgentAction, loadConfig, loadWorkflowFiles, looksLikeAiAction, looksLikeAiCli, looksLikeAiHttpDispatch, looksLikeAiUsage, matchesPath, mergeEnvironment, narrowEvents, normalizeTriggers, parseFailOn, parseInlineIgnores, parseWorkflowFile, permissionLevel, renderMarkdownReport, renderOrgMarkdownReport, renderTextReport, resolvePermissions, scanOrganization, scanRepository, scanWorkflow, scanWorkflowFiles, toSarif, untrustedGitHubContextEvents, untrustedGitHubContextMatches };

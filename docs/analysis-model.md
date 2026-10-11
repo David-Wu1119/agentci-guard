@@ -156,10 +156,15 @@ them is visible as an expression.
 The first is interpolation: `${{ github.event.issue.title }}` and its siblings
 expanded into a prompt, an input, or a `run:` block. This is what
 `agentci/untrusted-input-in-prompt` reports.
-The current candidate conservatively treats a whole `run:` step as one sink.
-It can therefore attribute text in an unrelated command of the same step to
-the AI invocation. This is an unresolved false-positive path, not a verified
-agent prompt input; command-level flow needs correction before evaluation.
+For local agent CLIs, the current candidate conservatively treats a whole
+`run:` step as one sink. It can therefore attribute text in an unrelated
+command of the same step to the AI invocation; that is an unresolved
+false-positive path. For a direct hosted-agent HTTP POST, the candidate
+instead traces the request body and only environment variables referenced by
+that body. A source used solely by an unrelated command is not a proven prompt
+input; opaque or unresolved shell flow emits
+`agentci/analysis-run-dataflow-unknown`. The direct-`curl` parser is not a
+general shell dataflow analysis, and CLI command-level flow remains open.
 
 The second route is Action self-fetching, which depends on vendor and mode.
 At the pinned Anthropic revision, [tag mode fetches parent Issue/PR data](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/modes/tag/index.ts)
@@ -346,6 +351,12 @@ therefore treats that Action as potentially write-capable even if the YAML
 token exchange success, or exact runtime scopes. Other separately minted or
 supplied credentials remain outside the model, so a negative write-token
 finding is not a proof of no write authority.
+
+For a hosted agent dispatched by HTTP, the runner's `GITHUB_TOKEN`
+permissions do not establish the remote agent's write capability. The
+candidate reports untrusted request-body ingestion but abstains from the
+write-token predicate with `agentci/analysis-remote-agent-capability-unknown`;
+it may still report `broad-write-permissions` for the runner job.
 
 ## Reusable workflows
 

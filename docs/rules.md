@@ -14,6 +14,9 @@ diagnostics—not forced into a security rule.
 
 Untrusted content reaches an AI agent with modeled sensitive write capability
 without qualifying for the documented actor-gate downgrade.
+For a hosted agent dispatched by HTTP, the runner job's `GITHUB_TOKEN` scope
+does not establish remote write capability; that path emits
+`analysis-remote-agent-capability-unknown` rather than this finding.
 
 ## `agentci/gated-ai-write-token`
 
@@ -38,7 +41,10 @@ modeled through permissions.
 
 Raw PR, issue, comment, review, branch, or commit text is interpolated into an
 AI step's inputs, command, shell, working directory, or effective environment.
-Display metadata such as the step name is not an input sink.
+For a direct hosted-agent HTTP POST, only the request body and environment
+variables expanded in that body count as proven prompt input; unresolved
+shell flow is an analysis diagnostic. Display metadata such as the step name
+is not an input sink.
 
 ## `agentci/ai-shell-access`
 

@@ -79,10 +79,15 @@ Direct interpolation is checked in `uses`, `run`, `with`, `shell`,
 `working-directory`, and the effective workflow → job → step environment.
 Step `name`, `id`, `if`, and other display/control metadata do not pass text
 to the agent and are not direct-input sinks. This does not prove that every
-value in `with` or the environment is consumed by the agent. A `run:` step
-with multiple commands is still treated as one sink: text interpolated only
-into an unrelated command can cause a false positive. Command-level flow
-must be resolved before freezing the nine-rule evaluation.
+value in `with` or the environment is consumed by the agent. A local CLI
+`run:` step with multiple commands is still treated as one sink: text
+interpolated only into an unrelated command can cause a false positive. For a
+direct hosted-agent HTTP POST, the candidate instead traces the request body
+and environment variables referenced by that body. Unrelated commands and
+unused environment values are not proven prompt input. Opaque or unresolved
+shell flow emits `analysis-run-dataflow-unknown`; this bounded parser is not a
+general shell dataflow analysis. CLI command-level flow remains unresolved
+before freezing the nine-rule evaluation.
 
 The candidate recognizes documented hosted-agent creation/follow-up routes
 only when a direct `curl` command sends POST. GET list/status calls and URL
@@ -96,6 +101,10 @@ method pairs are pinned to the [Cursor v1](https://prod.cursor.com/docs/cloud-ag
 and [GitHub Copilot task API](https://docs.github.com/en/rest/agent-tasks/agent-tasks?apiVersion=2026-03-10#start-a-task)
 references. Dynamic or wrapped HTTP requests are outside this direct-call
 detector; absence of a finding is not proof that no agent was launched.
+The hosted agent's repository permissions are not inferred from the runner's
+`GITHUB_TOKEN`: an ingested untrusted HTTP payload emits
+`analysis-remote-agent-capability-unknown` instead of a write-token finding.
+The job can still trigger `broad-write-permissions` for its own token scopes.
 
 `github.event.head_commit.message` on `push` is also independent of the
 triggering actor: a maintainer's squash merge can carry a contributor's PR
@@ -214,6 +223,8 @@ The following are not security findings:
 - `agentci/analysis-agent-tool-fetch-unknown`
 - `agentci/analysis-agent-event-unknown`
 - `agentci/analysis-agent-event-unsupported`
+- `agentci/analysis-run-dataflow-unknown`
+- `agentci/analysis-remote-agent-capability-unknown`
 - `agentci/analysis-remote-reusable-workflow`
 - `agentci/org-fetch-failed` — an organization scan could not fetch a repository's workflows (error; the repository and reason are in the message; archived and fork exclusions are not diagnostics)
 - `agentci/analysis-local-reusable-missing`

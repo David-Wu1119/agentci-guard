@@ -286,6 +286,9 @@ Concretely:
 - Remote reusable workflows are reported as unresolvable, not guessed at.
 - Agent detection is a maintained list of vendors, actions, CLIs, and dispatch
   endpoints. A new or renamed agent is invisible until a pattern is added.
+- Direct hosted-agent `curl` POSTs are analyzed at request-body level; opaque
+  shell flow is reported as incomplete. Runner `GITHUB_TOKEN` permissions do
+  not establish the hosted agent's write capability.
 - The unreleased source-aware candidate only lowers Anthropic's default-gated
   Action to `gated-ai-write-token` at **high** when its modeled input sources
   belong to the checked triggering actor. A maintainer comment or label can

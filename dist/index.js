@@ -7648,6 +7648,52 @@ function looksLikeAiCli(value) {
   return AI_AGENT_CLI_PATTERNS.some((pattern) => pattern.test(value));
 }
 function looksLikeAiHttpDispatch(value) {
+  return aiHttpDispatches(value).length > 0;
+}
+function shellWords(value) {
+  const words = [];
+  let text = "";
+  let expandableText = "";
+  let quote = "";
+  let started = false;
+  let escaped = false;
+  const push = () => {
+    if (started) words.push({ text, expandableText });
+    text = "";
+    expandableText = "";
+    started = false;
+  };
+  for (const character of value) {
+    if (escaped) {
+      text += character;
+      if (character !== "$") expandableText += character;
+      escaped = false;
+    } else if (character === "\\" && quote !== "'") {
+      escaped = true;
+    } else if (quote) {
+      if (character === quote) quote = "";
+      else {
+        text += character;
+        if (quote !== "'") expandableText += character;
+      }
+    } else if (character === "'" || character === '"') {
+      quote = character;
+    } else if (character === "#" && !started) {
+      break;
+    } else if (/\s/.test(character)) {
+      push();
+      continue;
+    } else {
+      text += character;
+      expandableText += character;
+    }
+    started = true;
+  }
+  push();
+  return words;
+}
+function aiHttpDispatches(value) {
+  const dispatches = [];
   let heredoc = "";
   const script = value.replace(/\\\r?\n/g, " ").split("\n").filter((line) => {
     if (heredoc) {
@@ -7660,41 +7706,75 @@ function looksLikeAiHttpDispatch(value) {
   for (const match of script.matchAll(
     /(?:^|[\n;&|()])\s*curl\b([^\n;&|]*)/gim
   )) {
-    const words = match[1].match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) ?? [];
+    const words = shellWords(match[1]);
     let method = "";
-    let hasBody = false;
     let getOverride = false;
     let hasRoute = false;
-    for (const [index, word] of words.entries()) {
+    const payloads = [];
+    for (let index = 0; index < words.length; index++) {
+      const word = words[index].text;
       if (word === "-G" || word === "--get") getOverride = true;
       if (word === "-X" || word === "--request") {
-        method = words[index + 1]?.replace(/^["']|["']$/g, "").toUpperCase() ?? "";
+        method = words[index + 1]?.text.toUpperCase() ?? "";
+        index++;
+        continue;
       } else if (word.startsWith("--request=")) {
-        method = word.slice("--request=".length).replace(/^["']|["']$/g, "").toUpperCase();
+        method = word.slice("--request=".length).toUpperCase();
+        continue;
       } else if (/^-X[A-Za-z]+$/.test(word)) {
         method = word.slice(2).toUpperCase();
-      }
-      if (/^(?:-d|-F|--data(?:-raw|-binary|-urlencode)?(?:=|$)|--json(?:=|$)|--form(?:=|$))/.test(
-        word
-      )) {
-        hasBody = true;
-      }
-      if (/^(?:-d|--data(?:-raw|-binary|-urlencode)?|--json|-F|--form)$/i.test(
-        words[index - 1] ?? ""
-      )) {
         continue;
       }
-      const candidate = word.replace(/^--url=/, "").replace(/^(["'])(.*)\1$/, "$2");
+      if (/^(?:-d|-F|--data(?:-raw|-binary|-urlencode)?|--json|--form)$/.test(
+        word
+      )) {
+        if (words[index + 1]) payloads.push(words[++index]);
+        continue;
+      }
+      const attached = /^(?:-d|-F)(.+)$|^--(?:data(?:-raw|-binary|-urlencode)?|json|form)=(.*)$/.exec(
+        word
+      );
+      if (attached) {
+        payloads.push({
+          text: attached[1] ?? attached[2],
+          expandableText: words[index].expandableText.replace(
+            /^(?:-d|-F|--(?:data(?:-raw|-binary|-urlencode)?|json|form)=)/,
+            ""
+          )
+        });
+        continue;
+      }
+      if (word === "-H" || word === "--header") {
+        index++;
+        continue;
+      }
+      if (word === "--url") {
+        index++;
+      } else if (word.startsWith("-") && !word.startsWith("--url=")) {
+        if (!/^(?:-[sSLfkvi]+|--(?:silent|show-error|location|fail|fail-with-body|insecure|verbose|compressed|include|http1\.1|http2))$/.test(
+          word
+        ) && /^https?:\/\//i.test(words[index + 1]?.text ?? ""))
+          index++;
+        continue;
+      }
+      const candidate = words[index]?.text.replace(/^--url=/, "") ?? "";
       if (AI_AGENT_API_PATTERNS.some(
         (pattern) => pattern.exec(candidate)?.index === 0
       )) {
         hasRoute = true;
       }
     }
-    if (hasRoute && !getOverride && (method === "POST" || !method && hasBody))
-      return true;
+    if (hasRoute && !getOverride && (method === "POST" || !method && payloads.length > 0)) {
+      dispatches.push({
+        command: `curl ${words.map((word) => word.text).join(" ")}`,
+        payload: payloads.map((word) => word.text).join(" "),
+        expandablePayload: payloads.map((word) => word.expandableText).join(" "),
+        expandableCommand: words.map((word) => word.expandableText).join(" "),
+        opaquePayload: payloads.some((word) => /^@|\$\(|`/.test(word.text))
+      });
+    }
   }
-  return false;
+  return dispatches;
 }
 function containsUntrustedGitHubContext(value) {
   return untrustedGitHubContextEvents(value).length > 0;
@@ -8673,7 +8753,36 @@ function analyzeWorkflow(workflow, repository, context) {
       const stepUsesAiAction = looksLikeAiAction(actionReference);
       const materializedRun = materializeInputs(stepRun, context.inputValues);
       const stepUsesAiCli = looksLikeAiCli(materializedRun);
-      const stepUsesAi = stepUsesAiAction || stepUsesAiCli || looksLikeAiHttpDispatch(materializedRun);
+      const httpDispatches = aiHttpDispatches(materializedRun);
+      const stepUsesAi = stepUsesAiAction || stepUsesAiCli || httpDispatches.length > 0;
+      const httpOnly = httpDispatches.length > 0 && !stepUsesAiCli && !stepUsesAiAction;
+      const httpCommands = httpDispatches.map((dispatch) => dispatch.command).join("\n");
+      const payload = httpDispatches.map((dispatch) => dispatch.payload).join("\n");
+      const referencedEnvironment = (expressionText, shellText) => Object.fromEntries(
+        Object.entries(effectiveEnvironment).filter(([name]) => {
+          const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          return new RegExp(
+            `\\$\\{\\{\\s*env(?:\\.${escaped}|\\[\\s*['"]${escaped}['"]\\s*\\])\\s*\\}\\}`,
+            "i"
+          ).test(expressionText) || new RegExp(
+            `\\$(?:\\{${escaped}\\}|${escaped}(?![A-Za-z0-9_]))`
+          ).test(shellText);
+        })
+      );
+      const sinkMaterial = httpOnly ? JSON.stringify({
+        payload,
+        env: referencedEnvironment(
+          payload,
+          httpDispatches.map((dispatch) => dispatch.expandablePayload).join("\n")
+        )
+      }) : materialized;
+      const secretMaterial = httpOnly ? JSON.stringify({
+        command: httpCommands,
+        env: referencedEnvironment(
+          httpCommands,
+          httpDispatches.map((dispatch) => dispatch.expandableCommand).join("\n")
+        )
+      }) : "";
       if (stepUsesAi && stepReachability.events.some(
         (event) => secretEnvTransferEvents.has(event)
       )) {
@@ -8703,7 +8812,29 @@ function analyzeWorkflow(workflow, repository, context) {
           creationOnlyEvents
         )
       );
-      const sinkMatches = activeMatches(materialized);
+      const sinkMatches = activeMatches(sinkMaterial);
+      if (httpOnly && (activeMatches(materializedRun).length > 0 && activeMatches(sinkMaterial).length === 0 || containsSecretReference(materializedRun) && !containsSecretReference(secretMaterial) || httpDispatches.some(
+        (dispatch) => [
+          ...dispatch.expandablePayload.matchAll(
+            /\$(?:\{([A-Za-z_]\w*)\}|([A-Za-z_]\w*))/g
+          )
+        ].some(
+          (match) => !Object.prototype.hasOwnProperty.call(
+            effectiveEnvironment,
+            match[1] ?? match[2]
+          )
+        )
+      ) || httpDispatches.some((dispatch) => dispatch.opaquePayload))) {
+        output.diagnostics.push({
+          code: "agentci/analysis-run-dataflow-unknown",
+          kind: "analysis",
+          severity: "warning",
+          file,
+          job: jobName,
+          line: stepLine,
+          message: "The HTTP request body or another command has unresolved input/secret flow; only direct payload references are findings."
+        });
+      }
       const hasUntrustedSink = sinkMatches.length > 0;
       const fetchedMatches = stepUsesAiAction ? selfFetchedSources(
         materializeInputs(stepUses, context.inputValues),
@@ -8723,6 +8854,17 @@ function analyzeWorkflow(workflow, repository, context) {
         untrustedInRun = true;
       }
       const hasUntrustedIngestion = hasUntrustedSink || fetchedMatches.length > 0;
+      if (httpOnly && hasUntrustedIngestion) {
+        output.diagnostics.push({
+          code: "agentci/analysis-remote-agent-capability-unknown",
+          kind: "analysis",
+          severity: "warning",
+          file,
+          job: jobName,
+          line: stepLine,
+          message: "The HTTP request reaches a hosted agent, but this job's GITHUB_TOKEN permissions do not establish the remote agent's repository write capability."
+        });
+      }
       const potentialAppWrite = isSelfGatingAgentAction(actionReference) && permissionLevel(jobPermissions, "id-token") === "write" && (!isRecord2(effectiveWith) || String(effectiveWith.github_token ?? "").trim().length === 0);
       const selfGated = isSelfGatingAgentAction(actionReference) && !hasAgentGateBypass(rawStep.with);
       const verifiedSelfGate = selfGated && VERIFIED_ANTHROPIC_WRITE_GATES.has(pinnedAnthropicRef ?? "");
@@ -8741,7 +8883,7 @@ function analyzeWorkflow(workflow, repository, context) {
           creationOnlyEvents
         )
       );
-      const hasSecret = containsSecretReference(JSON.stringify(effectiveEnvironment)) || containsSecretReference(
+      const hasSecret = httpOnly ? containsSecretReference(secretMaterial) : containsSecretReference(JSON.stringify(effectiveEnvironment)) || containsSecretReference(
         materializeInputs(
           JSON.stringify({
             uses: rawStep.uses,
@@ -8789,6 +8931,7 @@ function analyzeWorkflow(workflow, repository, context) {
           hasSecret,
           hasUntrustedSink,
           hasUntrustedIngestion,
+          remoteHttp: httpOnly,
           sourceMayDifferFromTrigger,
           ingestionEvents,
           potentialAppWrite,
@@ -8803,7 +8946,7 @@ function analyzeWorkflow(workflow, repository, context) {
               job: jobName,
               step: stepName,
               stepIndex: index,
-              evidence: shrink(materialized),
+              evidence: shrink(sinkMaterial),
               line: stepLine,
               events: stepReachability.events,
               callChain: context.callChain
@@ -8873,7 +9016,7 @@ function analyzeWorkflow(workflow, repository, context) {
       (step) => !step.actorGated && step.events.includes("pull_request_target")
     );
     const ingesting = aiSteps.filter(
-      (step) => step.hasUntrustedIngestion && step.ingestionEvents.some((event) => UNTRUSTED_EVENTS.has(event)) && (jobHasWrite || step.potentialAppWrite)
+      (step) => step.hasUntrustedIngestion && !step.remoteHttp && step.ingestionEvents.some((event) => UNTRUSTED_EVENTS.has(event)) && (jobHasWrite || step.potentialAppWrite)
     );
     const untrustedViaInterpolation = ingesting.some(
       (step) => step.hasUntrustedSink
@@ -9770,6 +9913,7 @@ export {
   SENSITIVE_WRITE_SCOPES,
   SEVERITY_ORDER,
   UNTRUSTED_EVENTS,
+  aiHttpDispatches,
   containsSecretReference,
   containsShellAccess,
   containsUntrustedGitHubContext,
