@@ -55,6 +55,17 @@ for (let attempt = 0; attempt < 50; attempt++) {
   await new Promise((r) => setTimeout(r, 100));
 }
 const checks = [];
+const hero = await evaluate(
+  '({label:document.querySelector(".scan-card")?.getAttribute("aria-label"),status:document.querySelector(".scan-card .status")?.textContent,marker:document.querySelector(".scan-card .severity")?.textContent,text:document.querySelector(".scan-card")?.textContent})',
+);
+assert.equal(hero.label, "Schematic workflow review checklist");
+assert.equal(hero.status, "Schematic");
+assert.equal(hero.marker, "NOT A SCAN RESULT");
+assert.match(hero.text, /not executable YAML/);
+assert.equal(hero.text.includes("CRITICAL"), false);
+checks.push({
+  hero: { label: hero.label, status: hero.status, marker: hero.marker },
+});
 const research = await evaluate(
   '({canonical:document.querySelector("link[rel=canonical]")?.href,robots:document.querySelector("meta[name=robots]")!==null,caseRows:Array.from(document.querySelectorAll("#research tbody tr")).map(row=>Array.from(row.cells).map(cell=>cell.textContent.trim())),pinned:document.querySelector("#research .case-links a")?.href.includes("blob/5c045e0469f412aecd0f9d5f32876bf10c7fc66b/"),localPreview:document.body.textContent.includes("Local preview")})',
 );

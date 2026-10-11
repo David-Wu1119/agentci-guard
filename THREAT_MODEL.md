@@ -40,7 +40,7 @@ adversary can change trusted base-branch workflow YAML before the run.
 ## Unsupported or incomplete semantics
 
 - Arbitrary data flow through scripts, generated files, composite Actions, or
-  external services.
+  external services, including agent-initiated API/tool fetches.
 - Runtime behavior of downloaded Actions and model providers.
 - Full GitHub expression language, matrices, dynamic object access, and
   authorization logic hidden in scripts.
@@ -55,6 +55,9 @@ Unsupported event expressions, ambiguous checkout protection, permission
 defaults, vendor event compatibility, reusable-workflow boundaries,
 and parse failures produce diagnostics and `analysis_complete=false`. A diagnostic is not a finding, but a clean-looking
 finding list with a diagnostic is not a closed analysis.
+`analysis_complete=true` only means that no _recognized_ unsupported construct
+was encountered. It cannot certify the absence of indirect input paths that
+the scanner does not model.
 
 ## Expected failure modes
 
@@ -71,6 +74,9 @@ finding list with a diagnostic is not a closed analysis.
   allowlists, or isolation the scanner does not model.
 - A dangerous workflow can use a source, sink, capability, or permission not
   represented by the nine rules.
+- A prompt can direct an agent to fetch untrusted Issue/PR content through an
+  allowed tool without interpolating that content into YAML. The scanner can
+  miss this source-to-agent path even when `analysis_complete=true`.
 
 ## Interpretation
 

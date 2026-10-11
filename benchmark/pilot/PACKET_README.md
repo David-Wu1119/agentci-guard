@@ -21,6 +21,12 @@ repeatability. It is not an accuracy benchmark or an inter-rater study.
 8. If this is pass 2, begin only after seven full days have elapsed since the
    latest pass-1 completion timestamp.
 
+The generic guide names repository paths. In this packet, use
+`annotation-sheet.csv`, `manifest.json`, and
+`workflows/<case-id>/<original-workflow-path>` instead of its `benchmark/`
+sheet, manifest, and snapshot paths. There is no independent-review sheet here;
+follow this packet's two-pass instructions, not the guide's two-human workflow.
+
 ## Files to fill
 
 - `annotation-sheet.csv`: complete every blank decision, evidence, and
