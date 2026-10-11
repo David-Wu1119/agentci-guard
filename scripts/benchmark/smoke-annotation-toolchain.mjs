@@ -49,6 +49,25 @@ try {
     "--pass",
     "2",
   ]);
+  const importedPilotLabels = fs.readFileSync(pilotAJsonl);
+  expectFailure(
+    [
+      "scripts/benchmark/import-annotation-csv.mjs",
+      pilotACsv,
+      "pilot-solo",
+      pilotAJsonl,
+      "--coverage",
+      "pilot",
+      "--review-mode",
+      "test-retest",
+      "--pass",
+      "1",
+    ],
+    "EEXIST",
+  );
+  if (!fs.readFileSync(pilotAJsonl).equals(importedPilotLabels)) {
+    throw new Error("Annotation import overwrote existing imported labels.");
+  }
   const filledPilotCsv = fs.readFileSync(pilotACsv);
   expectFailure(
     [
@@ -81,17 +100,34 @@ try {
     ],
     "independent record has invalid review_status.",
   );
+  const pilotDisagreementsCsv = path.join(temporary, "pilot-disagreements.csv");
   run([
     "scripts/benchmark/compare-annotations.mjs",
     pilotAJsonl,
     pilotBJsonl,
-    path.join(temporary, "pilot-disagreements.csv"),
+    pilotDisagreementsCsv,
     "--coverage",
     "pilot",
     "--review-mode",
     "test-retest",
   ]);
-  const importedPilotLabels = fs.readFileSync(pilotAJsonl);
+  const existingDisagreements = fs.readFileSync(pilotDisagreementsCsv);
+  expectFailure(
+    [
+      "scripts/benchmark/compare-annotations.mjs",
+      pilotAJsonl,
+      pilotBJsonl,
+      pilotDisagreementsCsv,
+      "--coverage",
+      "pilot",
+      "--review-mode",
+      "test-retest",
+    ],
+    "EEXIST",
+  );
+  if (!fs.readFileSync(pilotDisagreementsCsv).equals(existingDisagreements)) {
+    throw new Error("Annotation comparison overwrote existing disagreements.");
+  }
   expectFailure(
     [
       "scripts/benchmark/compare-annotations.mjs",
