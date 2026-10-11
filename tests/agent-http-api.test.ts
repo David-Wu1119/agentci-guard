@@ -95,6 +95,148 @@ jobs:
     ).toBe(true);
   });
 
+  it("tracks hosted-agent dispatch through literal shell branches", () => {
+    const scanRun = (run: string) => {
+      const raw = YAML.stringify({
+        on: "issues",
+        permissions: { issues: "write" },
+        jobs: {
+          review: {
+            "runs-on": "ubuntu-latest",
+            steps: [{ run }],
+          },
+        },
+      });
+      return scanWorkflowFiles(
+        [
+          {
+            path: ".github/workflows/test.yml",
+            document: YAML.parse(raw),
+            raw,
+          },
+        ],
+        ".",
+        { ignore: [], ignorePaths: [] },
+      );
+    };
+    const dispatch =
+      'curl -X POST https://api.cursor.com/v1/agents -d "\${{ github.event.issue.body }}"';
+    for (const run of [
+      "if true; then " + dispatch + "; fi",
+      "if false; then :; else " + dispatch + "; fi",
+      "for item in one; do " + dispatch + "; done",
+      "time " + dispatch,
+      "time -p " + dispatch,
+      "X=1 " + dispatch,
+      "env CI=1 " + dispatch,
+    ]) {
+      const result = scanRun(run);
+      expect(result.agent_usages[0]?.kind).toBe("http");
+      expect(result.findings.map((item) => item.rule_id)).toContain(
+        "agentci/untrusted-input-in-prompt",
+      );
+      expect(result.diagnostics.map((item) => item.code)).not.toContain(
+        "agentci/analysis-shell-control-flow-unknown",
+      );
+    }
+    for (const run of [
+      "# if true; then " + dispatch + "; fi",
+      "if false; then " + dispatch + "; fi",
+      "then " + dispatch,
+    ]) {
+      const result = scanRun(run);
+      expect(result.agent_usages).toEqual([]);
+      expect(result.findings).toEqual([]);
+    }
+    const uncertain = scanRun(
+      'if test "$RUN_AGENT" = yes; then ' + dispatch + "; fi",
+    );
+    expect(uncertain.diagnostics.map((item) => item.code)).toContain(
+      "agentci/analysis-shell-control-flow-unknown",
+    );
+    expect(uncertain.analysis_complete).toBe(false);
+
+    expect(
+      scanRun("if false || true; then " + dispatch + "; fi").agent_usages,
+    ).toHaveLength(1);
+    for (const run of [
+      "if true && false; then " + dispatch + "; fi",
+      "for item in ; do " + dispatch + "; done",
+      "create_agent() { " + dispatch + "; }",
+      "function create_agent { " + dispatch + "; }",
+      "create_agent() { :; { :; }; " + dispatch + "; }",
+      "false && " + dispatch,
+      "true || " + dispatch,
+      "if false && " + dispatch + "; then :; fi",
+      "if true || " + dispatch + "; then :; fi",
+      "! true && " + dispatch,
+      "! false || " + dispatch,
+    ]) {
+      expect(scanRun(run).agent_usages).toEqual([]);
+    }
+    for (const run of [
+      "create_agent() { " + dispatch + "; }",
+      "create_agent() { " + dispatch + "; }; create_agent",
+      "function create_agent { " + dispatch + "; }; create_agent",
+      "create_agent() { :; { :; }; " + dispatch + "; }; create_agent",
+      "create_agent() { bash -c '" + dispatch + "'; }; create_agent",
+    ]) {
+      const result = scanRun(run);
+      expect(result.analysis_complete).toBe(false);
+      expect(result.diagnostics.map((item) => item.code)).toContain(
+        "agentci/analysis-run-dataflow-unknown",
+      );
+    }
+    for (const run of [
+      'if test "$X" && ' + dispatch + "; then :; fi",
+      "echo maybe && " + dispatch,
+      "if true | false; then " + dispatch + "; fi",
+      "if false | true; then " + dispatch + "; fi",
+      "while false | true; do " + dispatch + "; done",
+      "case x in y) " + dispatch + ";; esac",
+      "case x in x) :;; y) " + dispatch + ";; esac",
+      "exit 0; " + dispatch,
+      "if true; then exit 0; " + dispatch + "; fi",
+      "for item in one; do break; " + dispatch + "; done",
+      "select item in one; do " + dispatch + "; break; done",
+      "false && (" + dispatch + ")",
+      "true || (" + dispatch + ")",
+    ]) {
+      const result = scanRun(run);
+      expect(result.agent_usages).toHaveLength(1);
+      expect(result.analysis_complete).toBe(false);
+      expect(result.diagnostics.map((item) => item.code)).toContain(
+        "agentci/analysis-shell-control-flow-unknown",
+      );
+    }
+    for (const run of ["! false && " + dispatch, "! true || " + dispatch]) {
+      const result = scanRun(run);
+      expect(result.agent_usages).toHaveLength(1);
+      expect(result.diagnostics.map((item) => item.code)).not.toContain(
+        "agentci/analysis-shell-control-flow-unknown",
+      );
+    }
+    for (const run of [`result=$(${dispatch})`, `echo "$(${dispatch})"`]) {
+      const result = scanRun(run);
+      expect(result.analysis_complete).toBe(false);
+      expect(result.diagnostics.map((item) => item.code)).toContain(
+        "agentci/analysis-run-dataflow-unknown",
+      );
+    }
+    const nestedShell = scanRun(`bash -c '${dispatch}'`);
+    expect(nestedShell.agent_usages).toEqual([]);
+    expect(nestedShell.analysis_complete).toBe(false);
+    expect(nestedShell.diagnostics.map((item) => item.code)).toContain(
+      "agentci/analysis-run-dataflow-unknown",
+    );
+    const nestedSubstitution = scanRun(`result=$(bash -c '${dispatch}')`);
+    expect(nestedSubstitution.agent_usages).toEqual([]);
+    expect(nestedSubstitution.analysis_complete).toBe(false);
+    expect(nestedSubstitution.diagnostics.map((item) => item.code)).toContain(
+      "agentci/analysis-run-dataflow-unknown",
+    );
+  });
+
   it("does not treat an endpoint in a request body or heredoc as dispatch", () => {
     expect(
       looksLikeAiUsage(

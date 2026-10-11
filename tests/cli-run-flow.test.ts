@@ -64,6 +64,12 @@ describe("local CLI run-step input flow", () => {
     expect(nested.diagnostics.map((item) => item.code)).toContain(
       "agentci/analysis-run-dataflow-unknown",
     );
+    const nestedShell = scan('result=$(bash -c "claude -p fixed")');
+    expect(nestedShell.agent_usages).toEqual([]);
+    expect(nestedShell.analysis_complete).toBe(false);
+    expect(nestedShell.diagnostics.map((item) => item.code)).toContain(
+      "agentci/analysis-run-dataflow-unknown",
+    );
   });
 
   it("respects env's option terminator and executable boundary", () => {
@@ -89,6 +95,8 @@ describe("local CLI run-step input flow", () => {
     for (const run of [
       'CI=1 claude -p "\${{ github.event.issue.body }}"',
       'CI=1 env claude -p "\${{ github.event.issue.body }}"',
+      'time claude -p "\${{ github.event.issue.body }}"',
+      'time -p claude -p "\${{ github.event.issue.body }}"',
     ]) {
       const result = scan(run);
       expect(result.agent_usages).toHaveLength(1);
@@ -148,6 +156,99 @@ describe("local CLI run-step input flow", () => {
       );
       expect(rules(result)).not.toContain("agentci/untrusted-input-in-prompt");
       expect(rules(result)).not.toContain("agentci/untrusted-ai-write-token");
+      expect(result.analysis_complete).toBe(true);
+    }
+  });
+
+  it("recognizes an agent command after shell control keywords", () => {
+    for (const run of [
+      'if true; then claude -p "\${{ github.event.issue.body }}"; fi',
+      'if false; then :; else claude -p "\${{ github.event.issue.body }}"; fi',
+      'for item in one; do claude -p "\${{ github.event.issue.body }}"; done',
+      'if claude -p "\${{ github.event.issue.body }}"; then :; fi',
+    ]) {
+      const result = scan(run);
+      expect(result.agent_usages).toHaveLength(1);
+      expect(rules(result)).toContain("agentci/untrusted-input-in-prompt");
+      expect(rules(result)).toContain("agentci/untrusted-ai-write-token");
+      expect(result.analysis_complete).toBe(true);
+    }
+    for (const run of [
+      'echo "then claude -p \${{ github.event.issue.body }}"',
+      '"then" claude -p "\${{ github.event.issue.body }}"',
+      '# if true; then claude -p "\${{ github.event.issue.body }}"; fi',
+      'if false; then claude -p "\${{ github.event.issue.body }}"; fi',
+      'then claude -p "\${{ github.event.issue.body }}"',
+    ]) {
+      expect(scan(run).agent_usages).toEqual([]);
+    }
+    const uncertain = scan(
+      'if test "$RUN_AGENT" = yes; then claude -p "\${{ github.event.issue.body }}"; fi',
+    );
+    expect(uncertain.diagnostics.map((item) => item.code)).toContain(
+      "agentci/analysis-shell-control-flow-unknown",
+    );
+    expect(uncertain.analysis_complete).toBe(false);
+  });
+
+  it("keeps compound conditions and function bodies out of certain CLI findings", () => {
+    const dispatch = 'claude -p "\${{ github.event.issue.body }}"';
+    const reached = scan(`if false || true; then ${dispatch}; fi`);
+    expect(reached.agent_usages).toHaveLength(1);
+    expect(reached.analysis_complete).toBe(true);
+    for (const run of [
+      `if true && false; then ${dispatch}; fi`,
+      `for item in ; do ${dispatch}; done`,
+      `create_agent() { ${dispatch}; }`,
+      `function create_agent { ${dispatch}; }`,
+      `create_agent() { :; { :; }; ${dispatch}; }`,
+      `false && ${dispatch}`,
+      `true || ${dispatch}`,
+      `if false && ${dispatch}; then :; fi`,
+      `if true || ${dispatch}; then :; fi`,
+      `! true && ${dispatch}`,
+      `! false || ${dispatch}`,
+    ]) {
+      expect(scan(run).agent_usages).toEqual([]);
+    }
+    for (const run of [
+      `create_agent() { ${dispatch}; }`,
+      `create_agent() { ${dispatch}; }; create_agent`,
+      `function create_agent { ${dispatch}; }; create_agent`,
+      `create_agent() { :; { :; }; ${dispatch}; }; create_agent`,
+      `create_agent() { bash -c '${dispatch}'; }; create_agent`,
+    ]) {
+      const result = scan(run);
+      expect(result.analysis_complete).toBe(false);
+      expect(result.diagnostics.map((item) => item.code)).toContain(
+        "agentci/analysis-run-dataflow-unknown",
+      );
+    }
+    for (const run of [
+      `if test "$X" && ${dispatch}; then :; fi`,
+      `echo maybe && ${dispatch}`,
+      `if true | false; then ${dispatch}; fi`,
+      `if false | true; then ${dispatch}; fi`,
+      `while false | true; do ${dispatch}; done`,
+      `case x in y) ${dispatch};; esac`,
+      `case x in x) :;; y) ${dispatch};; esac`,
+      `exit 0; ${dispatch}`,
+      `if true; then exit 0; ${dispatch}; fi`,
+      `for item in one; do break; ${dispatch}; done`,
+      `select item in one; do ${dispatch}; break; done`,
+      `false && (${dispatch})`,
+      `true || (${dispatch})`,
+    ]) {
+      const result = scan(run);
+      expect(result.agent_usages).toHaveLength(1);
+      expect(result.analysis_complete).toBe(false);
+      expect(result.diagnostics.map((item) => item.code)).toContain(
+        "agentci/analysis-shell-control-flow-unknown",
+      );
+    }
+    for (const run of [`! false && ${dispatch}`, `! true || ${dispatch}`]) {
+      const result = scan(run);
+      expect(result.agent_usages).toHaveLength(1);
       expect(result.analysis_complete).toBe(true);
     }
   });
