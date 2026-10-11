@@ -13386,6 +13386,8 @@ var package_default = {
     "benchmark:behavior": "node scripts/benchmark/report-behavior.mjs --out evidence/behavior",
     "site:build": "python3 site/build.py",
     "site:check": "npm run build && python3 site/build.py && node site/check-browser-scanner.mjs",
+    "site:deploy-preflight": "node site/deploy-preflight.mjs",
+    "site:deploy": "pnpm site:deploy-preflight && npx --yes wrangler@4.147.0 pages deploy site/dist --project-name axiom-console --branch main",
     "licenses:check": "node scripts/generate-third-party-licenses.mjs --check",
     "package:smoke": "node scripts/verify-standalone-package.mjs"
   },
