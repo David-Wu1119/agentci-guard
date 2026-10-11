@@ -266,6 +266,7 @@ export function writeJsonLines(file, records) {
   fs.writeFileSync(
     file,
     `${records.map((record) => JSON.stringify(record)).join("\n")}\n`,
+    { flag: "wx" },
   );
 }
 

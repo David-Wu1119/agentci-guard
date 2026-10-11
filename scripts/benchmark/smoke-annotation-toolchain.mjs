@@ -49,6 +49,25 @@ try {
     "--pass",
     "2",
   ]);
+  const filledPilotCsv = fs.readFileSync(pilotACsv);
+  expectFailure(
+    [
+      "scripts/benchmark/import-annotation-csv.mjs",
+      pilotACsv,
+      "pilot-solo",
+      pilotACsv,
+      "--coverage",
+      "pilot",
+      "--review-mode",
+      "test-retest",
+      "--pass",
+      "1",
+    ],
+    "EEXIST",
+  );
+  if (!fs.readFileSync(pilotACsv).equals(filledPilotCsv)) {
+    throw new Error("Annotation import overwrote the filled packet CSV.");
+  }
   assertReviewStatus(pilotAJsonl, "test-retest-pass-1");
   assertReviewStatus(pilotBJsonl, "test-retest-pass-2");
   expectFailure(
@@ -72,6 +91,23 @@ try {
     "--review-mode",
     "test-retest",
   ]);
+  const importedPilotLabels = fs.readFileSync(pilotAJsonl);
+  expectFailure(
+    [
+      "scripts/benchmark/compare-annotations.mjs",
+      pilotAJsonl,
+      pilotBJsonl,
+      pilotAJsonl,
+      "--coverage",
+      "pilot",
+      "--review-mode",
+      "test-retest",
+    ],
+    "EEXIST",
+  );
+  if (!fs.readFileSync(pilotAJsonl).equals(importedPilotLabels)) {
+    throw new Error("Annotation comparison overwrote imported labels.");
+  }
   const pilotTimingA = path.join(packetRootA, "timing-sheet.csv");
   const pilotTimingB = path.join(packetRootB, "timing-sheet.csv");
   fillTiming(

@@ -120,7 +120,7 @@ for (const registry of reviewer.registryRows) {
   ]);
 }
 
-fs.writeFileSync(path.resolve(outputArgument), renderCsv(rows));
+fs.writeFileSync(path.resolve(outputArgument), renderCsv(rows), { flag: "wx" });
 const overlap = reviewer.registry.size;
 const coverageLabel =
   reviewMode === "test-retest" ? "Test-retest" : "Independent review";

@@ -80,6 +80,10 @@ labels, notes, or explanations from pass 1 into pass 2.
 
 After both passes:
 
+Keep derived JSONL and disagreement files outside both packet directories and
+give each output a new filename. Import and comparison refuse to replace any
+existing output, so a retry needs a fresh destination.
+
 ```bash
 node scripts/benchmark/import-annotation-csv.mjs \
   /absolute/private/path/agentci-pilot-pass-1/annotation-sheet.csv \
