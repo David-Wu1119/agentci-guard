@@ -655,6 +655,7 @@ function shellExecutableSegments(value: string): Array<{
   // shortcut: subshell function scope and unset -f are not modeled; upgrade for measured misses.
   const shadowed = new Set<string>();
   const deferredShadows = new Map<string, Set<string>>();
+  const deferredCalls = new Map<string, Set<string>>();
   let pendingFunction = "";
   let previousStatus: ShellReach = "unknown";
   let controlTransferSeen = false;
@@ -954,10 +955,65 @@ function shellExecutableSegments(value: string): Array<{
       )
     )
       pendingFunction = command;
-    if (current !== false && !functionBody)
-      for (const name of deferredShadows.get(shellWords(command)[0]?.text) ??
-        [])
-        shadowed.add(name);
+    if (command && (functionBody || current !== false)) {
+      const words = shellWords(command);
+      let index = 0;
+      while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[index]?.raw ?? "")) index++;
+      if (!startsCondition && index === 0 && words[0]?.raw === "time") {
+        index = words[1]?.raw === "-p" ? 2 : 1;
+        while (words[index]?.raw === "!") index++;
+      }
+      const call = words[index];
+      let evalIndex = index;
+      while (["builtin", "command"].includes(words[evalIndex]?.text ?? ""))
+        evalIndex++;
+      const evalCall = words[evalIndex]?.text === "eval";
+      const evalScript = evalCall
+        ? words
+            .slice(evalIndex + 1)
+            .map((word) => word.text)
+            .join(" ")
+        : "";
+      const simpleEval =
+        /^[A-Za-z_]\w*(?:[ \t]+[A-Za-z0-9_./:+-]+)*$/.test(evalScript) &&
+        !/^(?:time|eval|command|builtin|exec|source)\b/.test(evalScript);
+      const invoked = evalCall
+        ? simpleEval
+          ? shellWords(evalScript)[0]
+          : undefined
+        : call;
+      // shortcut: unresolved command positions can call any defined function; upgrade when measured precision warrants resolution.
+      const opaqueCall =
+        /[$`*?{}\[\]]/.test(invoked?.expandableText ?? "") ||
+        (evalCall && evalScript !== "" && !simpleEval);
+      const calls = opaqueCall ? ["*"] : invoked ? [invoked.text] : [];
+      // shortcut: deferred calls ignore definition order; upgrade if labeled precision shows this matters.
+      if (functionBody && shellAnd(definitionReach(), gate) !== false) {
+        const enclosing = [...frames]
+          .reverse()
+          .find((frame) => frame.kind === "function");
+        if (enclosing?.kind === "function") {
+          const names = deferredCalls.get(enclosing.name) ?? new Set<string>();
+          for (const name of calls) names.add(name);
+          deferredCalls.set(enclosing.name, names);
+        }
+      } else if (current !== false) {
+        const pending = [...calls];
+        const seen = new Set<string>();
+        while (pending.length) {
+          const name = pending.pop()!;
+          if (name === "*") {
+            pending.push(...deferredShadows.keys(), ...deferredCalls.keys());
+            continue;
+          }
+          if (seen.has(name)) continue;
+          seen.add(name);
+          for (const nested of deferredShadows.get(name) ?? [])
+            shadowed.add(nested);
+          pending.push(...(deferredCalls.get(name) ?? []));
+        }
+      }
+    }
     closeFunction("segment");
     functionParenthesis(segment.separatorAfter);
     if (

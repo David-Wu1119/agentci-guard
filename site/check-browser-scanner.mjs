@@ -228,6 +228,11 @@ assert.ok(
     ({ code }) => code === "agentci/analysis-shell-control-flow-unknown",
   ),
 );
+const indirectShadow = scan(
+  'on: issues\npermissions:\n  contents: write\njobs:\n  agent:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          outer() { false() { true; }; }\n          f=outer\n          "$f"\n          if false; then claude -p "${{ github.event.issue.body }}"; fi\n',
+);
+assert.equal(indirectShadow.analysis_complete, false);
+assert.ok(indirectShadow.agent_usages.length > 0);
 const uncalledFunction = scan(
   'on: issues\npermissions:\n  contents: write\njobs:\n  agent:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          if ignored() { claude -p "${{ github.event.issue.body }}"; }; then :; fi\n',
 );

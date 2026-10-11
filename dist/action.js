@@ -7914,6 +7914,7 @@ function shellExecutableSegments(value) {
   const frames = [];
   const shadowed = /* @__PURE__ */ new Set();
   const deferredShadows = /* @__PURE__ */ new Map();
+  const deferredCalls = /* @__PURE__ */ new Map();
   let pendingFunction = "";
   let previousStatus = "unknown";
   let controlTransferSeen = false;
@@ -8136,9 +8137,48 @@ function shellExecutableSegments(value) {
       command
     ))
       pendingFunction = command;
-    if (current !== false && !functionBody)
-      for (const name of deferredShadows.get(shellWords(command)[0]?.text) ?? [])
-        shadowed.add(name);
+    if (command && (functionBody || current !== false)) {
+      const words = shellWords(command);
+      let index = 0;
+      while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[index]?.raw ?? "")) index++;
+      if (!startsCondition && index === 0 && words[0]?.raw === "time") {
+        index = words[1]?.raw === "-p" ? 2 : 1;
+        while (words[index]?.raw === "!") index++;
+      }
+      const call = words[index];
+      let evalIndex = index;
+      while (["builtin", "command"].includes(words[evalIndex]?.text ?? ""))
+        evalIndex++;
+      const evalCall = words[evalIndex]?.text === "eval";
+      const evalScript = evalCall ? words.slice(evalIndex + 1).map((word) => word.text).join(" ") : "";
+      const simpleEval = /^[A-Za-z_]\w*(?:[ \t]+[A-Za-z0-9_./:+-]+)*$/.test(evalScript) && !/^(?:time|eval|command|builtin|exec|source)\b/.test(evalScript);
+      const invoked = evalCall ? simpleEval ? shellWords(evalScript)[0] : void 0 : call;
+      const opaqueCall = /[$`*?{}\[\]]/.test(invoked?.expandableText ?? "") || evalCall && evalScript !== "" && !simpleEval;
+      const calls = opaqueCall ? ["*"] : invoked ? [invoked.text] : [];
+      if (functionBody && shellAnd(definitionReach(), gate) !== false) {
+        const enclosing = [...frames].reverse().find((frame) => frame.kind === "function");
+        if (enclosing?.kind === "function") {
+          const names = deferredCalls.get(enclosing.name) ?? /* @__PURE__ */ new Set();
+          for (const name of calls) names.add(name);
+          deferredCalls.set(enclosing.name, names);
+        }
+      } else if (current !== false) {
+        const pending = [...calls];
+        const seen = /* @__PURE__ */ new Set();
+        while (pending.length) {
+          const name = pending.pop();
+          if (name === "*") {
+            pending.push(...deferredShadows.keys(), ...deferredCalls.keys());
+            continue;
+          }
+          if (seen.has(name)) continue;
+          seen.add(name);
+          for (const nested of deferredShadows.get(name) ?? [])
+            shadowed.add(nested);
+          pending.push(...deferredCalls.get(name) ?? []);
+        }
+      }
+    }
     closeFunction("segment");
     functionParenthesis(segment.separatorAfter);
     if (!functionBody && /^(?:exit|return|break|continue)(?=\s|$)/.test(command))

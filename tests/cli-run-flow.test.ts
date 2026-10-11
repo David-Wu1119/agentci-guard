@@ -270,6 +270,23 @@ describe("local CLI run-step input flow", () => {
       `if true; then false() { true; }; fi; if false; then ${dispatch}; fi`,
       `if false; then :; else false() { true; }; fi; if false; then ${dispatch}; fi`,
       `outer() { false() { true; }; }; outer; if false; then ${dispatch}; fi`,
+      `outer() { inner() { false() { true; }; }; inner; }; outer; if false; then ${dispatch}; fi`,
+      `top() { outer() { inner() { false() { true; }; }; inner; }; outer; }; top; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; time outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; time -p outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; time ! outer || :; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; time -p ! outer || :; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; F=1 outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; eval outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; builtin eval outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; command eval outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; builtin command eval outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; command builtin eval outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; eval time outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; eval eval outer; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; f=outer; $f; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; f=outer; "$f"; if false; then ${dispatch}; fi`,
+      `outer() { false() { true; }; }; o{u,u}ter; if false; then ${dispatch}; fi`,
       `false() ( true ); if false; then ${dispatch}; fi`,
       `false() if true; then true; fi; if false; then ${dispatch}; fi`,
       `false() for item in one; do true; done; if false; then ${dispatch}; fi`,
@@ -297,6 +314,35 @@ describe("local CLI run-step input flow", () => {
     );
     expect(uncalledOuter.agent_usages).toEqual([]);
     expect(uncalledOuter.analysis_complete).toBe(true);
+    const nestedNotCalled = scan(
+      `outer() { inner() { false() { true; }; }; }; outer; if false; then ${dispatch}; fi`,
+    );
+    expect(nestedNotCalled.agent_usages).toEqual([]);
+    expect(nestedNotCalled.analysis_complete).toBe(true);
+    const nestedCallSkipped = scan(
+      `outer() { inner() { false() { true; }; }; if false; then inner; fi; }; outer; if false; then ${dispatch}; fi`,
+    );
+    expect(nestedCallSkipped.agent_usages).toEqual([]);
+    expect(nestedCallSkipped.analysis_complete).toBe(true);
+    for (const command of [
+      "time echo hi",
+      "eval echo hi",
+      "eval 'echo hi'",
+      "'time' outer || :",
+      '"time" outer || :',
+      "'o{u,u}ter' || :",
+      "F=1 time outer || :",
+      "command outer || :",
+      "builtin outer || :",
+      "if time outer; then :; fi",
+      "while time outer; do break; done",
+    ]) {
+      const unrelatedCall = scan(
+        `outer() { false() { true; }; }; ${command}; if false; then ${dispatch}; fi`,
+      );
+      expect(unrelatedCall.agent_usages, command).toEqual([]);
+      expect(unrelatedCall.analysis_complete, command).toBe(true);
+    }
   });
 
   it("does not report agent commands in uncalled function bodies", () => {
