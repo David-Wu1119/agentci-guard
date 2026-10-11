@@ -33,7 +33,7 @@ What can truthfully be said today:
   not be cited as held out (see `BENCHMARK.md`, "Status change, 2026-09-05").
 - Every critical finding on the benchmark was hand-read during development,
   and six detection defects were found and fixed by that process; the
-  defects and their measured effects are recorded in
+  defects and their observed behavioral effects are recorded in
   [`CHANGELOG.md`](../CHANGELOG.md).
 - The earlier numeric comparison with zizmor is withdrawn. This repository
   lacks the per-workflow zizmor output and rule-equivalence mapping needed to

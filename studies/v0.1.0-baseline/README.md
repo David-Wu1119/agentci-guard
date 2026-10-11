@@ -64,5 +64,6 @@ transcript, but the raw workflow list, fetched workflow snapshots, repository
 commit SHAs, and raw report were temporary files and are absent. See
 [`artifact-inventory.md`](artifact-inventory.md).
 
-Until a new fixed corpus is collected and published, the old aggregate numbers
-must be described only as a historical, non-reproducible exploratory scan.
+The old aggregate numbers remain historical, non-reproducible exploratory
+scanner output. The fixed 152-workflow development corpus is a new dataset;
+it does not reproduce this scan.
