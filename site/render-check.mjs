@@ -120,9 +120,23 @@ await send("Emulation.setDeviceMetricsOverride", {
 await evaluate('document.getElementById("load-example").click()');
 await evaluate('document.getElementById("scan-button").click()');
 const sample = await evaluate(
-  '({heading:document.getElementById("scan-results-heading").textContent,complete:document.getElementById("scan-completeness").textContent,usages:Array.from(document.querySelectorAll("#scan-agent-usages li")).map(li=>li.textContent),rules:Array.from(document.querySelectorAll("#scan-findings li")).map(li=>li.textContent),diagnostics:document.querySelectorAll("#scan-diagnostics li").length,errorHidden:document.getElementById("scan-error").hidden})',
+  '({heading:document.getElementById("scan-results-heading").textContent,status:document.getElementById("scan-status").textContent,complete:document.getElementById("scan-completeness").textContent,usages:Array.from(document.querySelectorAll("#scan-agent-usages li")).map(li=>li.textContent),rules:Array.from(document.querySelectorAll("#scan-findings li")).map(li=>li.textContent),diagnostics:document.querySelectorAll("#scan-diagnostics li").length,errorHidden:document.getElementById("scan-error").hidden})',
 );
 assert.equal(sample.heading, "2 findings for published sample");
+assert.match(
+  sample.status,
+  /^1 recognized agent-use step; 2 findings; analysis complete for published sample\. Browser scanner trial \(page build source: /,
+);
+assert.ok(
+  sample.status.includes(
+    `page build source: ${scanner.sourceHref?.split("/").at(-1) ?? scanner.source.trim()}`,
+  ),
+);
+assert.match(
+  sample.status,
+  /cached HTML can load a different script; compare separately with the published Action\/CLI/,
+);
+assert.doesNotMatch(sample.status, /Scanner v[0-9]/);
 assert.match(sample.complete, /analysis_complete: true/);
 assert.match(
   sample.complete,
