@@ -773,10 +773,9 @@ function analyzeWorkflow(
               : stepUses.length > 0
                 ? "action"
                 : "other",
-          evidence:
-            stepRun.trim().length > 0
-              ? shrink(stepRun)
-              : shrink(stepUses || materialized),
+          evidence: shrink(
+            cliCommands || httpCommands || stepUses || materialized,
+          ),
           line: stepLine,
           reachable_events: stepReachability.events,
           call_chain:

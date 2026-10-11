@@ -13,8 +13,10 @@ directory contains the machine-verifiable research artifacts:
   superseded unlabeled candidate manifests.
 - `annotation-sheet.csv`: 7,056 blank workflow/job/step/task units.
 - `review-sheet.csv`: deterministic 5,676-unit candidate secondary-pass plan.
-- `pilot/`: deterministic development-only, single-annotator test-retest pilot; never
-  counted as accuracy evidence.
+- `candidate-pilot/`: current nine-rule, 160-unit development-only
+  single-annotator test-retest packet; never counted as accuracy evidence.
+- `pilot/`: historical v0.1.1 eight-rule, 168-unit development-only pilot;
+  retained separately from the current candidate packet.
 - `schemas/`: manifest and annotation JSON Schemas.
 - `labels/`: human source labels, adjudicated labels, and post-evaluation error
   analysis when available.
@@ -44,9 +46,12 @@ synthetic labels only.
 
 ## Human workflow
 
-Follow the development-only [`pilot/README.md`](pilot/README.md) procedure to
-measure annotation time and single-annotator test-retest agreement. The current
-two-human import/adjudication scripts remain for historical toolchain smoke;
+Follow the current development-only
+[`candidate-pilot/README.md`](candidate-pilot/README.md) procedure for the
+nine-rule, 160-unit packet. Use only its standalone `CONTRACT.md` for decisions;
+the historical [`pilot/README.md`](pilot/README.md) is an incompatible
+eight-rule, 168-unit procedure. The current two-human import/adjudication
+scripts remain for historical toolchain smoke;
 they do not create independent review when one person supplies both files.
 Formal evaluation requires a fresh v4 sample, a nine-rule annotation registry,
 and a frozen human protocol. The v3 scorer rejects `eval` and `all` regardless

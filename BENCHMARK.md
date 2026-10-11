@@ -115,14 +115,18 @@ is `benchmark/schemas/annotation-record.schema.json`.
 
 ## Human review protocol
 
-- Before formal labeling, the sole available human runs the deterministic
-  development-only feasibility pilot under `benchmark/pilot/`.
+- Before formal labeling, the sole available human runs the current nine-rule,
+  160-unit development-only micro-pilot under
+  [`benchmark/candidate-pilot/`](benchmark/candidate-pilot/README.md).
+- The six-workflow, 168-unit eight-rule pilot under `benchmark/pilot/` is a
+  historical v0.1.1 protocol. Do not use its packet or contract for the current
+  candidate pilot, and do not combine labels from the two versions.
 - The same stable pseudonym is used for both pilot passes. Pass 2 starts at
   least seven full days after pass 1 ends, and pass-1 decisions remain closed
   until pass 2 is complete.
-- The pilot measures active time, raw exact agreement, chance-corrected
-  test-retest agreement, and protocol ambiguity on 168 development units. It
-  is not accuracy or inter-rater agreement evidence.
+- The current pilot records self-reported active time and per-rule label
+  distributions and disagreements across 160 development units. It is not
+  accuracy or inter-rater agreement evidence.
 - Formal evaluation labeling has not begun. The current formal comparison,
   adjudication, validation, and scoring path still requires two genuinely
   independent human identities. It must not be bypassed by assigning two
@@ -138,7 +142,10 @@ is `benchmark/schemas/annotation-record.schema.json`.
   commit are frozen. If rules change after evaluation errors are seen, the
   affected evaluation data becomes development data.
 
-See [`ANNOTATION_GUIDE.md`](ANNOTATION_GUIDE.md) for the decision rules.
+For the current candidate pilot, use its standalone
+[`CONTRACT.md`](benchmark/candidate-pilot/CONTRACT.md). The repository
+[`ANNOTATION_GUIDE.md`](ANNOTATION_GUIDE.md) documents the historical eight-rule
+v3 registry and pilot, not this candidate packet.
 
 ## Metrics
 

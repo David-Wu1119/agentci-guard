@@ -9,6 +9,7 @@ const status = document.getElementById('scan-status');
 const error = document.getElementById('scan-error');
 const output = document.getElementById('scan-output');
 const completeness = document.getElementById('scan-completeness');
+const agentUsages = document.getElementById('scan-agent-usages');
 const findings = document.getElementById('scan-findings');
 const diagnostics = document.getElementById('scan-diagnostics');
 const scanButton = document.getElementById('scan-button');
@@ -20,6 +21,7 @@ function resetResults(message) {
   error.hidden = true;
   error.textContent = '';
   output.hidden = true;
+  agentUsages.replaceChildren();
   findings.replaceChildren();
   diagnostics.replaceChildren();
 }
@@ -45,11 +47,30 @@ function addDetail(item, label, value) {
 }
 
 function renderResult(result) {
-  if (!Array.isArray(result?.findings) || !Array.isArray(result?.diagnostics) || typeof result.analysis_complete !== 'boolean') {
+  if (!Array.isArray(result?.agent_usages) || !Array.isArray(result.findings) || !Array.isArray(result.diagnostics) || typeof result.analysis_complete !== 'boolean') {
     throw new Error('The scanner returned an invalid result.');
   }
+  agentUsages.replaceChildren();
   findings.replaceChildren();
   diagnostics.replaceChildren();
+
+  for (const usage of result.agent_usages) {
+    const item = document.createElement('li');
+    const title = document.createElement('h5');
+    title.textContent = `${usage.job} / ${usage.step}`;
+    item.append(title);
+    addDetail(item, 'Location', `${usage.file}:${usage.line}`);
+    addDetail(item, 'Evidence', usage.evidence);
+    addDetail(item, 'Reachable events', usage.reachable_events.join(', '));
+    agentUsages.append(item);
+  }
+  if (!result.agent_usages.length) {
+    const item = document.createElement('li');
+    item.textContent = result.analysis_complete
+      ? 'No supported agent-use step detected in this file. Indirect or unsupported agents may be missed.'
+      : 'No agent-use step confirmed; analysis is incomplete. Review diagnostics.';
+    agentUsages.append(item);
+  }
 
   for (const finding of result.findings) {
     const item = document.createElement('li');
@@ -87,7 +108,7 @@ function renderResult(result) {
 
   const count = result.findings.length;
   heading.textContent = `${count} finding${count === 1 ? '' : 's'}`;
-  status.textContent = `Scanner v${scanWorkflow.version}: ${result.analysis_complete ? 'analysis complete' : 'analysis incomplete'} for this one-file input.`;
+  status.textContent = `Scanner v${scanWorkflow.version}: ${result.agent_usages.length} recognized agent-use step${result.agent_usages.length === 1 ? '' : 's'}; ${result.analysis_complete ? 'analysis complete' : 'analysis incomplete'} for this one-file input.`;
   completeness.textContent = result.analysis_complete
     ? 'analysis_complete: true. This covers only supported static checks for the supplied file; it does not validate the full GitHub Actions schema or guarantee security.'
     : 'analysis_complete: false. The diagnostics below identify unsupported or failed analysis; do not treat this as a clean scan.';

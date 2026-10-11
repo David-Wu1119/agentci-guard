@@ -95,7 +95,7 @@ if (scanner.sourceHref)
 await evaluate('document.getElementById("load-example").click()');
 await evaluate('document.getElementById("scan-button").click()');
 const sample = await evaluate(
-  '({heading:document.getElementById("scan-results-heading").textContent,complete:document.getElementById("scan-completeness").textContent,rules:Array.from(document.querySelectorAll("#scan-findings li")).map(li=>li.textContent),diagnostics:document.querySelectorAll("#scan-diagnostics li").length,errorHidden:document.getElementById("scan-error").hidden})',
+  '({heading:document.getElementById("scan-results-heading").textContent,complete:document.getElementById("scan-completeness").textContent,usages:Array.from(document.querySelectorAll("#scan-agent-usages li")).map(li=>li.textContent),rules:Array.from(document.querySelectorAll("#scan-findings li")).map(li=>li.textContent),diagnostics:document.querySelectorAll("#scan-diagnostics li").length,errorHidden:document.getElementById("scan-error").hidden})',
 );
 assert.equal(sample.heading, "2 findings");
 assert.match(sample.complete, /analysis_complete: true/);
@@ -110,6 +110,9 @@ assert.equal(
   true,
 );
 assert.equal(sample.rules.length, 2);
+assert.equal(sample.usages.length, 1);
+assert.match(sample.usages[0], /Evidence:.*anthropics\/claude-code-action@/);
+assert.match(sample.usages[0], /Location:.*input\.yml:/);
 for (const [rule] of research.caseRows)
   assert.ok(
     sample.rules.some((row) => row.includes(rule)),
@@ -155,6 +158,9 @@ const setAndScan = (raw) =>
       error: document.getElementById("scan-error").textContent,
       outputHidden: document.getElementById("scan-output").hidden,
       findingText: document.getElementById("scan-findings").textContent,
+      usageText: document.getElementById("scan-agent-usages").textContent,
+      usageRows: document.querySelectorAll("#scan-agent-usages li").length,
+      injectedUsageImages: document.querySelectorAll("#scan-agent-usages img").length,
       diagnostics: document.querySelectorAll("#scan-diagnostics li").length,
       focus: document.activeElement.id,
       errorTop: document.getElementById("scan-error").getBoundingClientRect().top,
@@ -164,6 +170,7 @@ const setAndScan = (raw) =>
   })()`);
 const malformed = await setAndScan("on: [\njobs: {");
 assert.match(malformed.complete, /analysis_complete: false/);
+assert.match(malformed.usageText, /analysis is incomplete/);
 assert.ok(malformed.diagnostics > 0);
 assert.equal(malformed.outputHidden, false);
 const genericYaml = await setAndScan("foo: bar");
@@ -174,7 +181,39 @@ const clean = await setAndScan(
 );
 assert.equal(clean.heading, "0 findings");
 assert.match(clean.findingText, /not proof of safety/i);
+assert.match(clean.usageText, /No supported agent-use step detected/);
 assert.equal(clean.error, "");
+const usageOnly = await setAndScan(
+  "on: push\npermissions:\n  contents: read\njobs:\n  agent:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Agent\n        uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567\n        with:\n          prompt: hi\n",
+);
+assert.equal(usageOnly.heading, "0 findings");
+assert.equal(usageOnly.usageRows, 1);
+assert.match(usageOnly.usageText, /Evidence:.*anthropics\/claude-code-action@/);
+assert.match(usageOnly.complete, /analysis_complete: true/);
+const lateCli = await setAndScan(
+  `on: push\npermissions:\n  contents: read\njobs:\n  agent:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          echo ${"x".repeat(520)}\n          codex exec hello\n`,
+);
+assert.equal(lateCli.usageRows, 1);
+assert.match(lateCli.usageText, /Evidence:.*codex exec hello/);
+const httpUsage = await setAndScan(
+  "on: push\njobs:\n  agent:\n    runs-on: ubuntu-latest\n    steps:\n      - run: curl -X POST https://api.cursor.com/v1/agents -d '{}'\n",
+);
+assert.equal(httpUsage.usageRows, 1);
+assert.match(httpUsage.usageText, /Evidence:.*curl.*api\.cursor\.com/);
+assert.doesNotMatch(httpUsage.usageText, /CLI ·/);
+const hostileUsage = await setAndScan(
+  "on: push\npermissions:\n  contents: read\njobs:\n  agent:\n    runs-on: ubuntu-latest\n    steps:\n      - name: <img src=x onerror=alert(1)>\n        uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567\n        with:\n          prompt: hi\n",
+);
+assert.match(hostileUsage.usageText, /<img src=x onerror=alert\(1\)>/);
+assert.equal(hostileUsage.injectedUsageImages, 0);
+const reset = await evaluate(`(() => {
+  const input = document.getElementById("workflow-yaml");
+  input.value += "\\n";
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  return { hidden: document.getElementById("scan-output").hidden,
+    usageRows: document.querySelectorAll("#scan-agent-usages li").length };
+})()`);
+assert.deepEqual(reset, { hidden: true, usageRows: 0 });
 await send("Emulation.setDeviceMetricsOverride", {
   width: 390,
   height: 700,
@@ -184,6 +223,7 @@ await send("Emulation.setDeviceMetricsOverride", {
 const empty = await setAndScan("  ");
 assert.match(empty.error, /Paste workflow YAML/);
 assert.equal(empty.outputHidden, true);
+assert.equal(empty.usageRows, 0);
 assert.equal(empty.focus, "scan-results-heading");
 assert.ok(
   empty.errorTop >= 0 && empty.errorBottom <= empty.viewportHeight,
@@ -202,7 +242,19 @@ const tooManySteps = await setAndScan(
 );
 assert.match(tooManySteps.error, /browser limit of 500 steps/);
 assert.equal(tooManySteps.outputHidden, true);
-checks.push({ malformed, genericYaml, clean, empty, oversized, tooManySteps });
+checks.push({
+  malformed,
+  genericYaml,
+  clean,
+  usageOnly,
+  lateCli,
+  httpUsage,
+  hostileUsage,
+  reset,
+  empty,
+  oversized,
+  tooManySteps,
+});
 const filePick = await evaluate(`(async () => {
   const sample = document.querySelector("#research pre code").textContent;
   const selected = new File([sample], "<img src=x onerror=alert(1)>.yaml", { type: "text/yaml" });

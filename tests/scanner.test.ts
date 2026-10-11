@@ -5,8 +5,10 @@ import { describe, expect, it } from "vitest";
 import YAML from "yaml";
 import {
   loadWorkflowFiles,
+  parseWorkflowFile,
   scanRepository,
   scanWorkflow,
+  scanWorkflowFiles,
   toSarif,
   type WorkflowFile,
 } from "../src/index.js";
@@ -133,6 +135,28 @@ jobs:
         .map((line, index) => ({ line, number: index + 1 }))
         .filter(({ line }) => line === "      - name: Duplicate")[1]?.number,
     );
+  });
+
+  it("shows the agent command when a long benign command precedes it", () => {
+    const raw = `on: push
+permissions:
+  contents: read
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo ${"x".repeat(520)}
+          codex exec hello
+`;
+    const workflow = parseWorkflowFile("/repo/.github/workflows/test.yml", raw);
+    const result = scanWorkflowFiles([workflow], "/repo", {
+      ignore: [],
+      ignorePaths: [],
+    });
+
+    expect(result.agent_usages).toHaveLength(1);
+    expect(result.agent_usages[0]?.evidence).toContain("codex exec hello");
   });
 
   it("fails when an explicit config path is missing", async () => {

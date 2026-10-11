@@ -12678,7 +12678,9 @@ function analyzeWorkflow(workflow, repository, context) {
           step: stepName,
           step_index: index,
           kind: stepRun.trim().length > 0 ? "cli" : stepUses.length > 0 ? "action" : "other",
-          evidence: stepRun.trim().length > 0 ? shrink(stepRun) : shrink(stepUses || materialized),
+          evidence: shrink(
+            cliCommands || httpCommands || stepUses || materialized
+          ),
           line: stepLine,
           reachable_events: stepReachability.events,
           call_chain: context.callChain.length > 0 ? context.callChain : void 0
