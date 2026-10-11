@@ -9248,7 +9248,7 @@ function analyzeWorkflow(workflow, repository, context) {
           job: jobName,
           step: stepName,
           step_index: index,
-          kind: stepRun.trim().length > 0 ? "cli" : stepUses.length > 0 ? "action" : "other",
+          kind: httpOnly ? "http" : stepRun.trim().length > 0 ? "cli" : stepUses.length > 0 ? "action" : "other",
           evidence: shrink(
             cliCommands || httpCommands || stepUses || materialized
           ),

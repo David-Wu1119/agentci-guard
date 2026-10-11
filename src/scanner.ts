@@ -767,8 +767,9 @@ function analyzeWorkflow(
           job: jobName,
           step: stepName,
           step_index: index,
-          kind:
-            stepRun.trim().length > 0
+          kind: httpOnly
+            ? "http"
+            : stepRun.trim().length > 0
               ? "cli"
               : stepUses.length > 0
                 ? "action"

@@ -140,6 +140,7 @@ jobs:
       { ignore: [], ignorePaths: [] },
     );
     expect(result.agent_usages).toHaveLength(1);
+    expect(result.agent_usages[0]?.kind).toBe("http");
   });
 
   it("reports payload ingestion without assigning the runner token to the remote agent", () => {

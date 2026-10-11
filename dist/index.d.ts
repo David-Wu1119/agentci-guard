@@ -26,7 +26,7 @@ type AgentUsage = {
     step: string;
     /** Zero-based index in the job's steps array. */
     step_index: number;
-    kind: "action" | "cli" | "other";
+    kind: "action" | "cli" | "http" | "other";
     evidence: string;
     line: number;
     reachable_events: string[];
