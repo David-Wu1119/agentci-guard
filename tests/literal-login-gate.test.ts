@@ -12,21 +12,19 @@ function ruleIds(raw: string): Set<string> {
   );
 }
 
-// A job restricted to a literal login is exactly as sound as one restricted to
-// github.repository_owner: GitHub resolves github.actor before the job starts,
-// and a stranger cannot be that user. Corpus case ai-015 (marktext, ~61k
-// stars) gates its agent on `github.actor == 'Jocs'` and was reported critical.
-describe("literal-login actor gates", () => {
-  it("recognizes a single literal login on actor and sender", () => {
-    expect(hasTrustedActorGate("github.actor == 'Jocs'")).toBe(true);
-    expect(hasTrustedActorGate('github.actor == "Jocs"')).toBe(true);
-    expect(hasTrustedActorGate("'Jocs' == github.actor")).toBe(true);
+// YAML can identify a username, but cannot prove that account has repository
+// write access. A hard-coded login is not equivalent to repository_owner.
+describe("literal-login actor conditions", () => {
+  it("does not mistake a named login for verified write access", () => {
+    expect(hasTrustedActorGate("github.actor == 'Jocs'")).toBe(false);
+    expect(hasTrustedActorGate('github.actor == "Jocs"')).toBe(false);
+    expect(hasTrustedActorGate("'Jocs' == github.actor")).toBe(false);
     expect(hasTrustedActorGate("github.event.sender.login == 'Jocs'")).toBe(
-      true,
+      false,
     );
     expect(
       hasTrustedActorGate("github.event.comment.user.login == 'maintainer'"),
-    ).toBe(true);
+    ).toBe(false);
     expect(hasTrustedActorGate("github.triggering_actor == 'Jocs'")).toBe(
       false,
     );
@@ -48,21 +46,39 @@ jobs:
     expect(rules).toContain("agentci/untrusted-ai-write-token");
   });
 
-  it("recognizes an allowlist of literal logins via contains(fromJSON(...))", () => {
+  it("does not verify the access role of a literal-login allowlist", () => {
     expect(
       hasTrustedActorGate(
         'contains(fromJSON(\'["alice","bob"]\'), github.actor)',
       ),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       hasTrustedActorGate(
         "contains(fromJSON('[\"alice\"]'), github.event.comment.user.login)",
       ),
-    ).toBe(true);
+    ).toBe(false);
     // An empty allowlist gates nothing.
     expect(hasTrustedActorGate("contains(fromJSON('[]'), github.actor)")).toBe(
       false,
     );
+  });
+
+  it("reports a named but unverified commenter reaching a write-capable base Action", () => {
+    const rules = ruleIds(`
+on: issue_comment
+permissions:
+  contents: write
+jobs:
+  respond:
+    if: github.actor == 'Jocs'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-base-action@beta
+        with:
+          prompt: \${{ github.event.comment.body }}
+`);
+    expect(rules).toContain("agentci/untrusted-input-in-prompt");
+    expect(rules).toContain("agentci/untrusted-ai-write-token");
   });
 
   it("does not trust inequality, a bot suffix wildcard, or a non-login field", () => {
@@ -78,7 +94,7 @@ jobs:
     ).toBe(false);
   });
 
-  it("clears the marktext shape: literal login AND a trigger-phrase disjunction", () => {
+  it("keeps the parent issue untrusted when a trusted login assigns it", () => {
     const rules = ruleIds(`
 on:
   issue_comment:
@@ -101,7 +117,7 @@ jobs:
     steps:
       - uses: anthropics/claude-code-action@v1
 `);
-    expect(rules).not.toContain("agentci/untrusted-ai-write-token");
+    expect(rules).toContain("agentci/untrusted-ai-write-token");
     expect(rules).not.toContain("agentci/untrusted-input-in-prompt");
     expect(rules).toContain("agentci/broad-write-permissions");
   });
@@ -120,9 +136,8 @@ jobs:
     steps:
       - uses: anthropics/claude-code-action@v1
 `);
-    // A trigger phrase is not an actor gate, so the job stays reachable and a
-    // write-token finding fires; with the action's own default gate intact it
-    // is the high variant.
-    expect(rules).toContain("agentci/gated-ai-write-token");
+    // The action fetches the parent Issue, whose author can differ from the
+    // commenter; the action's actor gate cannot sanitize that content.
+    expect(rules).toContain("agentci/untrusted-ai-write-token");
   });
 });

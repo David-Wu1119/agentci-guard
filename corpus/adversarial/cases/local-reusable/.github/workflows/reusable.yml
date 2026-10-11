@@ -14,5 +14,5 @@ jobs:
     steps:
       - uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567
         with:
-          prompt: ${{ inputs.request }}
+          prompt: "Handle: ${{ inputs.request }}"
           claude_args: ${{ inputs.tools }}

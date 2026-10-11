@@ -13,9 +13,9 @@ function rulesFor(workflow: string): Set<string> {
 }
 
 describe("write-scope precision", () => {
-  // The Anthropic-recommended pattern: read-only repo perms, id-token for
-  // OIDC, gated on an @claude mention. Must NOT be flagged as write-token risk.
-  const safePattern = `
+  // The workflow token is read-only, but the full Action can exchange OIDC
+  // for a separate write-capable App token when github_token is omitted.
+  const appTokenPattern = `
 on:
   issue_comment:
     types: [created]
@@ -32,14 +32,26 @@ jobs:
           claude_code_oauth_token: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 `;
 
-  it("does not flag id-token:write as repo-write", () => {
-    const rules = rulesFor(safePattern);
+  it("reports possible App-token write while keeping workflow-token breadth negative", () => {
+    const rules = rulesFor(appTokenPattern);
+    expect(rules.has("agentci/untrusted-ai-write-token")).toBe(true);
+    expect(rules.has("agentci/broad-write-permissions")).toBe(false);
+  });
+
+  it("does not infer an App token when the Action is given the read-only workflow token", () => {
+    const rules = rulesFor(
+      appTokenPattern.replace(
+        "claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}",
+        "github_token: ${{ github.token }}",
+      ),
+    );
     expect(rules.has("agentci/untrusted-ai-write-token")).toBe(false);
+    expect(rules.has("agentci/gated-ai-write-token")).toBe(false);
     expect(rules.has("agentci/broad-write-permissions")).toBe(false);
   });
 
   it("does not treat untrusted content in an if: guard as a prompt sink", () => {
-    const rules = rulesFor(safePattern);
+    const rules = rulesFor(appTokenPattern);
     expect(rules.has("agentci/untrusted-input-in-prompt")).toBe(false);
   });
 

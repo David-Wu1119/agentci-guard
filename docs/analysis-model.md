@@ -1,8 +1,12 @@
 # Static Analysis Model
 
-AgentCI Guard v0.1.1 evaluates each AI step under an explicit effective
-context. This document states the approximation boundary so a finding can be
-reproduced and challenged.
+AgentCI Guard evaluates each AI step under an explicit effective context. This
+document describes the **unreleased source-provenance candidate in this
+checkout**. The published v0.1.1 annotation predicates in [`RULES.md`](../RULES.md)
+remain a historical contract; changed candidate outcomes cannot be scored
+against those labels as independent accuracy evidence. The documented vendor
+mode assumptions below refer to a pinned Anthropic commit, not every future
+`@v1` tag target.
 
 ## Environment
 
@@ -102,12 +106,16 @@ rejected because it worsened the heredoc case.
 
 ## The agent's own gate
 
-`anthropics/claude-code-action` refuses to run for users without repository
-write access by default. Its security documentation states the check applies to
-issue, pull request, comment, and review events and that the only way to relax
-it is `allowed_non_write_users`, which the same document calls "a significant
-security risk"; `allowed_bots` entries are not permission-checked at all. The
-lower-level `claude-code-base-action` performs no such check.
+At [the pinned Anthropic revision](https://github.com/anthropics/claude-code-action/tree/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc),
+`anthropics/claude-code-action` checks the triggering actor's repository write
+access for issue, pull request, comment, and review events by default. Its
+[security guidance](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/docs/security.md)
+documents `allowed_non_write_users` and `allowed_bots` as ways to admit actors
+without that check. The lower-level `claude-code-base-action` is not modeled as
+having this gate. Anthropic says `allowed_non_write_users` works **only** with
+an explicit `github_token` input; the candidate checks for that input before
+modeling a bypass, but cannot resolve whether a dynamic token expression is
+empty. `allowed_bots` entries are not permission-checked.
 
 When the untrusted-trigger, agent, write-token pattern is present and **all** of
 the following hold, the finding is `agentci/gated-ai-write-token` at high rather
@@ -120,25 +128,24 @@ than `agentci/untrusted-ai-write-token` at critical:
   `issue_comment`, `pull_request`, `pull_request_review`,
   `pull_request_review_comment`; `pull_request_target` and the discussion events
   are not listed and keep critical;
+- every **modeled** ingested source belongs to the actor checked by that gate. Parent Issue,
+  PR, or discussion content may have a different author on comment, review, or
+  label activity and therefore prevents the downgrade;
 - no `run:` step in the job expands untrusted event text, because that path
   bypasses the agent's gate entirely.
 
-The downgrade is a statement about who can trigger the job, not about what it
-can do: `broad-write-permissions`, `unpinned-ai-action`, and `ai-with-secrets`
-are unaffected, and `untrusted-input-in-prompt` still reports an interpolation.
-Two residual risks remain and are named in the finding: a write-access user
-acting on attacker-authored content, and any bypass in the action's runtime
-check (one was disclosed in January 2026). Whether the action applies the check
-identically when a `prompt` input is supplied is not stated in its docs; this
-model assumes it does, because the docs describe the check by event rather than
-by mode.
+The Action's gate answers "who activated this run?", not "who authored every
+piece of text the agent reads?" A trusted maintainer can label an attacker
+Issue or comment on an attacker PR. When tag mode fetches that parent content,
+the candidate keeps `untrusted-ai-write-token` critical if a sensitive write
+capability is modeled. `broad-write-permissions`, `unpinned-ai-action`, and
+`ai-with-secrets` are independent of the downgrade. The gate itself is a runtime
+implementation detail, not a static proof of safety.
 
-This is a severity contract set by the project owner on 2026-09-05 after
-reviewing the action's documentation. On the frozen benchmark it moves 24 of 30
-critical findings to high; the six that remain critical carry an
-`allowed_non_write_users` or `allowed_bots` bypass, run on
-`pull_request_target`, or use an agent whose default behavior has not been
-verified against its vendor's documentation.
+The v0.1.1 downgrade was set on 2026-09-05 and historically moved 24 of 30
+critical benchmark findings to high. Those counts describe the **old
+classifier on development data**, not the source-aware candidate or a
+precision/recall estimate. No claim about the candidate's accuracy follows.
 
 ## Untrusted content reaching an agent
 
@@ -149,50 +156,90 @@ The first is interpolation: `${{ github.event.issue.title }}` and its siblings
 expanded into a prompt, an input, or a `run:` block. This is what
 `agentci/untrusted-input-in-prompt` reports.
 
-The second is self-fetching, and it is the dominant shape in practice. Agent
-_actions_ such as `anthropics/claude-code-action` receive a token and read the
-triggering issue, comment, or pull request through the GitHub API at runtime.
-The attacker's text arrives in the agent's context without ever appearing in
-the workflow file. A reachability model that requires an expression therefore
-misses the ordinary case: a job triggered by `issue_comment`, holding
-`contents: write`, running an agent action, and gated on nothing but a trigger
-phrase that any stranger can type.
+The second route is Action self-fetching, which depends on vendor and mode.
+At the pinned Anthropic revision, [tag mode fetches parent Issue/PR data](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/modes/tag/index.ts)
+and builds a prompt from it. The [mode detector](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/modes/detector.ts)
+normally selects agent mode when a nonempty `prompt` is present; in
+[agent mode](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/modes/agent/index.ts),
+the supplied prompt is used directly rather than automatically fetching event
+text. Supported `track_progress` can force tag mode. Without a prompt, issue,
+comment, and review events can use tag mode when the Action's trigger check
+passes; a bare PR event does not automatically imply tag-mode ingestion. The
+scanner models these event/mode routes but cannot prove a runtime `@claude`
+trigger check succeeded. A single unresolved `${{ ... }}` prompt can resolve
+to empty at runtime, so the candidate still permits tag-mode ingestion in that
+case. An explicit event expression still counts as a source when it is passed
+into the Action's inputs or effective environment.
 
-So an agent action reachable on an event in `UNTRUSTED_EVENTS` is treated as
-ingesting that event's untrusted content, whether or not an expression is
-present. A `run:` invocation of an agent CLI is treated differently: it only
-receives what the shell hands it, so it still requires interpolation.
+On a PR, the [pinned tag prompt](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/create-prompt/index.ts) also includes changed-file paths. An owner can open a PR from an attacker-authored fork, so the actor gate does not authenticate those paths. Because `issue_comment` can target a PR, the candidate conservatively keeps that path possible there too.
 
-The two routes stay distinguishable in output.
-`agentci/untrusted-input-in-prompt` remains specific to interpolation, and
-`agentci/untrusted-ai-write-token` reports either route, naming which one it
-found in the finding's evidence.
+`claude-code-base-action` has no modeled self-fetch route. Other recognized
+agent Actions still use a conservative event-ingestion heuristic; their modes
+have not been verified to this specificity. A `run:` invocation of an agent
+CLI or HTTP dispatch is treated differently: it only receives what the shell
+passes, so untrusted content requires interpolation.
+
+Anthropic tag mode's [data fetcher](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/github/data/fetcher.ts)
+also loads pre-trigger comments and reviews. The candidate attributes its
+automatic fetch to the parent Issue/PR **and** conservatively treats prior
+comments/reviews as a separate untrusted history source. A PR-head provenance
+guard cannot sanitize that history. The scanner does not resolve each comment's
+author or the Action's `include_comments_by_actor` filter, so some findings
+will be conservative.
+
+The two routes stay distinguishable in output:
+`agentci/untrusted-input-in-prompt` is specific to interpolation, while the
+write-token rule covers either supported route. A static `prompt` with no event
+expression is not treated as ingesting an event merely because the Action uses
+an event trigger.
 
 ## Actor and provenance guards
 
 An untrusted trigger does not by itself mean an untrusted actor can reach a job.
-A job or step condition is treated as _actor-gated_ when it restricts execution
-to one or more literal logins (`github.actor == 'maintainer'`, or
-`contains(fromJSON('["a","b"]'), github.actor)` — GitHub resolves the actor
-before the job starts and a stranger cannot be that user, so this is exactly as
-sound as an owner comparison, and it is the shape Anthropic's workflow template
-ships; inequality such as `!= 'dependabot[bot]'` excludes one account and
-admits everyone else, so it is not a gate), to the repository owner (`github.actor` or `github.event.sender.login` compared
-against `github.repository_owner`), to pull requests originating in the base
-repository (`github.event.pull_request.head.repo.full_name ==
-github.repository`, or a negated `head.repo.fork`), or to a trusted
-`author_association` — `OWNER`, `MEMBER`, or `COLLABORATOR` — by equality or by
-`contains(fromJSON(...), ...)` membership.
+A job or step condition has an _actor gate_ when it restricts execution to
+`github.repository_owner` or to `OWNER` in the triggering comment/review's
+`author_association`. `MEMBER` and `COLLABORATOR` do not prove repository
+write access: GitHub gives organization members and outside collaborators
+[Read or Triage roles](https://docs.github.com/en/organizations/managing-user-access-to-your-organizations-repositories/managing-repository-roles/repository-roles-for-an-organization)
+without write access. An inequality such as
+`github.actor != 'dependabot[bot]'` is not a gate. A separate _PR provenance
+gate_ recognizes a same-repository PR head or a non-fork PR. These checks are
+not interchangeable: the first identifies who triggered the activity; the
+second constrains the PR source.
 
-The gate must identify the actor who supplied the triggering input, not the
-author of its parent issue or pull request. On `issue_comment` and
-`pull_request_review_comment`, `github.event.issue.user` and
-`github.event.pull_request.user` can name a maintainer while an untrusted
-person wrote the comment. The same applies to those parent objects'
-`author_association` values. These parent-author checks are conservatively
-ungated even for an `issues` or `pull_request` workflow where a narrower
-activity-specific check could sometimes be sound; this analyzer does not
-prove that activity-level correspondence.
+A literal login (`github.actor == 'maintainer'`) or finite login allowlist
+restricts identity but does not prove that account has write access. The
+candidate no longer treats it as a verified trust gate; this can yield
+conservative findings until a separate role-proof mechanism exists.
+
+The candidate classifies supported input expressions as Issue, PR,
+discussion, comment, review, commit message, or other. Actor gates remove triggering
+comment/review content, but do not remove parent Issue/PR/discussion content
+when its author can differ from that actor. On `issue_comment`, for example,
+an owner comment can activate tag mode on an Issue opened by a stranger. On
+`issues: [labeled]`, the owner who applied the label likewise need not have
+written the Issue body. A PR provenance gate can separately rule out the
+supported untrusted PR-derived fields.
+
+Only a single explicit creation activity lets an actor gate authenticate the
+new parent's title/body: `issues`, `pull_request`, or `pull_request_target`
+with `types: [opened]`, or `discussion` with `types: [created]`. A PR opener
+need not have authored the head branch name; `github.event.pull_request.head.ref`
+and `github.head_ref` remain separate PR-head sources even on `opened`. A
+supported same-repository/non-fork guard can constrain them. Mixed or omitted
+activity lists stay conservative. This is a narrow YAML `on.types` rule, not
+a general evaluator of `github.event.action` in `if:` expressions.
+
+Parent-object `user` or `author_association` checks are not accepted as
+comment-author gates: on a comment event, those values can identify the
+maintainer who opened the parent while a stranger wrote the comment.
+
+A `push` actor can merge a contributor's commit or squash a PR whose title or
+commit message becomes `github.event.head_commit.message`; that message is
+not authenticated by an owner-actor condition. The model keeps its
+`untrusted-input-in-prompt` route even though `push` is not one of the
+write-token rule's untrusted triggers. [GitHub documents the squash-merge
+message sources](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/configuring-commit-squashing-for-pull-requests).
 
 `github.triggering_actor` is not a trusted gate either: on a re-run it names
 the re-run initiator, while the original event payload and `github.actor`
@@ -201,25 +248,24 @@ does not make the comment trusted.
 
 Recognition is an implication check rather than an evaluation. A conjunction is
 gated when _either_ operand is gated, because `A && B` implies `A`. A
-disjunction is gated only when _every_ operand is gated. Negation and every
-unrecognized construct are treated as ungated.
+disjunction is gated only when _every_ operand is gated. The supported
+`!github.event.pull_request.head.repo.fork` form is a PR-head provenance gate;
+other negation and unrecognized constructs are treated as ungated.
 
-An actor gate can suppress untrusted-input findings for the triggering
-comment/review text, but not for an explicitly interpolated parent Issue,
-discussion, or pull request on a comment/review event: a trusted person can
-comment on attacker-authored content. The `pull-request-target-ai` rule is
-specifically about whether an untrusted actor can reach an agent step, so it
-still consults the job or step gate. Until 2026-09-05 it consulted only the
-job gate; `tests/prt-step-gate.test.ts` pins the corrected step behavior.
+An actor gate can suppress untrusted-input findings for its own trigger text,
+but not for a parent whose author can differ. The `pull-request-target-ai` rule
+asks whether an untrusted actor can reach the AI step and still consults a
+recognized job or step gate; that rule alone does not settle whether the step
+will read an attacker-authored PR. `tests/prt-step-gate.test.ts` pins step-level
+gating, while the source-aware regressions cover parent-content cases.
 `unsafe-checkout` does **not** consult the actor gate: an owner applying a label
 does not make an attacker PR head safe to execute. Permission breadth, action
 pinning, and secret exposure are also unaffected by actor gates.
 
-This is an incremental source-provenance model, not proof that every actor
-gate is safe. Action self-fetching and parent content on `issues`/`pull_request`
-activity other than creation still need event-activity-specific evaluation;
-until then, actor-gated findings can be false negatives. Do not use this
-version as a production security gate or quote calibrated accuracy for it.
+This is a bounded source-provenance model, not proof that every actor guard is
+safe. It recognizes only the fields and creation activities above, and its
+vendor self-fetch assumptions are pinned snapshots. Do not use this version as
+a production security gate or quote calibrated accuracy for it.
 
 Only guards GitHub resolves before the job starts are trusted. A gate computed
 by workflow code at runtime, such as a step that queries collaborator
@@ -253,6 +299,20 @@ known policy through `agentci.config.json`:
 
 `defaultPermissions` also accepts `none`, `write-all`, `unknown`, or a scope
 map.
+
+`broad-write-permissions` is a model of the workflow's `GITHUB_TOKEN`. The
+unreleased write-token rule also recognizes one separate capability path. At
+the pinned Anthropic revision, the full Action without an explicit
+`github_token` input [exchanges an OIDC token for its GitHub App
+token](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/github/token.ts);
+its [App permission documentation](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/docs/security.md#github-app-permissions)
+includes write access to contents, pull requests, and issues. With no
+`with.github_token` and **known** effective `id-token: write`, the candidate
+therefore treats that Action as potentially write-capable even if the YAML
+`contents:` permission is read-only. This does not prove App installation,
+token exchange success, or exact runtime scopes. Other separately minted or
+supplied credentials remain outside the model, so a negative write-token
+finding is not a proof of no write authority.
 
 ## Reusable workflows
 

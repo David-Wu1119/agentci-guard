@@ -18,6 +18,7 @@ export const RULES: Record<string, RuleDefinition> = {
     fix: [
       "Do not run privileged AI agents on untrusted triggers.",
       "Use read-only GITHUB_TOKEN permissions for untrusted events.",
+      "Account for separately minted Action App tokens; a read-only workflow token alone may not remove write capability.",
       "Require maintainer approval before running the agent.",
       "Sanitize and summarize untrusted content before passing it to an agent.",
     ],
@@ -27,12 +28,12 @@ export const RULES: Record<string, RuleDefinition> = {
     title:
       "Untrusted event content reaches a write-capable agent that gates on repository write access",
     severity: "high",
-    why: "The untrusted-trigger, AI-agent, write-token pattern is present, but the agent is anthropics/claude-code-action, which by default refuses to run for users without repository write access, so a stranger's issue or comment does not reach the agent as configured. Two residual risks remain: a user with write access can act on attacker-authored content (a maintainer @-mentioning the agent on a malicious issue), and the check lives inside the action at runtime, where a bypass was disclosed in January 2026. One configuration change makes this critical.",
+    why: "An untrusted triggering actor's own content reaches anthropics/claude-code-action with write permissions, but the action normally checks that actor for repository write access before running. This reduction does not apply when the agent reads a parent Issue or PR written by someone else, when the gate is bypassed, or when the event is outside the documented gate.",
     fix: [
       "Keep the default gate: never set allowed_non_write_users, and avoid allowed_bots.",
       "Pin the action to a commit SHA so a fixed authorization check cannot silently regress.",
       "Prefer read-only permissions on untrusted triggers and move writes to a separate, maintainer-approved job.",
-      "Treat maintainer @-mentions on untrusted issues as a review step, not an automation trigger.",
+      "Do not treat a maintainer's comment or label as proof that the parent Issue or PR is trusted.",
     ],
   },
   "agentci/pull-request-target-ai": {

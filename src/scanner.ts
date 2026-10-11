@@ -12,7 +12,7 @@ import {
   looksLikeAiAction,
   looksLikeAiCli,
   SELF_GATED_EVENTS,
-  untrustedGitHubContextEvents,
+  untrustedGitHubContextMatches,
 } from "./detect.js";
 import { RULES, SEVERITY_ORDER } from "./rules.js";
 import type {
@@ -30,8 +30,10 @@ import {
   hasUnknownSensitivePermission,
   mergeEnvironment,
   hasTrustedActorGate,
+  hasTrustedPrProvenanceGate,
   narrowEvents,
   normalizeTriggers,
+  permissionLevel,
   resolvePermissions,
   UNTRUSTED_EVENTS,
 } from "./workflow-model.js";
@@ -55,6 +57,9 @@ type AnalysisOutput = {
 };
 type ReusableContext = {
   events?: string[];
+  creationOnlyEvents?: string[];
+  actorGate?: boolean;
+  prGate?: boolean;
   permissionCeiling?: EffectivePermissions;
   inputValues: Record<string, string>;
   inheritedSecrets: boolean;
@@ -273,6 +278,9 @@ function analyzeWorkflow(
   const doc = isRecord(workflow.document) ? workflow.document : {};
   const workflowEvents =
     context.events ?? normalizeTriggers(doc.on ?? doc["on"]);
+  const creationOnlyEvents = new Set(
+    context.creationOnlyEvents ?? creationOnlyTriggers(doc.on),
+  );
   const workflowEnvironment = mergeEnvironment(doc.env);
   const workflowPermissions =
     context.permissionCeiling && doc.permissions === undefined
@@ -294,7 +302,10 @@ function analyzeWorkflow(
     if (!isRecord(rawJob)) continue;
     const jobLine = locateJobLine(workflow.raw, jobName);
     const jobReachability = narrowEvents(workflowEvents, rawJob.if);
-    const jobActorGate = hasTrustedActorGate(rawJob.if);
+    const jobActorGate =
+      Boolean(context.actorGate) || hasTrustedActorGate(rawJob.if);
+    const jobPrGate =
+      Boolean(context.prGate) || hasTrustedPrProvenanceGate(rawJob.if);
     if (!jobReachability.complete) {
       output.diagnostics.push({
         code: "agentci/analysis-event-condition",
@@ -328,6 +339,7 @@ function analyzeWorkflow(
           rawJob,
           jobLine,
           jobReachability.events,
+          [...creationOnlyEvents],
           jobPermissions,
           repository,
           context,
@@ -342,6 +354,9 @@ function analyzeWorkflow(
       hasSecret: boolean;
       hasUntrustedSink: boolean;
       hasUntrustedIngestion: boolean;
+      sourceMayDifferFromTrigger: boolean;
+      potentialAppWrite: boolean;
+      ingestionEvents: string[];
       /** anthropics/claude-code-action with its default write-access gate intact. */
       selfGated: boolean;
       /** The job or this step carries a recognized actor/provenance gate. */
@@ -398,7 +413,20 @@ function analyzeWorkflow(
         stepUsesAiAction ||
         looksLikeAiCli(materializeInputs(stepRun, context.inputValues));
       const stepActorGate = jobActorGate || hasTrustedActorGate(rawStep.if);
-      const untrustedEvents = untrustedGitHubContextEvents(
+      const stepPrGate = jobPrGate || hasTrustedPrProvenanceGate(rawStep.if);
+      const activeMatches = (value: string) =>
+        untrustedGitHubContextMatches(value).filter(
+          (match) =>
+            contextCanReach(stepReachability.events, [match.event]) &&
+            !sourceTrustedByGate(
+              match.source,
+              match.event,
+              stepActorGate,
+              stepPrGate,
+              creationOnlyEvents,
+            ),
+        );
+      const sinkMatches = activeMatches(
         materializeInputs(
           JSON.stringify({
             step: stripGuards(rawStep),
@@ -406,33 +434,49 @@ function analyzeWorkflow(
           }),
           context.inputValues,
         ),
-        stepActorGate,
       );
-      const hasUntrustedSink = contextCanReach(
-        stepReachability.events,
-        untrustedEvents,
-      );
-      // Agent *actions* read issue, comment, and pull-request content through
-      // their own token, so an untrusted trigger is itself the ingestion path.
-      // Requiring a `${{ }}` expansion in the workflow misses the dominant
-      // real-world shape entirely. A `run:` invocation is different: it only
-      // receives what the shell hands it, so it still needs interpolation.
+      const hasUntrustedSink = sinkMatches.length > 0;
+      const fetchedMatches = stepUsesAiAction
+        ? selfFetchedSources(
+            materializeInputs(stepUses, context.inputValues),
+            effectiveWith,
+            stepReachability.events,
+            creationOnlyEvents,
+          ).filter(
+            (match) =>
+              !sourceTrustedByGate(
+                match.source,
+                match.event,
+                stepActorGate,
+                stepPrGate,
+                creationOnlyEvents,
+              ),
+          )
+        : [];
       if (
         stepRun.trim().length > 0 &&
-        contextCanReach(
-          stepReachability.events,
-          untrustedGitHubContextEvents(
-            materializeInputs(stepRun, context.inputValues),
-          ),
-        )
+        activeMatches(materializeInputs(stepRun, context.inputValues)).length >
+          0
       ) {
         untrustedInRun = true;
       }
       const hasUntrustedIngestion =
-        hasUntrustedSink ||
-        (stepUsesAiAction &&
-          !stepActorGate &&
-          stepReachability.events.some((event) => UNTRUSTED_EVENTS.has(event)));
+        hasUntrustedSink || fetchedMatches.length > 0;
+      const ingestionEvents = unionEvents(
+        [...sinkMatches, ...fetchedMatches].flatMap((match) =>
+          match.event === "*" ? stepReachability.events : [match.event],
+        ),
+      );
+      const sourceMayDifferFromTrigger = [
+        ...sinkMatches,
+        ...fetchedMatches,
+      ].some((match) =>
+        sourceMayDifferFromTriggerActor(
+          match.source,
+          match.event,
+          creationOnlyEvents,
+        ),
+      );
       const hasSecret =
         context.inheritedSecrets ||
         containsSecretReference(JSON.stringify(effectiveEnvironment)) ||
@@ -473,6 +517,15 @@ function analyzeWorkflow(
           hasSecret,
           hasUntrustedSink,
           hasUntrustedIngestion,
+          sourceMayDifferFromTrigger,
+          ingestionEvents,
+          potentialAppWrite:
+            isSelfGatingAgentAction(
+              materializeInputs(stepUses, context.inputValues),
+            ) &&
+            permissionLevel(jobPermissions, "id-token") === "write" &&
+            (!isRecord(effectiveWith) ||
+              String(effectiveWith.github_token ?? "").trim().length === 0),
           selfGated:
             isSelfGatingAgentAction(
               materializeInputs(stepUses, context.inputValues),
@@ -566,12 +619,13 @@ function analyzeWorkflow(
     const aiOnPullRequestTarget = aiSteps.some(
       (step) => !step.actorGated && step.events.includes("pull_request_target"),
     );
-    const untrustedAiSink = aiSteps.some(
+    const ingesting = aiSteps.filter(
       (step) =>
         step.hasUntrustedIngestion &&
-        step.events.some((event) => UNTRUSTED_EVENTS.has(event)),
+        step.ingestionEvents.some((event) => UNTRUSTED_EVENTS.has(event)) &&
+        (jobHasWrite || step.potentialAppWrite),
     );
-    const untrustedViaInterpolation = aiSteps.some(
+    const untrustedViaInterpolation = ingesting.some(
       (step) => step.hasUntrustedSink,
     );
 
@@ -587,18 +641,18 @@ function analyzeWorkflow(
         }),
       );
     }
-    if (jobHasWrite && untrustedAiSink) {
-      const ingesting = aiSteps.filter((step) => step.hasUntrustedIngestion);
+    if (ingesting.length > 0) {
       const reachableUntrusted = unionEvents(
-        ingesting.flatMap((step) => step.events),
+        ingesting.flatMap((step) => step.ingestionEvents),
       ).filter((event) => UNTRUSTED_EVENTS.has(event));
       // Downgrade to high only when every ingesting step is the self-gating
       // action with its gate intact, every reachable untrusted event is one the
-      // action's docs say it checks, and no run: step expands untrusted text
-      // (that path bypasses the agent's gate entirely).
+      // action's docs say it checks, no parent content may have a different
+      // author, and no run: step expands untrusted text outside that gate.
       const gated =
         ingesting.every((step) => step.selfGated) &&
         reachableUntrusted.every((event) => SELF_GATED_EVENTS.has(event)) &&
+        !ingesting.some((step) => step.sourceMayDifferFromTrigger) &&
         !untrustedInRun;
       output.findings.push(
         makeFinding(
@@ -609,12 +663,12 @@ function analyzeWorkflow(
             file,
             job: jobName,
             evidence: gated
-              ? "untrusted trigger + AI usage + effective write permission, but anthropics/claude-code-action refuses users without repository write access by default; no allowed_non_write_users / allowed_bots bypass, no pull_request_target or discussion trigger, no untrusted text in a run: step. Residual: a write-access user acting on attacker content, and any bypass in the action's own check."
+              ? "actor-authored event content + AI usage + effective write permission; anthropics/claude-code-action normally checks the triggering actor for repository write access, with no configured allowlist bypass or untrusted run: expansion"
               : untrustedViaInterpolation
-                ? "reachable untrusted event content + AI usage + effective write permission"
-                : "AI agent action reachable on an untrusted event reads that event's content through its own token + effective write permission",
+                ? "reachable untrusted event content + AI usage + workflow or potential Action App write capability"
+                : "AI agent action may ingest reachable event content through its runtime context + workflow or potential Action App write capability",
             line: jobLine,
-            events: unionEvents(ingesting.flatMap((step) => step.events)),
+            events: reachableUntrusted,
             callChain: context.callChain,
           },
         ),
@@ -671,6 +725,7 @@ function analyzeReusableCall(
   rawJob: WorkflowMap,
   jobLine: number,
   events: string[],
+  creationOnlyEvents: string[],
   permissions: EffectivePermissions,
   repository: RepositoryAnalysis,
   context: ReusableContext,
@@ -735,6 +790,9 @@ function analyzeReusableCall(
 
   return analyzeWorkflow(target, repository, {
     events,
+    creationOnlyEvents,
+    actorGate: Boolean(context.actorGate) || hasTrustedActorGate(rawJob.if),
+    prGate: Boolean(context.prGate) || hasTrustedPrProvenanceGate(rawJob.if),
     permissionCeiling: permissions,
     inputValues: toStringMap(rawJob.with, context.inputValues),
     inheritedSecrets:
@@ -784,6 +842,130 @@ function contextCanReach(
   return (
     contextEvents.includes("*") ||
     contextEvents.some((event) => reachableEvents.includes(event))
+  );
+}
+
+type ContextSource =
+  | ReturnType<typeof untrustedGitHubContextMatches>[number]["source"]
+  | "history"
+  | "pr_head_content";
+
+function creationOnlyTriggers(raw: unknown): string[] {
+  if (!isRecord(raw)) return [];
+  return Object.entries(raw)
+    .filter(([event, settings]) => {
+      const creation = event === "discussion" ? "created" : "opened";
+      return (
+        [
+          "issues",
+          "pull_request",
+          "pull_request_target",
+          "discussion",
+        ].includes(event) &&
+        isRecord(settings) &&
+        Array.isArray(settings.types) &&
+        settings.types.length === 1 &&
+        settings.types[0] === creation
+      );
+    })
+    .map(([event]) => event);
+}
+
+function sourceTrustedByGate(
+  source: ContextSource,
+  event: string,
+  actorGate: boolean,
+  prGate: boolean,
+  creationOnlyEvents: Set<string>,
+): boolean {
+  if (source === "history") return false;
+  if (source === "commit") return false;
+  if (source === "pull_request") {
+    return actorGate && creationOnlyEvents.has(event);
+  }
+  if (source === "pr_head_ref" || source === "pr_head_content") return prGate;
+  if (source === "issue" || source === "discussion") {
+    return actorGate && creationOnlyEvents.has(event);
+  }
+  return actorGate;
+}
+
+function sourceMayDifferFromTriggerActor(
+  source: ContextSource,
+  event: string,
+  creationOnlyEvents: Set<string>,
+): boolean {
+  return (
+    source === "history" ||
+    source === "commit" ||
+    source === "pr_head_ref" ||
+    source === "pr_head_content" ||
+    ((source === "issue" ||
+      source === "pull_request" ||
+      source === "discussion") &&
+      !creationOnlyEvents.has(event))
+  );
+}
+
+function selfFetchedSources(
+  uses: string,
+  withBlock: unknown,
+  events: string[],
+  creationOnlyEvents: Set<string>,
+): Array<{ event: string; source: ContextSource }> {
+  if (/^anthropics\/claude-code-base-action(?:@|$)/i.test(uses)) return [];
+  if (!isSelfGatingAgentAction(uses)) {
+    return events
+      .filter((event) => UNTRUSTED_EVENTS.has(event))
+      .map((event) => ({ event, source: "other" }));
+  }
+  const inputs = isRecord(withBlock) ? withBlock : {};
+  const prompt = String(inputs.prompt ?? "").trim();
+  // A lone unresolved expression can evaluate to empty and select tag mode.
+  const hasPrompt = prompt.length > 0 && !/^\$\{\{[\s\S]*\}\}$/.test(prompt);
+  const trackProgress =
+    inputs.track_progress !== undefined &&
+    ![false, "false", ""].includes(inputs.track_progress as string | boolean);
+  if (hasPrompt && !trackProgress) return [];
+  const defaultTagEvents = new Set([
+    "issues",
+    "issue_comment",
+    "pull_request_review",
+    "pull_request_review_comment",
+  ]);
+  return events.flatMap(
+    (event): Array<{ event: string; source: ContextSource }> => {
+      if (!trackProgress && !defaultTagEvents.has(event)) return [];
+      if (event === "issues" || event === "issue_comment") {
+        return [
+          { event, source: "issue" },
+          // issue_comment can target a PR, whose changed-file paths are fetched too.
+          ...(event === "issue_comment"
+            ? [{ event, source: "pr_head_content" as const }]
+            : []),
+          ...(!creationOnlyEvents.has(event)
+            ? [{ event, source: "history" as const }]
+            : []),
+        ];
+      }
+      if (
+        [
+          "pull_request",
+          "pull_request_target",
+          "pull_request_review",
+          "pull_request_review_comment",
+        ].includes(event)
+      ) {
+        return [
+          { event, source: "pull_request" },
+          { event, source: "pr_head_content" },
+          ...(!creationOnlyEvents.has(event)
+            ? [{ event, source: "history" as const }]
+            : []),
+        ];
+      }
+      return [];
+    },
   );
 }
 

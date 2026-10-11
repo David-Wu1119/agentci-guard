@@ -7539,7 +7539,19 @@ var AI_AGENT_PATTERNS = [
 ];
 var UNTRUSTED_CONTEXT_PATTERNS = [
   {
-    pattern: /github\.event\.pull_request\.(body|title|head\.ref)/i,
+    pattern: /github\.event\.pull_request\.(body|title)/i,
+    source: "pull_request",
+    events: [
+      "pull_request",
+      "pull_request_target",
+      "pull_request_review",
+      "pull_request_review_comment"
+    ],
+    parentEvents: ["pull_request_review", "pull_request_review_comment"]
+  },
+  {
+    pattern: /github\.event\.pull_request\.head\.ref/i,
+    source: "pr_head_ref",
     events: [
       "pull_request",
       "pull_request_target",
@@ -7550,16 +7562,19 @@ var UNTRUSTED_CONTEXT_PATTERNS = [
   },
   {
     pattern: /github\.event\.issue\.(body|title)/i,
+    source: "issue",
     events: ["issues", "issue_comment"],
     parentEvents: ["issue_comment"]
   },
   {
     pattern: /github\.event\.discussion\.(body|title)/i,
+    source: "discussion",
     events: ["discussion", "discussion_comment"],
     parentEvents: ["discussion_comment"]
   },
   {
     pattern: /github\.event\.comment\.body/i,
+    source: "comment",
     events: [
       "issue_comment",
       "discussion_comment",
@@ -7568,22 +7583,27 @@ var UNTRUSTED_CONTEXT_PATTERNS = [
   },
   {
     pattern: /github\.event\.review\.body/i,
+    source: "review",
     events: ["pull_request_review"]
   },
   {
     pattern: /github\.event\.review_comment\.body/i,
+    source: "comment",
     events: ["pull_request_review_comment"]
   },
   {
     pattern: /github\.event\.head_commit\.message/i,
+    source: "commit",
     events: ["push"]
   },
   {
     pattern: /github\.head_ref/i,
+    source: "pr_head_ref",
     events: ["pull_request", "pull_request_target"]
   },
   {
     pattern: /github\.ref_name/i,
+    source: "other",
     events: ["*"]
   }
 ];
@@ -7603,6 +7623,9 @@ function hasAgentGateBypass(withBlock) {
     const value = withBlock[key];
     if (value === void 0 || value === null) continue;
     if (typeof value === "string" && value.trim() === "") continue;
+    if (key === "allowed_non_write_users" && !String(withBlock.github_token ?? "").trim()) {
+      continue;
+    }
     return true;
   }
   return false;
@@ -7625,8 +7648,8 @@ function looksLikeAiCli(value) {
     (pattern) => pattern.test(value)
   );
 }
-function untrustedGitHubContextEvents(value, parentOnly = false) {
-  const events = /* @__PURE__ */ new Set();
+function matchingGitHubContextPatterns(value) {
+  const matches = /* @__PURE__ */ new Set();
   let cursor = 0;
   while (true) {
     const start = value.indexOf("${{", cursor);
@@ -7647,15 +7670,16 @@ function untrustedGitHubContextEvents(value, parentOnly = false) {
     }
     if (end < 0) break;
     for (const candidate of UNTRUSTED_CONTEXT_PATTERNS) {
-      if (candidate.pattern.test(expression)) {
-        for (const event of parentOnly ? candidate.parentEvents ?? [] : candidate.events) {
-          events.add(event);
-        }
-      }
+      if (candidate.pattern.test(expression)) matches.add(candidate);
     }
     cursor = end;
   }
-  return [...events];
+  return [...matches];
+}
+function untrustedGitHubContextMatches(value) {
+  return matchingGitHubContextPatterns(value).flatMap(
+    (candidate) => candidate.events.map((event) => ({ event, source: candidate.source }))
+  );
 }
 function containsSecretReference(value) {
   return SECRET_PATTERNS.some((pattern) => pattern.test(value));
@@ -7715,6 +7739,7 @@ var RULES = {
     fix: [
       "Do not run privileged AI agents on untrusted triggers.",
       "Use read-only GITHUB_TOKEN permissions for untrusted events.",
+      "Account for separately minted Action App tokens; a read-only workflow token alone may not remove write capability.",
       "Require maintainer approval before running the agent.",
       "Sanitize and summarize untrusted content before passing it to an agent."
     ]
@@ -7723,12 +7748,12 @@ var RULES = {
     id: "agentci/gated-ai-write-token",
     title: "Untrusted event content reaches a write-capable agent that gates on repository write access",
     severity: "high",
-    why: "The untrusted-trigger, AI-agent, write-token pattern is present, but the agent is anthropics/claude-code-action, which by default refuses to run for users without repository write access, so a stranger's issue or comment does not reach the agent as configured. Two residual risks remain: a user with write access can act on attacker-authored content (a maintainer @-mentioning the agent on a malicious issue), and the check lives inside the action at runtime, where a bypass was disclosed in January 2026. One configuration change makes this critical.",
+    why: "An untrusted triggering actor's own content reaches anthropics/claude-code-action with write permissions, but the action normally checks that actor for repository write access before running. This reduction does not apply when the agent reads a parent Issue or PR written by someone else, when the gate is bypassed, or when the event is outside the documented gate.",
     fix: [
       "Keep the default gate: never set allowed_non_write_users, and avoid allowed_bots.",
       "Pin the action to a commit SHA so a fixed authorization check cannot silently regress.",
       "Prefer read-only permissions on untrusted triggers and move writes to a separate, maintainer-approved job.",
-      "Treat maintainer @-mentions on untrusted issues as a review step, not an automation trigger."
+      "Do not treat a maintainer's comment or label as proof that the parent Issue or PR is trusted."
     ]
   },
   "agentci/pull-request-target-ai": {
@@ -8184,18 +8209,12 @@ function toPermissionLevel(value) {
 function isRecord(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
-var ACTOR_LOGIN_CONTEXT = "(?:github\\.actor|github\\.event\\.(?:sender|comment\\.user|review\\.user)\\.login)";
-var LITERAL_LOGIN = `(['"])[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\\[bot\\])?\\1`;
 var TRUSTED_ACTOR_ATOMS = [
-  // Restricted to one literal login. GitHub resolves the actor before the job
-  // starts and a stranger cannot be that user, so this is exactly as sound as
-  // comparing against github.repository_owner. Anthropic's workflow template
-  // ships this shape with the maintainer's own login filled in.
-  new RegExp(`^${ACTOR_LOGIN_CONTEXT}\\s*(?:==|===)\\s*${LITERAL_LOGIN}$`, "i"),
-  new RegExp(`^${LITERAL_LOGIN}\\s*(?:==|===)\\s*${ACTOR_LOGIN_CONTEXT}$`, "i"),
   // Restricted to the repository owner.
   /^(?:github\.actor|github\.event\.sender\.login|github\.event\.comment\.user\.login)\s*(?:==|===)\s*github\.repository_owner$/i,
-  /^github\.repository_owner\s*(?:==|===)\s*(?:github\.actor|github\.event\.sender\.login)$/i,
+  /^github\.repository_owner\s*(?:==|===)\s*(?:github\.actor|github\.event\.sender\.login)$/i
+];
+var TRUSTED_PR_PROVENANCE_ATOMS = [
   // Restricted to pull requests that originate in the base repository.
   /^github\.event\.pull_request\.head\.repo\.full_name\s*(?:==|===)\s*github\.repository$/i,
   /^github\.repository\s*(?:==|===)\s*github\.event\.pull_request\.head\.repo\.full_name$/i,
@@ -8203,46 +8222,46 @@ var TRUSTED_ACTOR_ATOMS = [
   /^!\s*github\.event\.pull_request\.head\.repo\.fork$/i,
   /^github\.event\.pull_request\.head\.repo\.fork\s*(?:==|===)\s*false$/i
 ];
-var TRUSTED_ASSOCIATIONS = /* @__PURE__ */ new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
+var TRUSTED_ASSOCIATIONS = /* @__PURE__ */ new Set(["OWNER"]);
 var ASSOCIATION_EQUALITY = /^github\.event\.(?:comment|review)\.author_association\s*(?:==|===)\s*(['"])([A-Za-z_]+)\1$/i;
-var LOGIN_MEMBERSHIP = new RegExp(
-  `^contains\\s*\\(\\s*fromJSON\\s*\\(\\s*(['"])(.*?)\\1\\s*\\)\\s*,\\s*${ACTOR_LOGIN_CONTEXT}\\s*\\)$`,
-  "i"
-);
 var ASSOCIATION_MEMBERSHIP = /^contains\s*\(\s*fromJSON\s*\(\s*(['"])(.*?)\1\s*\)\s*,\s*github\.event\.(?:comment|review)\.author_association\s*\)$/i;
 function hasTrustedActorGate(rawCondition) {
   if (typeof rawCondition !== "string") return false;
-  return conditionImpliesTrustedActor(unwrapExpression(rawCondition));
+  return conditionImpliesTrustedSource(unwrapExpression(rawCondition), "actor");
 }
-function conditionImpliesTrustedActor(condition) {
+function hasTrustedPrProvenanceGate(rawCondition) {
+  if (typeof rawCondition !== "string") return false;
+  return conditionImpliesTrustedSource(unwrapExpression(rawCondition), "pr");
+}
+function conditionImpliesTrustedSource(condition, source) {
   const trimmed = stripOuterParens(condition.trim());
   if (trimmed.length === 0) return false;
   const disjuncts = splitTopLevel(trimmed, "||");
   if (disjuncts.length > 1) {
-    return disjuncts.every((part) => conditionImpliesTrustedActor(part));
+    return disjuncts.every(
+      (part) => conditionImpliesTrustedSource(part, source)
+    );
   }
   const conjuncts = splitTopLevel(trimmed, "&&");
   if (conjuncts.length > 1) {
-    return conjuncts.some((part) => conditionImpliesTrustedActor(part));
+    return conjuncts.some(
+      (part) => conditionImpliesTrustedSource(part, source)
+    );
   }
-  return isTrustedActorAtom(trimmed);
+  return isTrustedSourceAtom(trimmed, source);
 }
-function isTrustedActorAtom(atom) {
+function isTrustedSourceAtom(atom, source) {
   const normalized = atom.replace(/\s+/g, " ").trim();
+  if (source === "pr") {
+    return TRUSTED_PR_PROVENANCE_ATOMS.some(
+      (pattern) => pattern.test(normalized)
+    );
+  }
   if (TRUSTED_ACTOR_ATOMS.some((pattern) => pattern.test(normalized))) {
     return true;
   }
   const equality = ASSOCIATION_EQUALITY.exec(normalized);
   if (equality) return TRUSTED_ASSOCIATIONS.has(equality[2].toUpperCase());
-  const logins = LOGIN_MEMBERSHIP.exec(normalized);
-  if (logins) {
-    try {
-      const decoded = JSON.parse(logins[2]);
-      return Array.isArray(decoded) && decoded.length > 0 && decoded.every((value) => typeof value === "string" && value.length > 0);
-    } catch {
-      return false;
-    }
-  }
   const membership = ASSOCIATION_MEMBERSHIP.exec(normalized);
   if (membership) {
     try {
@@ -8451,6 +8470,9 @@ function analyzeWorkflow(workflow, repository, context) {
   }
   const doc = isRecord2(workflow.document) ? workflow.document : {};
   const workflowEvents = context.events ?? normalizeTriggers(doc.on ?? doc["on"]);
+  const creationOnlyEvents = new Set(
+    context.creationOnlyEvents ?? creationOnlyTriggers(doc.on)
+  );
   const workflowEnvironment = mergeEnvironment(doc.env);
   const workflowPermissions = context.permissionCeiling && doc.permissions === void 0 ? context.permissionCeiling : resolvePermissions(
     doc.permissions,
@@ -8468,7 +8490,8 @@ function analyzeWorkflow(workflow, repository, context) {
     if (!isRecord2(rawJob)) continue;
     const jobLine = locateJobLine(workflow.raw, jobName);
     const jobReachability = narrowEvents(workflowEvents, rawJob.if);
-    const jobActorGate = hasTrustedActorGate(rawJob.if);
+    const jobActorGate = Boolean(context.actorGate) || hasTrustedActorGate(rawJob.if);
+    const jobPrGate = Boolean(context.prGate) || hasTrustedPrProvenanceGate(rawJob.if);
     if (!jobReachability.complete) {
       output.diagnostics.push({
         code: "agentci/analysis-event-condition",
@@ -8496,6 +8519,7 @@ function analyzeWorkflow(workflow, repository, context) {
           rawJob,
           jobLine,
           jobReachability.events,
+          [...creationOnlyEvents],
           jobPermissions,
           repository,
           context
@@ -8549,29 +8573,59 @@ function analyzeWorkflow(workflow, repository, context) {
       );
       const stepUsesAi = stepUsesAiAction || looksLikeAiCli(materializeInputs(stepRun, context.inputValues));
       const stepActorGate = jobActorGate || hasTrustedActorGate(rawStep.if);
-      const untrustedEvents = untrustedGitHubContextEvents(
+      const stepPrGate = jobPrGate || hasTrustedPrProvenanceGate(rawStep.if);
+      const activeMatches = (value) => untrustedGitHubContextMatches(value).filter(
+        (match) => contextCanReach(stepReachability.events, [match.event]) && !sourceTrustedByGate(
+          match.source,
+          match.event,
+          stepActorGate,
+          stepPrGate,
+          creationOnlyEvents
+        )
+      );
+      const sinkMatches = activeMatches(
         materializeInputs(
           JSON.stringify({
             step: stripGuards(rawStep),
             effectiveEnvironment
           }),
           context.inputValues
-        ),
-        stepActorGate
-      );
-      const hasUntrustedSink = contextCanReach(
-        stepReachability.events,
-        untrustedEvents
-      );
-      if (stepRun.trim().length > 0 && contextCanReach(
-        stepReachability.events,
-        untrustedGitHubContextEvents(
-          materializeInputs(stepRun, context.inputValues)
         )
-      )) {
+      );
+      const hasUntrustedSink = sinkMatches.length > 0;
+      const fetchedMatches = stepUsesAiAction ? selfFetchedSources(
+        materializeInputs(stepUses, context.inputValues),
+        effectiveWith,
+        stepReachability.events,
+        creationOnlyEvents
+      ).filter(
+        (match) => !sourceTrustedByGate(
+          match.source,
+          match.event,
+          stepActorGate,
+          stepPrGate,
+          creationOnlyEvents
+        )
+      ) : [];
+      if (stepRun.trim().length > 0 && activeMatches(materializeInputs(stepRun, context.inputValues)).length > 0) {
         untrustedInRun = true;
       }
-      const hasUntrustedIngestion = hasUntrustedSink || stepUsesAiAction && !stepActorGate && stepReachability.events.some((event) => UNTRUSTED_EVENTS.has(event));
+      const hasUntrustedIngestion = hasUntrustedSink || fetchedMatches.length > 0;
+      const ingestionEvents = unionEvents(
+        [...sinkMatches, ...fetchedMatches].flatMap(
+          (match) => match.event === "*" ? stepReachability.events : [match.event]
+        )
+      );
+      const sourceMayDifferFromTrigger = [
+        ...sinkMatches,
+        ...fetchedMatches
+      ].some(
+        (match) => sourceMayDifferFromTriggerActor(
+          match.source,
+          match.event,
+          creationOnlyEvents
+        )
+      );
       const hasSecret = context.inheritedSecrets || containsSecretReference(JSON.stringify(effectiveEnvironment)) || containsSecretReference(
         materializeInputs(
           JSON.stringify({
@@ -8599,6 +8653,11 @@ function analyzeWorkflow(workflow, repository, context) {
           hasSecret,
           hasUntrustedSink,
           hasUntrustedIngestion,
+          sourceMayDifferFromTrigger,
+          ingestionEvents,
+          potentialAppWrite: isSelfGatingAgentAction(
+            materializeInputs(stepUses, context.inputValues)
+          ) && permissionLevel(jobPermissions, "id-token") === "write" && (!isRecord2(effectiveWith) || String(effectiveWith.github_token ?? "").trim().length === 0),
           selfGated: isSelfGatingAgentAction(
             materializeInputs(stepUses, context.inputValues)
           ) && !hasAgentGateBypass(rawStep.with),
@@ -8681,10 +8740,10 @@ function analyzeWorkflow(workflow, repository, context) {
     const aiOnPullRequestTarget = aiSteps.some(
       (step) => !step.actorGated && step.events.includes("pull_request_target")
     );
-    const untrustedAiSink = aiSteps.some(
-      (step) => step.hasUntrustedIngestion && step.events.some((event) => UNTRUSTED_EVENTS.has(event))
+    const ingesting = aiSteps.filter(
+      (step) => step.hasUntrustedIngestion && step.ingestionEvents.some((event) => UNTRUSTED_EVENTS.has(event)) && (jobHasWrite || step.potentialAppWrite)
     );
-    const untrustedViaInterpolation = aiSteps.some(
+    const untrustedViaInterpolation = ingesting.some(
       (step) => step.hasUntrustedSink
     );
     if (aiOnPullRequestTarget) {
@@ -8699,21 +8758,20 @@ function analyzeWorkflow(workflow, repository, context) {
         })
       );
     }
-    if (jobHasWrite && untrustedAiSink) {
-      const ingesting = aiSteps.filter((step) => step.hasUntrustedIngestion);
+    if (ingesting.length > 0) {
       const reachableUntrusted = unionEvents(
-        ingesting.flatMap((step) => step.events)
+        ingesting.flatMap((step) => step.ingestionEvents)
       ).filter((event) => UNTRUSTED_EVENTS.has(event));
-      const gated = ingesting.every((step) => step.selfGated) && reachableUntrusted.every((event) => SELF_GATED_EVENTS.has(event)) && !untrustedInRun;
+      const gated = ingesting.every((step) => step.selfGated) && reachableUntrusted.every((event) => SELF_GATED_EVENTS.has(event)) && !ingesting.some((step) => step.sourceMayDifferFromTrigger) && !untrustedInRun;
       output.findings.push(
         makeFinding(
           gated ? "agentci/gated-ai-write-token" : "agentci/untrusted-ai-write-token",
           {
             file,
             job: jobName,
-            evidence: gated ? "untrusted trigger + AI usage + effective write permission, but anthropics/claude-code-action refuses users without repository write access by default; no allowed_non_write_users / allowed_bots bypass, no pull_request_target or discussion trigger, no untrusted text in a run: step. Residual: a write-access user acting on attacker content, and any bypass in the action's own check." : untrustedViaInterpolation ? "reachable untrusted event content + AI usage + effective write permission" : "AI agent action reachable on an untrusted event reads that event's content through its own token + effective write permission",
+            evidence: gated ? "actor-authored event content + AI usage + effective write permission; anthropics/claude-code-action normally checks the triggering actor for repository write access, with no configured allowlist bypass or untrusted run: expansion" : untrustedViaInterpolation ? "reachable untrusted event content + AI usage + workflow or potential Action App write capability" : "AI agent action may ingest reachable event content through its runtime context + workflow or potential Action App write capability",
             line: jobLine,
-            events: unionEvents(ingesting.flatMap((step) => step.events)),
+            events: reachableUntrusted,
             callChain: context.callChain
           }
         )
@@ -8758,7 +8816,7 @@ function analyzeWorkflow(workflow, repository, context) {
   output.findings = ignores.all ? [] : output.findings.filter((finding) => !ignores.rules.has(finding.rule_id));
   return output;
 }
-function analyzeReusableCall(caller, jobName, rawJob, jobLine, events, permissions, repository, context) {
+function analyzeReusableCall(caller, jobName, rawJob, jobLine, events, creationOnlyEvents, permissions, repository, context) {
   const uses = String(rawJob.uses);
   const callerFile = relativeFile(repository.root, caller.path);
   if (!uses.startsWith("./")) {
@@ -8817,6 +8875,9 @@ function analyzeReusableCall(caller, jobName, rawJob, jobLine, events, permissio
   }
   return analyzeWorkflow(target, repository, {
     events,
+    creationOnlyEvents,
+    actorGate: Boolean(context.actorGate) || hasTrustedActorGate(rawJob.if),
+    prGate: Boolean(context.prGate) || hasTrustedPrProvenanceGate(rawJob.if),
     permissionCeiling: permissions,
     inputValues: toStringMap(rawJob.with, context.inputValues),
     inheritedSecrets: rawJob.secrets === "inherit" || containsSecretReference(JSON.stringify(rawJob.secrets ?? {})),
@@ -8853,6 +8914,76 @@ function workflowTriggers(workflow) {
 }
 function contextCanReach(reachableEvents, contextEvents) {
   return contextEvents.includes("*") || contextEvents.some((event) => reachableEvents.includes(event));
+}
+function creationOnlyTriggers(raw) {
+  if (!isRecord2(raw)) return [];
+  return Object.entries(raw).filter(([event, settings]) => {
+    const creation = event === "discussion" ? "created" : "opened";
+    return [
+      "issues",
+      "pull_request",
+      "pull_request_target",
+      "discussion"
+    ].includes(event) && isRecord2(settings) && Array.isArray(settings.types) && settings.types.length === 1 && settings.types[0] === creation;
+  }).map(([event]) => event);
+}
+function sourceTrustedByGate(source, event, actorGate, prGate, creationOnlyEvents) {
+  if (source === "history") return false;
+  if (source === "commit") return false;
+  if (source === "pull_request") {
+    return actorGate && creationOnlyEvents.has(event);
+  }
+  if (source === "pr_head_ref" || source === "pr_head_content") return prGate;
+  if (source === "issue" || source === "discussion") {
+    return actorGate && creationOnlyEvents.has(event);
+  }
+  return actorGate;
+}
+function sourceMayDifferFromTriggerActor(source, event, creationOnlyEvents) {
+  return source === "history" || source === "commit" || source === "pr_head_ref" || source === "pr_head_content" || (source === "issue" || source === "pull_request" || source === "discussion") && !creationOnlyEvents.has(event);
+}
+function selfFetchedSources(uses, withBlock, events, creationOnlyEvents) {
+  if (/^anthropics\/claude-code-base-action(?:@|$)/i.test(uses)) return [];
+  if (!isSelfGatingAgentAction(uses)) {
+    return events.filter((event) => UNTRUSTED_EVENTS.has(event)).map((event) => ({ event, source: "other" }));
+  }
+  const inputs = isRecord2(withBlock) ? withBlock : {};
+  const prompt = String(inputs.prompt ?? "").trim();
+  const hasPrompt = prompt.length > 0 && !/^\$\{\{[\s\S]*\}\}$/.test(prompt);
+  const trackProgress = inputs.track_progress !== void 0 && ![false, "false", ""].includes(inputs.track_progress);
+  if (hasPrompt && !trackProgress) return [];
+  const defaultTagEvents = /* @__PURE__ */ new Set([
+    "issues",
+    "issue_comment",
+    "pull_request_review",
+    "pull_request_review_comment"
+  ]);
+  return events.flatMap(
+    (event) => {
+      if (!trackProgress && !defaultTagEvents.has(event)) return [];
+      if (event === "issues" || event === "issue_comment") {
+        return [
+          { event, source: "issue" },
+          // issue_comment can target a PR, whose changed-file paths are fetched too.
+          ...event === "issue_comment" ? [{ event, source: "pr_head_content" }] : [],
+          ...!creationOnlyEvents.has(event) ? [{ event, source: "history" }] : []
+        ];
+      }
+      if ([
+        "pull_request",
+        "pull_request_target",
+        "pull_request_review",
+        "pull_request_review_comment"
+      ].includes(event)) {
+        return [
+          { event, source: "pull_request" },
+          { event, source: "pr_head_content" },
+          ...!creationOnlyEvents.has(event) ? [{ event, source: "history" }] : []
+        ];
+      }
+      return [];
+    }
+  );
 }
 function assessPullRequestTargetCheckout(step) {
   if (typeof step.uses !== "string" || !/^actions\/checkout@/i.test(step.uses)) {

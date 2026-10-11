@@ -1,0 +1,16 @@
+name: owner-opened-pr-tag-paths
+on:
+  pull_request:
+    types: [opened]
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  agent:
+    if: github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc
+        with:
+          prompt: Review this pull request
+          track_progress: true

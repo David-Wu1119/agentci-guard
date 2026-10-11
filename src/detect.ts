@@ -74,9 +74,30 @@ const UNTRUSTED_CONTEXT_PATTERNS: Array<{
   pattern: RegExp;
   events: string[];
   parentEvents?: string[];
+  source:
+    | "issue"
+    | "pull_request"
+    | "pr_head_ref"
+    | "discussion"
+    | "comment"
+    | "review"
+    | "commit"
+    | "other";
 }> = [
   {
-    pattern: /github\.event\.pull_request\.(body|title|head\.ref)/i,
+    pattern: /github\.event\.pull_request\.(body|title)/i,
+    source: "pull_request",
+    events: [
+      "pull_request",
+      "pull_request_target",
+      "pull_request_review",
+      "pull_request_review_comment",
+    ],
+    parentEvents: ["pull_request_review", "pull_request_review_comment"],
+  },
+  {
+    pattern: /github\.event\.pull_request\.head\.ref/i,
+    source: "pr_head_ref",
     events: [
       "pull_request",
       "pull_request_target",
@@ -87,16 +108,19 @@ const UNTRUSTED_CONTEXT_PATTERNS: Array<{
   },
   {
     pattern: /github\.event\.issue\.(body|title)/i,
+    source: "issue",
     events: ["issues", "issue_comment"],
     parentEvents: ["issue_comment"],
   },
   {
     pattern: /github\.event\.discussion\.(body|title)/i,
+    source: "discussion",
     events: ["discussion", "discussion_comment"],
     parentEvents: ["discussion_comment"],
   },
   {
     pattern: /github\.event\.comment\.body/i,
+    source: "comment",
     events: [
       "issue_comment",
       "discussion_comment",
@@ -105,22 +129,27 @@ const UNTRUSTED_CONTEXT_PATTERNS: Array<{
   },
   {
     pattern: /github\.event\.review\.body/i,
+    source: "review",
     events: ["pull_request_review"],
   },
   {
     pattern: /github\.event\.review_comment\.body/i,
+    source: "comment",
     events: ["pull_request_review_comment"],
   },
   {
     pattern: /github\.event\.head_commit\.message/i,
+    source: "commit",
     events: ["push"],
   },
   {
     pattern: /github\.head_ref/i,
+    source: "pr_head_ref",
     events: ["pull_request", "pull_request_target"],
   },
   {
     pattern: /github\.ref_name/i,
+    source: "other",
     events: ["*"],
   },
 ];
@@ -146,10 +175,8 @@ export function isSelfGatingAgentAction(uses: string): boolean {
 }
 
 /**
- * The default gate is removed by allowlisting non-write users or bots. The
- * docs mark `allowed_non_write_users` "a significant security risk" and note
- * that `allowed_bots` entries are not permission-checked at all, so any
- * non-empty value for either counts as a bypass.
+ * The default gate is removed by allowlisting non-write users with an explicit
+ * token or by allowlisting bots. The latter are not permission-checked.
  */
 export function hasAgentGateBypass(withBlock: unknown): boolean {
   if (!withBlock || typeof withBlock !== "object") return false;
@@ -157,6 +184,12 @@ export function hasAgentGateBypass(withBlock: unknown): boolean {
     const value = (withBlock as Record<string, unknown>)[key];
     if (value === undefined || value === null) continue;
     if (typeof value === "string" && value.trim() === "") continue;
+    if (
+      key === "allowed_non_write_users" &&
+      !String((withBlock as Record<string, unknown>).github_token ?? "").trim()
+    ) {
+      continue;
+    }
     return true;
   }
   return false;
@@ -215,12 +248,10 @@ export function containsUntrustedGitHubContext(value: string): boolean {
   return untrustedGitHubContextEvents(value).length > 0;
 }
 
-/** With parentOnly, keep only fields whose author can differ from the commenter. */
-export function untrustedGitHubContextEvents(
-  value: string,
-  parentOnly = false,
-): string[] {
-  const events = new Set<string>();
+type ContextPattern = (typeof UNTRUSTED_CONTEXT_PATTERNS)[number];
+
+function matchingGitHubContextPatterns(value: string): ContextPattern[] {
+  const matches = new Set<ContextPattern>();
   let cursor = 0;
   while (true) {
     const start = value.indexOf("${{", cursor);
@@ -241,15 +272,34 @@ export function untrustedGitHubContextEvents(
     }
     if (end < 0) break;
     for (const candidate of UNTRUSTED_CONTEXT_PATTERNS) {
-      if (candidate.pattern.test(expression)) {
-        for (const event of parentOnly
-          ? (candidate.parentEvents ?? [])
-          : candidate.events) {
-          events.add(event);
-        }
-      }
+      if (candidate.pattern.test(expression)) matches.add(candidate);
     }
     cursor = end;
+  }
+  return [...matches];
+}
+
+export function untrustedGitHubContextMatches(value: string): Array<{
+  event: string;
+  source: ContextPattern["source"];
+}> {
+  return matchingGitHubContextPatterns(value).flatMap((candidate) =>
+    candidate.events.map((event) => ({ event, source: candidate.source })),
+  );
+}
+
+/** With parentOnly, keep only fields whose author can differ from the commenter. */
+export function untrustedGitHubContextEvents(
+  value: string,
+  parentOnly = false,
+): string[] {
+  const events = new Set<string>();
+  for (const candidate of matchingGitHubContextPatterns(value)) {
+    for (const event of parentOnly
+      ? (candidate.parentEvents ?? [])
+      : candidate.events) {
+      events.add(event);
+    }
   }
   return [...events];
 }

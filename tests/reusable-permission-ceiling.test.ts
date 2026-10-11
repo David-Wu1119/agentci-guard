@@ -11,6 +11,7 @@ import { scanRepository } from "../src/index.js";
 async function repository(
   callerPermissions: string,
   calleePermissions: string,
+  callerJobCondition = "",
 ): Promise<string> {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "agentci-reusable-"));
   const workflows = path.join(root, ".github", "workflows");
@@ -24,6 +25,7 @@ on:
 ${callerPermissions}
 jobs:
   delegate:
+${callerJobCondition}
     uses: ./.github/workflows/agent.yml
     secrets: inherit
 `,
@@ -52,6 +54,18 @@ const ruleIds = async (root: string) =>
   new Set((await scanRepository(root)).findings.map((f) => f.rule_id));
 
 describe("reusable-workflow permission ceiling", () => {
+  it("preserves a caller owner gate for an opened Issue in the callee", async () => {
+    const root = await repository(
+      "permissions:\n  contents: write",
+      "    permissions:\n      contents: write",
+      "    if: github.actor == github.repository_owner",
+    );
+    const rules = await ruleIds(root);
+    expect(rules).not.toContain("agentci/untrusted-input-in-prompt");
+    expect(rules).not.toContain("agentci/untrusted-ai-write-token");
+    expect(rules).not.toContain("agentci/gated-ai-write-token");
+  });
+
   it("lowers a callee write request to the caller's read grant", async () => {
     const root = await repository(
       "permissions:\n  contents: read\n  issues: read",

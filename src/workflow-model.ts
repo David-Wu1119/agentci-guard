@@ -500,34 +500,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-/**
- * Actor and provenance guards that GitHub evaluates before a job starts.
- *
- * These are the standard mitigations for untrusted-event risk, so a job that
- * is restricted by one of them is not reachable by an untrusted actor even
- * though its trigger appears in {@link UNTRUSTED_EVENTS}. Only guards that
- * GitHub itself resolves are trusted here; anything decided by workflow code
- * at runtime is deliberately excluded, because such a check can run after
- * untrusted content has already been fetched or executed.
- */
-/** Contexts GitHub resolves to the triggering user's login before a job runs. */
-const ACTOR_LOGIN_CONTEXT =
-  "(?:github\\.actor|github\\.event\\.(?:sender|comment\\.user|review\\.user)\\.login)";
-
-/** A quoted GitHub login, including the `name[bot]` form. */
-const LITERAL_LOGIN =
-  "(['\"])[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\\[bot\\])?\\1";
-
+/** Guards that GitHub evaluates before a job starts. */
 const TRUSTED_ACTOR_ATOMS: RegExp[] = [
-  // Restricted to one literal login. GitHub resolves the actor before the job
-  // starts and a stranger cannot be that user, so this is exactly as sound as
-  // comparing against github.repository_owner. Anthropic's workflow template
-  // ships this shape with the maintainer's own login filled in.
-  new RegExp(`^${ACTOR_LOGIN_CONTEXT}\\s*(?:==|===)\\s*${LITERAL_LOGIN}$`, "i"),
-  new RegExp(`^${LITERAL_LOGIN}\\s*(?:==|===)\\s*${ACTOR_LOGIN_CONTEXT}$`, "i"),
   // Restricted to the repository owner.
   /^(?:github\.actor|github\.event\.sender\.login|github\.event\.comment\.user\.login)\s*(?:==|===)\s*github\.repository_owner$/i,
   /^github\.repository_owner\s*(?:==|===)\s*(?:github\.actor|github\.event\.sender\.login)$/i,
+];
+
+const TRUSTED_PR_PROVENANCE_ATOMS: RegExp[] = [
   // Restricted to pull requests that originate in the base repository.
   /^github\.event\.pull_request\.head\.repo\.full_name\s*(?:==|===)\s*github\.repository$/i,
   /^github\.repository\s*(?:==|===)\s*github\.event\.pull_request\.head\.repo\.full_name$/i,
@@ -536,16 +516,10 @@ const TRUSTED_ACTOR_ATOMS: RegExp[] = [
   /^github\.event\.pull_request\.head\.repo\.fork\s*(?:==|===)\s*false$/i,
 ];
 
-const TRUSTED_ASSOCIATIONS = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
+const TRUSTED_ASSOCIATIONS = new Set(["OWNER"]);
 
 const ASSOCIATION_EQUALITY =
   /^github\.event\.(?:comment|review)\.author_association\s*(?:==|===)\s*(['"])([A-Za-z_]+)\1$/i;
-
-/** `contains(fromJSON('["alice","bob"]'), github.actor)` — an allowlist of logins. */
-const LOGIN_MEMBERSHIP = new RegExp(
-  `^contains\\s*\\(\\s*fromJSON\\s*\\(\\s*(['"])(.*?)\\1\\s*\\)\\s*,\\s*${ACTOR_LOGIN_CONTEXT}\\s*\\)$`,
-  "i",
-);
 
 const ASSOCIATION_MEMBERSHIP =
   /^contains\s*\(\s*fromJSON\s*\(\s*(['"])(.*?)\1\s*\)\s*,\s*github\.event\.(?:comment|review)\.author_association\s*\)$/i;
@@ -560,46 +534,49 @@ const ASSOCIATION_MEMBERSHIP =
  */
 export function hasTrustedActorGate(rawCondition: unknown): boolean {
   if (typeof rawCondition !== "string") return false;
-  return conditionImpliesTrustedActor(unwrapExpression(rawCondition));
+  return conditionImpliesTrustedSource(unwrapExpression(rawCondition), "actor");
 }
 
-function conditionImpliesTrustedActor(condition: string): boolean {
+export function hasTrustedPrProvenanceGate(rawCondition: unknown): boolean {
+  if (typeof rawCondition !== "string") return false;
+  return conditionImpliesTrustedSource(unwrapExpression(rawCondition), "pr");
+}
+
+function conditionImpliesTrustedSource(
+  condition: string,
+  source: "actor" | "pr",
+): boolean {
   const trimmed = stripOuterParens(condition.trim());
   if (trimmed.length === 0) return false;
 
   const disjuncts = splitTopLevel(trimmed, "||");
   if (disjuncts.length > 1) {
-    return disjuncts.every((part) => conditionImpliesTrustedActor(part));
+    return disjuncts.every((part) =>
+      conditionImpliesTrustedSource(part, source),
+    );
   }
   const conjuncts = splitTopLevel(trimmed, "&&");
   if (conjuncts.length > 1) {
-    return conjuncts.some((part) => conditionImpliesTrustedActor(part));
+    return conjuncts.some((part) =>
+      conditionImpliesTrustedSource(part, source),
+    );
   }
-  return isTrustedActorAtom(trimmed);
+  return isTrustedSourceAtom(trimmed, source);
 }
 
-function isTrustedActorAtom(atom: string): boolean {
+function isTrustedSourceAtom(atom: string, source: "actor" | "pr"): boolean {
   const normalized = atom.replace(/\s+/g, " ").trim();
+  if (source === "pr") {
+    return TRUSTED_PR_PROVENANCE_ATOMS.some((pattern) =>
+      pattern.test(normalized),
+    );
+  }
   if (TRUSTED_ACTOR_ATOMS.some((pattern) => pattern.test(normalized))) {
     return true;
   }
 
   const equality = ASSOCIATION_EQUALITY.exec(normalized);
   if (equality) return TRUSTED_ASSOCIATIONS.has(equality[2].toUpperCase());
-
-  const logins = LOGIN_MEMBERSHIP.exec(normalized);
-  if (logins) {
-    try {
-      const decoded = JSON.parse(logins[2]) as unknown;
-      return (
-        Array.isArray(decoded) &&
-        decoded.length > 0 &&
-        decoded.every((value) => typeof value === "string" && value.length > 0)
-      );
-    } catch {
-      return false;
-    }
-  }
 
   const membership = ASSOCIATION_MEMBERSHIP.exec(normalized);
   if (membership) {

@@ -15,8 +15,7 @@ function ruleIds(raw: string): Set<string> {
 // pull-request content itself through its own token, so the workflow contains
 // no interpolation of untrusted context for a static reader to find. With
 // anthropics/claude-code-action's default write-access gate intact, the
-// write-token finding is agentci/gated-ai-write-token (high); the point of
-// these tests is that ingestion is recognized at all.
+// parent content may have a different author from the trigger actor.
 describe("agent actions that fetch untrusted content themselves", () => {
   it("flags an agent action reachable on an untrusted event with write permissions", () => {
     const rules = ruleIds(`
@@ -35,7 +34,7 @@ jobs:
         with:
           claude_code_oauth_token: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 `);
-    expect(rules).toContain("agentci/gated-ai-write-token");
+    expect(rules).toContain("agentci/untrusted-ai-write-token");
   });
 
   it("does not mislabel self-fetched content as prompt interpolation", () => {
@@ -92,7 +91,81 @@ jobs:
         with:
           claude_code_oauth_token: \${{ secrets.TOKEN }}
 `);
+    expect(rules).toContain("agentci/untrusted-ai-write-token");
+  });
+
+  it.each([
+    "anthropics/claude-code-action@v1",
+    "anthropics/claude-code-base-action@beta",
+  ])("does not invent self-fetching for a static prompt on %s", (action) => {
+    const rules = ruleIds(`
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+jobs:
+  summarize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ${action}
+        with:
+          prompt: Summarize the repository README
+`);
     expect(rules).not.toContain("agentci/untrusted-ai-write-token");
+    expect(rules).not.toContain("agentci/gated-ai-write-token");
+    expect(rules).not.toContain("agentci/untrusted-input-in-prompt");
+  });
+
+  it("keeps tag-mode ingestion possible when a dynamic prompt can resolve empty", () => {
+    const rules = ruleIds(`
+on: issue_comment
+permissions:
+  contents: write
+jobs:
+  summarize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          prompt: "\${{ vars.CLAUDE_PROMPT }}"
+`);
+    expect(rules).toContain("agentci/untrusted-ai-write-token");
+    expect(rules).not.toContain("agentci/untrusted-input-in-prompt");
+  });
+
+  it("does not let a same-repo PR head gate sanitize earlier review comments fetched in tag mode", () => {
+    const rules = ruleIds(`
+on: pull_request_review_comment
+permissions:
+  contents: write
+jobs:
+  review:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+`);
+    expect(rules).toContain("agentci/untrusted-ai-write-token");
+  });
+
+  it("keeps fork changed-file context untrusted when the owner opens a PR in tag mode", () => {
+    const rules = ruleIds(`
+on:
+  pull_request:
+    types: [opened]
+permissions:
+  contents: write
+jobs:
+  review:
+    if: github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          track_progress: true
+`);
+    expect(rules).toContain("agentci/untrusted-ai-write-token");
   });
 
   it("does not flag an agent action on a trusted event", () => {
