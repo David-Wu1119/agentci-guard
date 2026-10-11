@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { renderPilotSources } from "./pilot-sources.mjs";
 
 const outputArgument = process.argv[2];
 if (!outputArgument) {
@@ -44,8 +45,8 @@ if (
 for (const [source, destination] of [
   ["benchmark/pilot/PACKET_README.md", "README.md"],
   ["ANNOTATION_GUIDE.md", "ANNOTATION_GUIDE.md"],
-  ["RULES.md", "RULES.md"],
-  ["docs/analysis-model.md", "analysis-model.md"],
+  ["benchmark/pilot/contracts/v0.1.1/RULES.md", "RULES.md"],
+  ["benchmark/pilot/contracts/v0.1.1/analysis-model.md", "analysis-model.md"],
   ["benchmark/pilot/manifest.json", "manifest.json"],
   ["benchmark/pilot/annotation-sheet.csv", "annotation-sheet.csv"],
   ["benchmark/pilot/timing-sheet.csv", "timing-sheet.csv"],
@@ -73,7 +74,7 @@ for (const item of pilotManifest.cases) {
 
 fs.writeFileSync(
   path.join(outputRoot, "SOURCES.md"),
-  renderSources(pilotManifest.cases),
+  renderPilotSources(pilotManifest.cases),
 );
 const packetFiles = walk(outputRoot).sort();
 const checksumRows = packetFiles.map((file) => {
@@ -108,23 +109,6 @@ function safeRelativePath(value) {
     throw new Error(`Unsafe packet path ${value}.`);
   }
   return normalized;
-}
-
-function renderSources(cases) {
-  const rows = [
-    "# Frozen workflow sources",
-    "",
-    "The packet contains only the exact development snapshots identified below.",
-    "",
-    "| Case | Repository | Commit | Workflow | SPDX | Frozen source |",
-    "| --- | --- | --- | --- | --- | --- |",
-  ];
-  for (const item of cases) {
-    rows.push(
-      `| ${item.case_id} | [${item.repository}](${item.repository_url}) | \`${item.source_commit}\` | \`${item.source_path}\` | \`${item.license}\` | [source](${item.source_url}) |`,
-    );
-  }
-  return `${rows.join("\n")}\n`;
 }
 
 function walk(directory) {

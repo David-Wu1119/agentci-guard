@@ -44,5 +44,6 @@ patterns that can increase the risk of AI coding-agent jobs.
   static-analysis boundary; it is not a security finding.
 
 Treat AgentCI Guard as an experimental review aid, not a security gate or a
-formal proof. Its precision and recall remain unreported until the frozen
-real-workflow benchmark is independently labeled and adjudicated.
+formal proof. Its precision and recall remain unreported until a fresh,
+repository-disjoint, sealed real-workflow sample is labeled under a versioned
+protocol and scored without using that sample for rule tuning.

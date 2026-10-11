@@ -14,10 +14,9 @@ const rulesOf = (raw: string) => new Set(findings(raw).map((f) => f.rule_id));
 const CRITICAL = "agentci/untrusted-ai-write-token";
 const GATED = "agentci/gated-ai-write-token";
 
-// anthropics/claude-code-action refuses users without write access by default
-// (docs/security.md). When that gate is intact, the untrusted-trigger +
-// write-token pattern is reported as high, not critical. Every condition that
-// removes the gate, or that the docs do not cover, keeps critical.
+// The Action's actor check cannot authenticate a parent Issue written by
+// someone else. A direct prompt containing only the triggering comment can
+// still receive the high-severity gate reduction.
 const BARE = (extra = "", trigger = "issue_comment:\n    types: [created]") => `
 on:
   ${trigger}
@@ -56,11 +55,14 @@ describe("self-gating agent detection", () => {
     ).toBe(false);
   });
 
-  it("treats any non-empty allowlist as a bypass, and the documented empty default as none", () => {
-    expect(hasAgentGateBypass({ allowed_non_write_users: "*" })).toBe(true);
-    expect(hasAgentGateBypass({ allowed_non_write_users: "alice,bob" })).toBe(
-      true,
-    );
+  it("requires an explicit token for the non-write-user bypass", () => {
+    expect(hasAgentGateBypass({ allowed_non_write_users: "*" })).toBe(false);
+    expect(
+      hasAgentGateBypass({
+        allowed_non_write_users: "alice,bob",
+        github_token: "${{ github.token }}",
+      }),
+    ).toBe(true);
     expect(hasAgentGateBypass({ allowed_bots: "renovate" })).toBe(true);
     expect(hasAgentGateBypass({ allowed_bots: "*" })).toBe(true);
     expect(hasAgentGateBypass({ allowed_non_write_users: "" })).toBe(false);
@@ -72,15 +74,35 @@ describe("self-gating agent detection", () => {
 });
 
 describe("gated-ai-write-token (high) versus untrusted-ai-write-token (critical)", () => {
-  it("downgrades the bare Anthropic template on issue_comment to high", () => {
+  it("uses only events that actually supply the matched prompt source for severity", () => {
+    const raw = `
+on:
+  issue_comment:
+    types: [created]
+  discussion:
+    types: [created]
+permissions:
+  contents: write
+jobs:
+  claude:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          prompt: "Reply: \${{ github.event.comment.body }}"
+`;
+    expect(rulesOf(raw)).toContain(GATED);
+    expect(rulesOf(raw)).not.toContain(CRITICAL);
+    expect(
+      findings(raw).find((finding) => finding.rule_id === GATED)
+        ?.reachable_events,
+    ).toEqual(["issue_comment"]);
+  });
+
+  it("keeps the bare tag-mode template critical for attacker-authored parent issues", () => {
     const rules = rulesOf(BARE());
-    expect(rules).toContain(GATED);
-    expect(rules).not.toContain(CRITICAL);
-    const f = findings(BARE()).find((x) => x.rule_id === GATED);
-    expect(f?.severity).toBe("high");
-    expect(f?.evidence).toMatch(
-      /refuses users without repository write access/,
-    );
+    expect(rules).toContain(CRITICAL);
+    expect(rules).not.toContain(GATED);
   });
 
   it("stays critical when allowed_non_write_users is set", () => {
@@ -95,24 +117,33 @@ describe("gated-ai-write-token (high) versus untrusted-ai-write-token (critical)
     expect(rules).not.toContain(GATED);
   });
 
-  it("treats an explicitly empty allowlist as the default (high)", () => {
+  it("does not let an empty allowlist sanitize a parent issue", () => {
     const rules = rulesOf(BARE('\n          allowed_non_write_users: ""'));
-    expect(rules).toContain(GATED);
-    expect(rules).not.toContain(CRITICAL);
+    expect(rules).toContain(CRITICAL);
+    expect(rules).not.toContain(GATED);
   });
 
   it("stays critical on pull_request_target regardless of the gate", () => {
     const rules = rulesOf(
-      BARE("", "pull_request_target:\n    types: [opened]"),
+      BARE(
+        "\n          track_progress: true",
+        "pull_request_target:\n    types: [opened]",
+      ).replace(
+        "if: contains(github.event.comment.body, '@claude')",
+        "if: github.event.action == 'opened'",
+      ),
     );
     expect(rules).toContain(CRITICAL);
     expect(rules).toContain("agentci/pull-request-target-ai");
     expect(rules).not.toContain(GATED);
   });
 
-  it("stays critical on discussion events, which the docs do not list as checked", () => {
+  it("keeps a potential critical finding for an unverified mutable discussion ref", () => {
     const rules = rulesOf(
-      BARE("", "discussion_comment:\n    types: [created]"),
+      BARE(
+        '\n          prompt: "${{ github.event.discussion.body }}"',
+        "discussion_comment:\n    types: [created]",
+      ),
     );
     expect(rules).toContain(CRITICAL);
     expect(rules).not.toContain(GATED);
@@ -120,7 +151,9 @@ describe("gated-ai-write-token (high) versus untrusted-ai-write-token (critical)
 
   it("downgrades on plain pull_request, which the docs do list as checked", () => {
     const rules = rulesOf(`
-on: pull_request
+on:
+  pull_request:
+    types: [opened]
 permissions:
   pull-requests: write
 jobs:
@@ -154,9 +187,11 @@ jobs:
   });
 
   it("stays critical for claude-code-base-action, which performs no actor check", () => {
-    const raw = BARE().replace(
+    const raw = BARE(
+      '\n          prompt: "${{ github.event.comment.body }}"',
+    ).replace(
       "anthropics/claude-code-action@v1",
-      "anthropics/claude-code-base-action@v1",
+      "anthropics/claude-code-base-action@beta",
     );
     const rules = rulesOf(raw);
     expect(rules).toContain(CRITICAL);
@@ -182,13 +217,13 @@ jobs:
     expect(rules).not.toContain(GATED);
   });
 
-  it("emits neither when an actor gate already makes the job unreachable", () => {
+  it("still reports a parent issue when only the commenter is trusted", () => {
     const raw = BARE().replace(
       "if: contains(github.event.comment.body, '@claude')",
       "if: github.event.comment.author_association == 'OWNER'",
     );
     const rules = rulesOf(raw);
-    expect(rules).not.toContain(CRITICAL);
+    expect(rules).toContain(CRITICAL);
     expect(rules).not.toContain(GATED);
   });
 
@@ -196,7 +231,7 @@ jobs:
     // The high-severity prompt-injection finding is about the interpolation
     // and is unaffected by the agent's own gate.
     const rules = rulesOf(
-      BARE('\n          prompt: "\${{ github.event.comment.body }}"'),
+      BARE('\n          prompt: "Reply: \${{ github.event.comment.body }}"'),
     );
     expect(rules).toContain("agentci/untrusted-input-in-prompt");
     expect(rules).toContain(GATED);

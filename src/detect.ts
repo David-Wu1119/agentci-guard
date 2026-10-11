@@ -56,38 +56,72 @@ export const AI_AGENT_CLI_PATTERNS = [
 // the repository, and the threat this project models requires that reach.
 // See the misleading-non-agent adversarial case.
 //
-// A scheme is required so prose, comments, and documentation naming these
-// hosts do not become observations.
+// Exact documented create routes. A matching URL alone is not an invocation;
+// looksLikeAiHttpDispatch also requires a curl POST command.
 export const AI_AGENT_API_PATTERNS = [
-  /https?:\/\/api\.cursor\.com\/v\d+\/agents\b/i,
-  /https?:\/\/api\.devin\.ai\/v\d+\/sessions\b/i,
-  /https?:\/\/api\.githubcopilot\.com\/[^\s"']*agents?\b/i,
+  /https?:\/\/api\.cursor\.com\/v1\/agents(?:\/[^/\s"'?#]+\/runs)?(?=$|[\s"'?#\\])/i,
+  /https?:\/\/api\.cursor\.com\/v0\/agents(?:\/[^/\s"'?#]+\/followup)?(?=$|[\s"'?#\\])/i,
+  /https?:\/\/api\.devin\.ai\/v1\/sessions(?=$|[\s"'?#\\])/i,
+  /https?:\/\/api\.devin\.ai\/v3\/organizations\/[^/\s"'?#]+\/sessions(?=$|[\s"'?#\\])/i,
+  /https?:\/\/api\.github\.com\/agents\/repos\/[^/\s"'?#]+\/[^/\s"'?#]+\/tasks(?=$|[\s"'?#\\])/i,
 ];
 
 export const AI_AGENT_PATTERNS = [
   ...AI_AGENT_ACTION_PATTERNS,
   ...AI_AGENT_CLI_PATTERNS,
-  ...AI_AGENT_API_PATTERNS,
 ];
 
 const UNTRUSTED_CONTEXT_PATTERNS: Array<{
   pattern: RegExp;
   events: string[];
+  parentEvents?: string[];
+  source:
+    | "issue"
+    | "pull_request"
+    | "pr_head_ref"
+    | "discussion"
+    | "comment"
+    | "review"
+    | "commit"
+    | "other";
 }> = [
   {
-    pattern: /github\.event\.pull_request\.(body|title|head\.ref)/i,
-    events: ["pull_request", "pull_request_target"],
+    pattern: /github\.event\.pull_request\.(body|title)/i,
+    source: "pull_request",
+    events: [
+      "pull_request",
+      "pull_request_target",
+      "pull_request_review",
+      "pull_request_review_comment",
+    ],
+    parentEvents: ["pull_request_review", "pull_request_review_comment"],
+  },
+  {
+    pattern: /github\.event\.pull_request\.head\.ref/i,
+    source: "pr_head_ref",
+    events: [
+      "pull_request",
+      "pull_request_target",
+      "pull_request_review",
+      "pull_request_review_comment",
+    ],
+    parentEvents: ["pull_request_review", "pull_request_review_comment"],
   },
   {
     pattern: /github\.event\.issue\.(body|title)/i,
+    source: "issue",
     events: ["issues", "issue_comment"],
+    parentEvents: ["issue_comment"],
   },
   {
     pattern: /github\.event\.discussion\.(body|title)/i,
+    source: "discussion",
     events: ["discussion", "discussion_comment"],
+    parentEvents: ["discussion_comment"],
   },
   {
     pattern: /github\.event\.comment\.body/i,
+    source: "comment",
     events: [
       "issue_comment",
       "discussion_comment",
@@ -96,28 +130,35 @@ const UNTRUSTED_CONTEXT_PATTERNS: Array<{
   },
   {
     pattern: /github\.event\.review\.body/i,
+    source: "review",
     events: ["pull_request_review"],
   },
   {
     pattern: /github\.event\.review_comment\.body/i,
+    source: "comment",
     events: ["pull_request_review_comment"],
   },
   {
     pattern: /github\.event\.head_commit\.message/i,
+    source: "commit",
     events: ["push"],
   },
   {
     pattern: /github\.head_ref/i,
+    source: "pr_head_ref",
     events: ["pull_request", "pull_request_target"],
   },
   {
     pattern: /github\.ref_name/i,
+    source: "other",
     events: ["*"],
   },
 ];
 
 const SECRET_PATTERNS = [
   /secrets\.[A-Za-z0-9_]+/i,
+  /\$\{\{[^}]*\bsecrets\s*\[[^\]]+\]/i,
+  /\$\{\{[^}]*\btoJSON\s*\(\s*secrets\s*\)/i,
   /github\.token/i,
   /\$\{\{\s*(?:env\.)?[A-Z0-9_]*(?:TOKEN|KEY)\s*\}\}/,
 ];
@@ -137,10 +178,8 @@ export function isSelfGatingAgentAction(uses: string): boolean {
 }
 
 /**
- * The default gate is removed by allowlisting non-write users or bots. The
- * docs mark `allowed_non_write_users` "a significant security risk" and note
- * that `allowed_bots` entries are not permission-checked at all, so any
- * non-empty value for either counts as a bypass.
+ * The default gate is removed by allowlisting non-write users with an explicit
+ * token or by allowlisting bots. The latter are not permission-checked.
  */
 export function hasAgentGateBypass(withBlock: unknown): boolean {
   if (!withBlock || typeof withBlock !== "object") return false;
@@ -148,6 +187,12 @@ export function hasAgentGateBypass(withBlock: unknown): boolean {
     const value = (withBlock as Record<string, unknown>)[key];
     if (value === undefined || value === null) continue;
     if (typeof value === "string" && value.trim() === "") continue;
+    if (
+      key === "allowed_non_write_users" &&
+      !String((withBlock as Record<string, unknown>).github_token ?? "").trim()
+    ) {
+      continue;
+    }
     return true;
   }
   return false;
@@ -156,7 +201,8 @@ export function hasAgentGateBypass(withBlock: unknown): boolean {
 /**
  * Events on which the action's docs state the write-access check applies.
  * `discussion`, `discussion_comment`, and `pull_request_target` are not listed;
- * a job reachable on any of those keeps its full severity.
+ * paths that can reach the Action on those events keep full severity. The
+ * scanner separately excludes events rejected by a verified pinned revision.
  */
 export const SELF_GATED_EVENTS = new Set([
   "issues",
@@ -167,7 +213,11 @@ export const SELF_GATED_EVENTS = new Set([
 ]);
 
 export function looksLikeAiUsage(value: string): boolean {
-  return AI_AGENT_PATTERNS.some((pattern) => pattern.test(value));
+  return (
+    looksLikeAiAction(value) ||
+    looksLikeAiCli(value) ||
+    looksLikeAiHttpDispatch(value)
+  );
 }
 
 /**
@@ -191,26 +241,592 @@ export function looksLikeAiAction(value: string): boolean {
 }
 
 /**
- * A shell-driven agent invocation: a local CLI, or an HTTP call to a hosted
- * agent endpoint. Both are grouped here rather than with actions because they
- * receive only what the surrounding script hands them, so untrusted content
- * still has to be interpolated for it to reach the agent.
+ * A local CLI invocation, separate from an HTTP dispatch to a remote agent.
  */
 export function looksLikeAiCli(value: string): boolean {
-  return [...AI_AGENT_CLI_PATTERNS, ...AI_AGENT_API_PATTERNS].some((pattern) =>
-    pattern.test(value),
+  // A command substitution executes too, but scanner.ts treats its dataflow
+  // as opaque rather than claiming a proven direct CLI sink.
+  return (
+    aiCliInvocations(value).length > 0 ||
+    hasOpaqueAiCliSubstitution(value) ||
+    hasOpaqueAiCliShellCommand(value)
   );
+}
+
+export function looksLikeAiHttpDispatch(value: string): boolean {
+  return aiHttpDispatches(value).length > 0;
+}
+
+type ShellWord = { text: string; expandableText: string; raw?: string };
+export type AiCliInvocation = {
+  command: string;
+  expandableCommand: string;
+  pipedInput: string;
+  opaqueInput: boolean;
+};
+type AiHttpDispatch = {
+  command: string;
+  payload: string;
+  expandablePayload: string;
+  expandableCommand: string;
+  opaquePayload: boolean;
+};
+
+function shellWords(value: string): ShellWord[] {
+  const words: ShellWord[] = [];
+  let text = "";
+  let expandableText = "";
+  let quote = "";
+  let started = false;
+  let escaped = false;
+  let wordStart = 0;
+  const push = (end: number) => {
+    if (started)
+      words.push({ text, expandableText, raw: value.slice(wordStart, end) });
+    text = "";
+    expandableText = "";
+    started = false;
+  };
+  for (let index = 0; index < value.length; index++) {
+    if (!started) wordStart = index;
+    const character = value[index];
+    if (escaped) {
+      text += character;
+      if (character !== "$") expandableText += character;
+      escaped = false;
+    } else if (value.startsWith("${{", index)) {
+      // Actions evaluates expressions before invoking the runner shell, even
+      // when the expression appears inside shell single quotes. Preserve the
+      // full expression so its own quoted punctuation cannot be re-parsed as
+      // shell syntax or hide a context field from the source matcher.
+      const end = githubExpressionEnd(value, index);
+      if (end < 0) {
+        text += character;
+        if (quote !== "'") expandableText += character;
+      } else {
+        const expression = value.slice(index, end);
+        text += expression;
+        expandableText += expression;
+        index = end - 1;
+      }
+    } else if (character === "\\" && quote !== "'") {
+      escaped = true;
+    } else if (quote) {
+      if (character === quote) quote = "";
+      else {
+        text += character;
+        if (quote !== "'") expandableText += character;
+      }
+    } else if (character === "'" || character === '"') {
+      quote = character;
+    } else if (character === "#" && !started) {
+      break;
+    } else if (/\s/.test(character)) {
+      push(index);
+      continue;
+    } else {
+      text += character;
+      expandableText += character;
+    }
+    started = true;
+  }
+  push(value.length);
+  return words;
+}
+
+function heredocDelimiter(line: string): string {
+  let quote = "";
+  let escaped = false;
+  for (let index = 0; index < line.length - 1; index++) {
+    const character = line[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (character === "\\" && quote !== "'") {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      if (character === quote) quote = "";
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+    if (character === "#" && (index === 0 || /\s/.test(line[index - 1]))) break;
+    if (line.startsWith("${{", index)) {
+      const end = githubExpressionEnd(line, index);
+      if (end >= 0) index = end - 1;
+      continue;
+    }
+    if (line.startsWith("<<<", index) || !line.startsWith("<<", index))
+      continue;
+    const operand = line
+      .slice(index + 2)
+      .match(
+        /^-?\s*(?:'([A-Za-z_][\w-]*)'|"([A-Za-z_][\w-]*)"|([A-Za-z_][\w-]*))/,
+      );
+    if (operand) return operand[1] ?? operand[2] ?? operand[3];
+  }
+  return "";
+}
+
+function shellScriptWithoutHeredocBodies(value: string): string {
+  let heredoc = "";
+  return value
+    .replace(/\\\r?\n/g, " ")
+    .split("\n")
+    .filter((line) => {
+      if (heredoc) {
+        if (line.trim() === heredoc) heredoc = "";
+        return false;
+      }
+      heredoc = heredocDelimiter(line);
+      return true;
+    })
+    .join("\n");
+}
+
+/** Find GitHub's closing expression delimiter outside quoted string literals. */
+function githubExpressionEnd(value: string, start: number): number {
+  let quoted = false;
+  for (let index = start + 3; index < value.length; index++) {
+    if (value[index] === "'") {
+      if (quoted && value[index + 1] === "'") index++;
+      else quoted = !quoted;
+    } else if (!quoted && value.startsWith("}}", index)) {
+      return index + 2;
+    }
+  }
+  return -1;
+}
+
+/** Keep nested shell substitutions opaque instead of promoting inner commands. */
+function commandSubstitutionEnd(value: string, start: number): number {
+  let depth = 1;
+  let quote = "";
+  let escaped = false;
+  for (let index = start + 2; index < value.length; index++) {
+    const character = value[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (character === "\\" && quote !== "'") {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      if (character === quote) quote = "";
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+    if (value.startsWith("${{", index)) {
+      const end = githubExpressionEnd(value, index);
+      if (end >= 0) index = end - 1;
+      continue;
+    }
+    if (character === "(") depth++;
+    if (character === ")" && --depth === 0) return index + 1;
+  }
+  return -1;
+}
+
+/**
+ * Split only the shell constructs needed to associate a directly executed
+ * agent CLI with its own arguments. This is not a general shell parser:
+ * scanner.ts reports an analysis diagnostic for opaque stdin/variable flow.
+ */
+function shellCommandSegments(
+  value: string,
+): Array<{ command: string; pipedInput: string }> {
+  const script = shellScriptWithoutHeredocBodies(value);
+  const segments: Array<{ command: string; pipedInput: string }> = [];
+  let start = 0;
+  let quote = "";
+  let escaped = false;
+  let pipeline = "";
+  const push = (end: number, separator: string) => {
+    const command = script.slice(start, end).trim();
+    if (command) segments.push({ command, pipedInput: pipeline });
+    pipeline =
+      separator === "|" || separator === "|&"
+        ? [pipeline, command].filter(Boolean).join("\n")
+        : "";
+    start = end + separator.length;
+  };
+  for (let index = 0; index < script.length; index++) {
+    const character = script[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (character === "\\" && quote !== "'") {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      if (character === quote) quote = "";
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+    // GitHub expressions are substituted before the shell runs; punctuation
+    // inside one is not a shell command separator.
+    if (script.startsWith("${{", index)) {
+      const end = githubExpressionEnd(script, index);
+      if (end >= 0) {
+        index = end - 1;
+        continue;
+      }
+    }
+    if (script.startsWith("$(", index)) {
+      const end = commandSubstitutionEnd(script, index);
+      index = end >= 0 ? end - 1 : script.length - 1;
+      continue;
+    }
+    // `2>&1` duplicates a file descriptor; its `&` is not a command boundary.
+    if (character === "&" && script[index - 1] === ">") continue;
+    if ("\n;&|()".includes(character)) {
+      const next = script[index + 1];
+      const paired =
+        ((character === "&" || character === "|") && next === character) ||
+        (character === "|" && next === "&");
+      const separator = paired ? character + next : character;
+      push(index, separator);
+      if (paired) index++;
+    }
+  }
+  push(script.length, "");
+  return segments;
+}
+
+function firstUnquotedRedirection(command: string): number {
+  let quote = "";
+  let escaped = false;
+  for (let index = 0; index < command.length; index++) {
+    const character = command[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (character === "\\" && quote !== "'") {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      if (character === quote) quote = "";
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+    if (command.startsWith("${{", index)) {
+      const end = githubExpressionEnd(command, index);
+      if (end >= 0) {
+        index = end - 1;
+        continue;
+      }
+    }
+    if (character === "<" || character === ">") return index;
+  }
+  return -1;
+}
+
+function envLaunchedCommand(words: ShellWord[]): {
+  commandWords: ShellWord[];
+  prefixWords: ShellWord[];
+} {
+  let index = 0;
+  while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[index]?.raw ?? "")) index++;
+  const assignmentEnd = index;
+  while (["sudo", "command", "exec"].includes(words[index]?.text)) index++;
+  if (!["env", "/usr/bin/env"].includes(words[index]?.text)) {
+    return {
+      commandWords: words.slice(assignmentEnd),
+      prefixWords: words.slice(0, assignmentEnd),
+    };
+  }
+  index++;
+  // shortcut: model literal env options; extend for -S if a measured miss warrants it.
+  while (true) {
+    const option = words[index]?.text;
+    if (option === "--") {
+      index++;
+      break;
+    }
+    if (["-i", "--ignore-environment"].includes(option)) {
+      index++;
+      continue;
+    }
+    if (
+      ["-u", "--unset"].includes(option) &&
+      /^[A-Za-z_][A-Za-z0-9_]*$/.test(words[index + 1]?.text ?? "")
+    ) {
+      index += 2;
+      continue;
+    }
+    if (/^--unset=[A-Za-z_][A-Za-z0-9_]*$/.test(option ?? "")) {
+      index++;
+      continue;
+    }
+    break;
+  }
+  while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[index]?.text ?? "")) index++;
+  if (["exec", "command"].includes(words[index]?.text)) {
+    return { commandWords: [], prefixWords: words };
+  }
+  return {
+    commandWords: words.slice(index),
+    prefixWords: words.slice(0, index),
+  };
+}
+
+/** Direct local CLI commands, excluding sibling commands and shell comments. */
+export function aiCliInvocations(value: string): AiCliInvocation[] {
+  const invocations: AiCliInvocation[] = [];
+  for (const segment of shellCommandSegments(value)) {
+    const redirection = firstUnquotedRedirection(segment.command);
+    const command =
+      redirection >= 0
+        ? segment.command.slice(0, redirection)
+        : segment.command;
+    const { commandWords, prefixWords } = envLaunchedCommand(
+      shellWords(command),
+    );
+    const executable = commandWords.map((word) => word.text).join(" ");
+    if (
+      !AI_AGENT_CLI_PATTERNS.some(
+        (pattern) => pattern.exec(executable)?.index === 0,
+      )
+    ) {
+      continue;
+    }
+    // The shell also accepts arguments *after* a redirect. We intentionally
+    // exclude the redirect tail from proven prompt material, but cannot call
+    // the command complete without parsing that tail's remaining arguments.
+    const opaqueInput =
+      redirection >= 0 ||
+      commandWords.some((word) => /\$\(|`/.test(word.text)) ||
+      prefixWords.some((word) => /\$/.test(word.expandableText));
+    invocations.push({
+      command: executable,
+      expandableCommand: commandWords
+        .map((word) => word.expandableText)
+        .join(" "),
+      pipedInput: segment.pipedInput,
+      opaqueInput,
+    });
+  }
+  return invocations;
+}
+
+/**
+ * A CLI named inside a nested command substitution can execute even when the
+ * bounded command splitter cannot attribute its arguments. Do not report it
+ * as a proven direct invocation; let the scanner mark analysis incomplete.
+ */
+export function hasOpaqueAiCliSubstitution(value: string): boolean {
+  const script = shellScriptWithoutHeredocBodies(value);
+  let quote = "";
+  let escaped = false;
+  for (let index = 0; index < script.length - 1; index++) {
+    const character = script[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (character === "\\" && quote !== "'") {
+      escaped = true;
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      if (!quote) quote = character;
+      else if (quote === character) quote = "";
+      continue;
+    }
+    if (quote !== "'" && character === "$" && script[index + 1] === "(") {
+      const end = commandSubstitutionEnd(script, index);
+      const body = script.slice(index + 2, end >= 0 ? end - 1 : undefined);
+      if (aiCliInvocations(body).length > 0) return true;
+    }
+  }
+  return false;
+}
+
+/** A shell -c string may execute an agent, but its nested dataflow is opaque. */
+export function hasOpaqueAiCliShellCommand(value: string): boolean {
+  // shortcut: one literal shell -c layer only; extend after measured misses.
+  return shellCommandSegments(value).some((segment) => {
+    const { commandWords } = envLaunchedCommand(shellWords(segment.command));
+    return (
+      ["sh", "bash", "/bin/sh", "/bin/bash"].includes(
+        commandWords[0]?.text ?? "",
+      ) &&
+      commandWords[1]?.text === "-c" &&
+      aiCliInvocations(commandWords[2]?.text ?? "").length > 0
+    );
+  });
+}
+
+export function aiHttpDispatches(value: string): AiHttpDispatch[] {
+  // shortcut: direct curl commands only; extend with a shell parser if a
+  // measured miss shows dispatch through wrappers or generated scripts.
+  const dispatches: AiHttpDispatch[] = [];
+  const script = shellScriptWithoutHeredocBodies(value);
+  for (const match of script.matchAll(
+    /(?:^|[\n;&|()])\s*curl\b([^\n;&|]*)/gim,
+  )) {
+    const words = shellWords(match[1]);
+    let method = "";
+    let getOverride = false;
+    let hasRoute = false;
+    const payloads: ShellWord[] = [];
+    for (let index = 0; index < words.length; index++) {
+      const word = words[index].text;
+      if (word === "-G" || word === "--get") getOverride = true;
+      if (word === "-X" || word === "--request") {
+        method = words[index + 1]?.text.toUpperCase() ?? "";
+        index++;
+        continue;
+      } else if (word.startsWith("--request=")) {
+        method = word.slice("--request=".length).toUpperCase();
+        continue;
+      } else if (/^-X[A-Za-z]+$/.test(word)) {
+        method = word.slice(2).toUpperCase();
+        continue;
+      }
+      if (
+        /^(?:-d|-F|--data(?:-raw|-binary|-urlencode)?|--json|--form)$/.test(
+          word,
+        )
+      ) {
+        if (words[index + 1]) payloads.push(words[++index]);
+        continue;
+      }
+      const attached =
+        /^(?:-d|-F)(.+)$|^--(?:data(?:-raw|-binary|-urlencode)?|json|form)=(.*)$/.exec(
+          word,
+        );
+      if (attached) {
+        payloads.push({
+          text: attached[1] ?? attached[2],
+          expandableText: words[index].expandableText.replace(
+            /^(?:-d|-F|--(?:data(?:-raw|-binary|-urlencode)?|json|form)=)/,
+            "",
+          ),
+        });
+        continue;
+      }
+      if (word === "-H" || word === "--header") {
+        index++;
+        continue;
+      }
+      if (word === "--url") {
+        index++;
+      } else if (word.startsWith("-") && !word.startsWith("--url=")) {
+        // shortcut: unknown curl options followed by a URL take that URL as
+        // an option value; expand the no-value list when a real call is missed.
+        if (
+          !/^(?:-[sSLfkvi]+|--(?:silent|show-error|location|fail|fail-with-body|insecure|verbose|compressed|include|http1\.1|http2))$/.test(
+            word,
+          ) &&
+          /^https?:\/\//i.test(words[index + 1]?.text ?? "")
+        )
+          index++;
+        continue;
+      }
+      const candidate = words[index]?.text.replace(/^--url=/, "") ?? "";
+      if (
+        AI_AGENT_API_PATTERNS.some(
+          (pattern) => pattern.exec(candidate)?.index === 0,
+        )
+      ) {
+        hasRoute = true;
+      }
+    }
+    if (
+      hasRoute &&
+      !getOverride &&
+      (method === "POST" || (!method && payloads.length > 0))
+    ) {
+      dispatches.push({
+        command: `curl ${words.map((word) => word.text).join(" ")}`,
+        payload: payloads.map((word) => word.text).join(" "),
+        expandablePayload: payloads
+          .map((word) => word.expandableText)
+          .join(" "),
+        expandableCommand: words.map((word) => word.expandableText).join(" "),
+        opaquePayload: payloads.some((word) => /^@|\$\(|`/.test(word.text)),
+      });
+    }
+  }
+  return dispatches;
 }
 
 export function containsUntrustedGitHubContext(value: string): boolean {
   return untrustedGitHubContextEvents(value).length > 0;
 }
 
-export function untrustedGitHubContextEvents(value: string): string[] {
+type ContextPattern = (typeof UNTRUSTED_CONTEXT_PATTERNS)[number];
+
+function matchingGitHubContextPatterns(value: string): ContextPattern[] {
+  const matches = new Set<ContextPattern>();
+  let cursor = 0;
+  while (true) {
+    const start = value.indexOf("${{", cursor);
+    if (start < 0) break;
+    let expression = "";
+    let quoted = false;
+    let end = -1;
+    for (let index = start + 3; index < value.length; index++) {
+      if (value[index] === "'") {
+        if (quoted && value[index + 1] === "'") index++;
+        else quoted = !quoted;
+      } else if (!quoted && value.startsWith("}}", index)) {
+        end = index + 2;
+        break;
+      } else if (!quoted) {
+        expression += value[index];
+      }
+    }
+    if (end < 0) break;
+    for (const candidate of UNTRUSTED_CONTEXT_PATTERNS) {
+      if (candidate.pattern.test(expression)) matches.add(candidate);
+    }
+    cursor = end;
+  }
+  return [...matches];
+}
+
+export function untrustedGitHubContextMatches(value: string): Array<{
+  event: string;
+  source: ContextPattern["source"];
+}> {
+  return matchingGitHubContextPatterns(value).flatMap((candidate) =>
+    candidate.events.map((event) => ({ event, source: candidate.source })),
+  );
+}
+
+/** With parentOnly, keep only fields whose author can differ from the commenter. */
+export function untrustedGitHubContextEvents(
+  value: string,
+  parentOnly = false,
+): string[] {
   const events = new Set<string>();
-  for (const candidate of UNTRUSTED_CONTEXT_PATTERNS) {
-    if (candidate.pattern.test(value)) {
-      for (const event of candidate.events) events.add(event);
+  for (const candidate of matchingGitHubContextPatterns(value)) {
+    for (const event of parentOnly
+      ? (candidate.parentEvents ?? [])
+      : candidate.events) {
+      events.add(event);
     }
   }
   return [...events];

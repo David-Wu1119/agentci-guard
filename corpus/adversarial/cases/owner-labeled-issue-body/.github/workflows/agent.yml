@@ -1,0 +1,14 @@
+name: owner-labeled-issue-body
+on:
+  issues:
+    types: [labeled]
+permissions:
+  contents: write
+jobs:
+  agent:
+    if: github.event.sender.login == github.repository_owner
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc
+        with:
+          prompt: "Respond to ${{ github.event.issue.body }}"

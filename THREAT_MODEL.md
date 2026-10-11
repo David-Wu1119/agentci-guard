@@ -40,7 +40,7 @@ adversary can change trusted base-branch workflow YAML before the run.
 ## Unsupported or incomplete semantics
 
 - Arbitrary data flow through scripts, generated files, composite Actions, or
-  external services.
+  external services, including agent-initiated API/tool fetches.
 - Runtime behavior of downloaded Actions and model providers.
 - Full GitHub expression language, matrices, dynamic object access, and
   authorization logic hidden in scripts.
@@ -52,9 +52,13 @@ adversary can change trusted base-branch workflow YAML before the run.
 - Non-GitHub CI systems.
 
 Unsupported event expressions, ambiguous checkout protection, permission
-defaults, reusable-workflow boundaries, and parse failures produce diagnostics and
-`analysis_complete=false`. A diagnostic is not a finding, but a clean-looking
+defaults, vendor event compatibility, an explicitly configured Issue-tool read,
+reusable-workflow boundaries,
+and parse failures produce diagnostics and `analysis_complete=false`. A diagnostic is not a finding, but a clean-looking
 finding list with a diagnostic is not a closed analysis.
+`analysis_complete=true` only means that no _recognized_ unsupported construct
+was encountered. It cannot certify the absence of indirect input paths that
+the scanner does not model.
 
 ## Expected failure modes
 
@@ -65,10 +69,15 @@ finding list with a diagnostic is not a closed analysis.
 - Complex conditions can reduce decision coverage through abstention.
 - Static permission and environment resolution can disagree with runtime
   policy or generated configuration.
+- Vendor Action event compatibility is modeled only for one verified immutable
+  Anthropic revision; other refs can still produce potential findings.
 - A matched pattern can be mitigated by author checks, approval gates, output
   allowlists, or isolation the scanner does not model.
 - A dangerous workflow can use a source, sink, capability, or permission not
-  represented by the eight rules.
+  represented by the nine rules.
+- A prompt can direct an agent to fetch untrusted Issue/PR content through an
+  allowed tool without interpolating that content into YAML. The scanner can
+  miss this source-to-agent path even when `analysis_complete=true`.
 
 ## Interpretation
 
@@ -76,7 +85,9 @@ Use “finding,” “pattern match,” “scanner rating,” “supported seman
 “analysis incomplete.” Do not describe a finding as a confirmed exploit or a
 clean result as a secure workflow.
 
-No precision or recall claim is valid until the frozen benchmark has public
-human labels, independent review, adjudication, and generated error analysis.
+No precision or recall claim is valid until a fresh, repository-disjoint
+evaluation sample has public human labels under a frozen single-annotator
+protocol and generated error analysis. The v3 corpus is development-only, and
+single-annotator test-retest checks cannot substitute for independent review.
 The qualification targets in the benchmark are wording gates for “calibrated
 experimental linter,” not safety guarantees.

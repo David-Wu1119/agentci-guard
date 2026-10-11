@@ -1,6 +1,6 @@
 # v0.6.1 Release Gate
 
-v0.6.1 is a precision patch over v0.6.0 for the one bounded defect the
+v0.6.1 is an action-owner matching patch over v0.6.0 for the one bounded defect the
 follow-up review of 2026-09-09 named: the action matcher accepted prefixed
 owners (`not-google-github-actions/run-gemini-cli`), for every vendor, because
 `\b` treats a hyphen as a word boundary. The matcher now requires the vendor

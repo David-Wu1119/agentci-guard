@@ -21,6 +21,72 @@
       "url": "https://docs.github.com/en/actions/reference/events-that-trigger-workflows",
       "claim": "Event payloads and pull_request_target execution context determine attacker influence and privilege."
     },
+    "env-command": {
+      "type": "primary",
+      "title": "GNU Coreutils env invocation",
+      "url": "https://www.gnu.org/s/coreutils/manual/html_node/env-invocation.html",
+      "claim": "env executes the command following its options and NAME=VALUE assignments in a modified environment."
+    },
+    "anthropic-action-modes": {
+      "type": "primary",
+      "title": "Claude Code Action tag and agent modes",
+      "url": "https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/modes/detector.ts",
+      "claim": "Supported issue, comment, and review triggers can select tag mode, which fetches parent issue or PR context; a nonempty prompt normally selects agent mode, while track_progress can force tag mode. A bare PR trigger does not imply tag mode."
+    },
+    "anthropic-action-access": {
+      "type": "primary",
+      "title": "Claude Code Action access control",
+      "url": "https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/docs/security.md",
+      "claim": "The action checks trigger-user write access by default, but this does not authenticate the author of separately fetched parent content."
+    },
+    "anthropic-action-event-support": {
+      "type": "primary",
+      "title": "Claude Code Action event parsing at an immutable revision",
+      "url": "https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/github/context.ts#L250-L251",
+      "claim": "This revision throws on discussion and discussion_comment before the agent can start. Other refs are not assumed to share that behavior."
+    },
+    "anthropic-tag-pr-paths": {
+      "type": "primary",
+      "title": "Claude Code Action tag-mode PR prompt",
+      "url": "https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/create-prompt/index.ts",
+      "claim": "Tag mode builds a PR prompt that includes changed-file paths, which can originate in the PR head rather than from the triggering actor."
+    },
+    "anthropic-app-token": {
+      "type": "primary",
+      "title": "Claude Code Action OIDC App token path",
+      "url": "https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/github/token.ts",
+      "claim": "Without a supplied github_token, the Action can exchange an OIDC token for an App token with default contents, pull-requests, and issues write permissions."
+    },
+    "anthropic-agent-prompt-787": {
+      "type": "primary",
+      "title": "Claude Code Action agent mode at the fixture's immutable revision",
+      "url": "https://github.com/anthropics/claude-code-action/blob/787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251/src/modes/agent/index.ts",
+      "claim": "Agent mode uses the configured prompt directly and forwards configured Claude tool arguments; it does not automatically append the Issue body."
+    },
+    "anthropic-agent-token-787": {
+      "type": "primary",
+      "title": "Claude Code Action token setup at the fixture's immutable revision",
+      "url": "https://github.com/anthropics/claude-code-action/blob/787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251/src/entrypoints/run.ts",
+      "claim": "The Action exports its acquired GitHub token as GH_TOKEN before starting Claude; exact issued App-token scope and tool invocation remain unobserved."
+    },
+    "anthropic-agent-oidc-787": {
+      "type": "primary",
+      "title": "Claude Code Action OIDC exchange at the fixture's immutable revision",
+      "url": "https://github.com/anthropics/claude-code-action/blob/787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251/src/github/token.ts",
+      "claim": "Without github_token, the Action attempts an OIDC-to-App token exchange; success and actual issued scope are external runtime facts."
+    },
+    "anthropic-agent-mcp-787": {
+      "type": "primary",
+      "title": "Claude Code Action MCP setup at the fixture's immutable revision",
+      "url": "https://github.com/anthropics/claude-code-action/blob/787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251/src/mcp/install-mcp-server.ts",
+      "claim": "Agent mode does not install GitHub MCP tools unless they are explicitly allowed."
+    },
+    "gh-issue-view": {
+      "type": "primary",
+      "title": "GitHub CLI issue view manual",
+      "url": "https://cli.github.com/manual/gh_issue_view",
+      "claim": "gh issue view displays an Issue's title, body, and other information."
+    },
     "checkout-protection": {
       "type": "primary",
       "title": "Safer pull_request_target defaults for GitHub Actions checkout",
@@ -38,6 +104,12 @@
       "title": "Reuse workflows",
       "url": "https://docs.github.com/en/actions/how-tos/sharing-automations/reusing-workflows",
       "claim": "Local reusable workflows inherit caller context subject to explicit inputs, secrets, and permissions."
+    },
+    "secrets-to-action": {
+      "type": "primary",
+      "title": "Secrets in GitHub Actions",
+      "url": "https://docs.github.com/en/actions/concepts/security/secrets",
+      "claim": "A secret must be set as an Action input or environment variable to make it available to that Action."
     },
     "project-analysis-contract": {
       "type": "project",
@@ -198,6 +270,78 @@
       },
       "rationale": "An AI CLI invoked in run already executes through a shell and therefore has command capability.",
       "assumption_sources": ["project-rule-contract"]
+    },
+    {
+      "id": "run-env-cli",
+      "path": "cases/run-env-cli",
+      "targets": ["env launcher around a direct AI CLI"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent",
+        "step": "Run Claude through env"
+      },
+      "expected": {
+        "reachable_events": ["issue_comment"],
+        "findings": [
+          {
+            "rule_id": "agentci/untrusted-ai-write-token",
+            "severity": "critical",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/untrusted-input-in-prompt",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "step": "Run Claude through env",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/ai-shell-access",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "step": "Run Claude through env",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/broad-write-permissions",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [],
+        "agent_usages": [
+          {
+            "file": ".github/workflows/agent.yml",
+            "job": "agent",
+            "step": "Run Claude through env",
+            "kind": "cli",
+            "line_min": 2,
+            "reachable_events": ["issue_comment"]
+          }
+        ],
+        "analysis_complete": true
+      },
+      "rationale": "GNU env runs Claude after a constant CI assignment; the comment body is a direct prompt argument in a writable AI job.",
+      "assumption_sources": [
+        "env-command",
+        "event-security",
+        "permissions",
+        "project-rule-contract"
+      ]
     },
     {
       "id": "action-prose-no-shell",
@@ -460,51 +604,33 @@
     {
       "id": "discussion-write",
       "path": "cases/discussion-write",
-      "targets": ["discussion event", "discussions permission"],
+      "targets": ["discussion event", "verified Action event incompatibility"],
       "subject": {
         "file": ".github/workflows/agent.yml",
         "job": "agent"
       },
       "expected": {
         "reachable_events": ["discussion"],
-        "findings": [
+        "findings": [],
+        "agent_usages": [],
+        "diagnostics": [
           {
-            "rule_id": "agentci/broad-write-permissions",
-            "severity": "medium",
+            "code": "agentci/analysis-agent-event-unsupported",
+            "severity": "warning",
             "location": {
               "file": ".github/workflows/agent.yml",
               "job": "agent",
-              "line_min": 2
-            }
-          },
-          {
-            "rule_id": "agentci/untrusted-ai-write-token",
-            "severity": "critical",
-            "location": {
-              "file": ".github/workflows/agent.yml",
-              "job": "agent",
-              "line_min": 2
-            }
-          },
-          {
-            "rule_id": "agentci/untrusted-input-in-prompt",
-            "severity": "high",
-            "location": {
-              "file": ".github/workflows/agent.yml",
-              "job": "agent",
-              "step": "step 1",
               "line_min": 2
             }
           }
         ],
-        "diagnostics": [],
-        "analysis_complete": true
+        "analysis_complete": false
       },
-      "rationale": "Discussion body content is untrusted and the discussions write scope gives the influenced agent a relevant write capability.",
+      "rationale": "GitHub can trigger this workflow, but the verified Anthropic Action revision rejects discussion before Claude starts. No agent-mediated write path is claimed.",
       "assumption_sources": [
         "event-security",
-        "permissions",
-        "project-rule-contract"
+        "anthropic-action-event-support",
+        "project-analysis-contract"
       ]
     },
     {
@@ -547,14 +673,25 @@
             }
           }
         ],
-        "diagnostics": [],
-        "analysis_complete": true
+        "diagnostics": [
+          {
+            "code": "agentci/analysis-agent-event-unknown",
+            "severity": "warning",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          }
+        ],
+        "analysis_complete": false
       },
-      "rationale": "Discussion comment content is attacker-controlled input and discussions write enables an agent-side effect.",
+      "rationale": "This synthetic Action ref has unverified discussion_comment support. The untrusted comment and write scope justify potential findings, not a confirmed agent-side effect.",
       "assumption_sources": [
         "event-security",
         "permissions",
-        "project-rule-contract"
+        "project-rule-contract",
+        "project-analysis-contract"
       ]
     },
     {
@@ -580,14 +717,25 @@
             }
           }
         ],
-        "diagnostics": [],
-        "analysis_complete": true
+        "diagnostics": [
+          {
+            "code": "agentci/analysis-agent-event-unknown",
+            "severity": "warning",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          }
+        ],
+        "analysis_complete": false
       },
-      "rationale": "Discussion comment content remains untrusted, but an explicit discussions read scope must not create write-permission findings.",
+      "rationale": "This synthetic Action ref has unverified discussion_comment support. If it runs, comment content is untrusted; explicit discussions read must not create write-permission findings.",
       "assumption_sources": [
         "event-security",
         "permissions",
-        "project-rule-contract"
+        "project-rule-contract",
+        "project-analysis-contract"
       ]
     },
     {
@@ -613,14 +761,25 @@
             }
           }
         ],
-        "diagnostics": [],
-        "analysis_complete": true
+        "diagnostics": [
+          {
+            "code": "agentci/analysis-agent-event-unknown",
+            "severity": "warning",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          }
+        ],
+        "analysis_complete": false
       },
-      "rationale": "A discussion title is untrusted event content even when an explicit discussions read scope prevents token-write findings.",
+      "rationale": "This synthetic Action ref has unverified discussion support. If it runs, title content is untrusted; explicit discussions read prevents token-write findings.",
       "assumption_sources": [
         "event-security",
         "permissions",
-        "project-rule-contract"
+        "project-rule-contract",
+        "project-analysis-contract"
       ]
     },
     {
@@ -719,7 +878,7 @@
         ],
         "analysis_complete": true
       },
-      "rationale": "Caller event, permission, untrusted input, and explicit capability context must propagate through a nested local reusable-workflow call chain. Contract change 2026-09-05, by owner decision after review of anthropics/claude-code-action docs/security.md: the callee is that action with its default write-access gate intact (no allowed_non_write_users or allowed_bots, no pull_request_target or discussion trigger, no untrusted text in a run: step), so the write-token finding is agentci/gated-ai-write-token at high rather than critical. See docs/analysis-model.md, 'The agent's own gate'.",
+      "rationale": "Caller event, permission, untrusted input, and explicit capability context must propagate through a nested local reusable-workflow call chain. The literal prompt prefix guarantees agent mode while retaining transitive input taint. Contract change 2026-09-05, by owner decision after review of anthropics/claude-code-action docs/security.md: the callee is that action with its default write-access gate intact (no allowed_non_write_users or allowed_bots, no pull_request_target or discussion trigger, no untrusted text in a run: step), so the write-token finding is agentci/gated-ai-write-token at high rather than critical. See docs/analysis-model.md, 'The agent's own gate'.",
       "assumption_sources": [
         "reusable-workflows",
         "permissions",
@@ -768,7 +927,7 @@
       "path": "cases/local-reusable-secret",
       "targets": [
         "reusable workflow secret propagation",
-        "inherited secret exposure"
+        "inherited secret availability without Action exposure"
       ],
       "subject": {
         "file": ".github/workflows/reusable.yml",
@@ -776,17 +935,7 @@
       },
       "expected": {
         "reachable_events": ["push"],
-        "findings": [
-          {
-            "rule_id": "agentci/ai-with-secrets",
-            "severity": "medium",
-            "location": {
-              "file": ".github/workflows/reusable.yml",
-              "job": "agent",
-              "line_min": 2
-            }
-          }
-        ],
+        "findings": [],
         "diagnostics": [],
         "agent_usages": [
           {
@@ -801,9 +950,10 @@
         ],
         "analysis_complete": true
       },
-      "rationale": "A caller's secrets inherit declaration exposes inherited secrets to a reachable AI job in the local reusable workflow.",
+      "rationale": "The caller makes secrets available to the reusable workflow, but the AI Action has no explicit secret input or environment reference. Inheritance alone is not an ai-with-secrets finding; the built-in workflow token is modeled separately.",
       "assumption_sources": [
         "reusable-workflows",
+        "secrets-to-action",
         "project-analysis-contract",
         "project-rule-contract"
       ]
@@ -1124,51 +1274,6 @@
         "reachable_events": ["issue_comment"],
         "findings": [
           {
-            "rule_id": "agentci/gated-ai-write-token",
-            "severity": "high",
-            "location": {
-              "file": ".github/workflows/agent.yml",
-              "job": "agent",
-              "line_min": 2
-            }
-          },
-          {
-            "rule_id": "agentci/ai-with-secrets",
-            "severity": "medium",
-            "location": {
-              "file": ".github/workflows/agent.yml",
-              "job": "agent",
-              "line_min": 2
-            }
-          },
-          {
-            "rule_id": "agentci/broad-write-permissions",
-            "severity": "medium",
-            "location": {
-              "file": ".github/workflows/agent.yml",
-              "job": "agent",
-              "line_min": 2
-            }
-          }
-        ],
-        "diagnostics": [],
-        "analysis_complete": true
-      },
-      "rationale": "Bare anthropics/claude-code-action on issue_comment with contents/issues write and no allowed_non_write_users or allowed_bots: the action's documented default refuses users without write access, so the pattern is reported at high (gated-ai-write-token), not critical. Owner-set contract, 2026-09-05; see docs/analysis-model.md 'The agent's own gate'.",
-      "assumption_sources": ["event-security", "project-rule-contract"]
-    },
-    {
-      "id": "gated-write-bypass",
-      "path": "cases/gated-write-bypass",
-      "targets": ["agent default write-access gate", "project-rule-contract"],
-      "subject": {
-        "file": ".github/workflows/agent.yml",
-        "job": "agent"
-      },
-      "expected": {
-        "reachable_events": ["issue_comment"],
-        "findings": [
-          {
             "rule_id": "agentci/untrusted-ai-write-token",
             "severity": "critical",
             "location": {
@@ -1199,8 +1304,524 @@
         "diagnostics": [],
         "analysis_complete": true
       },
-      "rationale": "Identical to gated-write except allowed_non_write_users: '*', which the action's docs call a significant security risk: the default gate is disabled for every account, so the finding is critical. Pins the boundary from the other side.",
+      "rationale": "The bare action uses tag mode. A trusted commenter may trigger it on an attacker-authored parent Issue or PR; checking the commenter does not authenticate the fetched parent body. The write-token path remains critical despite the action's default trigger-user gate.",
+      "assumption_sources": [
+        "event-security",
+        "anthropic-action-modes",
+        "anthropic-action-access",
+        "project-rule-contract"
+      ]
+    },
+    {
+      "id": "gated-write-bypass",
+      "path": "cases/gated-write-bypass",
+      "targets": [
+        "explicit non-write-user bypass with github_token",
+        "agent-mode Issue prompt"
+      ],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["issues"],
+        "findings": [
+          {
+            "rule_id": "agentci/untrusted-ai-write-token",
+            "severity": "critical",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/untrusted-input-in-prompt",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "step": "step 1",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/ai-with-secrets",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/broad-write-permissions",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "An external Issue creator can reach the explicit agent-mode prompt carrying their title. The pinned Action only honors allowed_non_write_users when github_token is supplied; this workflow supplies both, so its default trigger-user write-access gate no longer justifies a high-severity downgrade.",
+      "assumption_sources": [
+        "event-security",
+        "anthropic-action-modes",
+        "anthropic-action-access",
+        "project-rule-contract"
+      ]
+    },
+    {
+      "id": "owner-labeled-issue-body",
+      "path": "cases/owner-labeled-issue-body",
+      "targets": [
+        "trigger actor differs from parent Issue author",
+        "owner-applied label"
+      ],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["issues"],
+        "findings": [
+          {
+            "rule_id": "agentci/untrusted-ai-write-token",
+            "severity": "critical",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/untrusted-input-in-prompt",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "step": "step 1",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/broad-write-permissions",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [
+          {
+            "code": "agentci/analysis-event-condition",
+            "severity": "warning",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 8
+            }
+          }
+        ],
+        "analysis_complete": false
+      },
+      "rationale": "The owner can apply a label to an attacker-authored Issue. The owner-only sender gate authenticates the labeler, not the author of the Issue body interpolated into the agent prompt. The actor-only job condition remains an event-reachability uncertainty.",
+      "assumption_sources": [
+        "event-security",
+        "anthropic-action-access",
+        "project-rule-contract"
+      ]
+    },
+    {
+      "id": "owner-opened-issue-body",
+      "path": "cases/owner-opened-issue-body",
+      "targets": ["creation-only event connects sender to Issue body author"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["issues"],
+        "findings": [
+          {
+            "rule_id": "agentci/broad-write-permissions",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [
+          {
+            "code": "agentci/analysis-event-condition",
+            "severity": "warning",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 8
+            }
+          }
+        ],
+        "analysis_complete": false
+      },
+      "rationale": "On an issues.opened-only trigger, the gated sender created the Issue body. The owner-only gate removes untrusted-source findings, but the job still carries a broad write scope. The actor-only job condition remains an event-reachability uncertainty.",
       "assumption_sources": ["event-security", "project-rule-contract"]
+    },
+    {
+      "id": "trusted-comment-parent-tag",
+      "path": "cases/trusted-comment-parent-tag",
+      "targets": [
+        "tag-mode parent context",
+        "trusted commenter differs from parent author"
+      ],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["issue_comment"],
+        "findings": [
+          {
+            "rule_id": "agentci/untrusted-ai-write-token",
+            "severity": "critical",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/broad-write-permissions",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [
+          {
+            "code": "agentci/analysis-event-condition",
+            "severity": "warning",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 8
+            }
+          }
+        ],
+        "analysis_complete": false
+      },
+      "rationale": "A trusted owner comment can invoke tag mode on an attacker-authored parent Issue. Tag mode fetches the Issue body at runtime, so a commenter gate does not remove the parent-content write-token path. The actor-only job condition remains an event-reachability uncertainty.",
+      "assumption_sources": [
+        "event-security",
+        "anthropic-action-modes",
+        "anthropic-action-access",
+        "project-rule-contract"
+      ]
+    },
+    {
+      "id": "explicit-static-agent-prompt",
+      "path": "cases/explicit-static-agent-prompt",
+      "targets": [
+        "explicit agent-mode prompt does not self-fetch event content"
+      ],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["issues"],
+        "findings": [
+          {
+            "rule_id": "agentci/broad-write-permissions",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "Providing a static prompt selects Anthropic agent mode, which writes that prompt directly. The scanner must not infer event-body ingestion merely because the trigger is issues.opened; the broad write scope remains independently reportable.",
+      "assumption_sources": [
+        "event-security",
+        "anthropic-action-modes",
+        "project-rule-contract"
+      ]
+    },
+    {
+      "id": "issue-tool-fetch",
+      "path": "cases/issue-tool-fetch",
+      "targets": ["Issue body read through an explicitly permitted agent tool"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["issues"],
+        "findings": [
+          {
+            "rule_id": "agentci/ai-shell-access",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "step": "Plan issue",
+              "line_min": 11
+            }
+          },
+          {
+            "rule_id": "agentci/ai-with-secrets",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 8
+            }
+          },
+          {
+            "rule_id": "agentci/broad-write-permissions",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 8
+            }
+          }
+        ],
+        "diagnostics": [
+          {
+            "code": "agentci/analysis-agent-tool-fetch-unknown",
+            "severity": "warning",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 11
+            }
+          }
+        ],
+        "analysis_complete": false
+      },
+      "rationale": "The pinned Action receives a static prompt with the Issue number and a Bash allowlist for gh issue view. A write-authorized labeler may trigger it on an outsider-authored Issue. The tool could read that body, but the workflow alone cannot prove Claude invoked the tool or that the App token had a particular issued scope; the write-token path abstains rather than claiming a critical finding.",
+      "assumption_sources": [
+        "event-security",
+        "permissions",
+        "anthropic-agent-prompt-787",
+        "anthropic-agent-token-787",
+        "anthropic-agent-oidc-787",
+        "gh-issue-view",
+        "project-rule-contract"
+      ]
+    },
+    {
+      "id": "issue-tool-no-read",
+      "path": "cases/issue-tool-no-read",
+      "targets": ["Issue number without a permitted gh issue read tool"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["issues"],
+        "findings": [
+          {
+            "rule_id": "agentci/ai-shell-access",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "step": "Plan issue",
+              "line_min": 11
+            }
+          },
+          {
+            "rule_id": "agentci/ai-with-secrets",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 8
+            }
+          },
+          {
+            "rule_id": "agentci/broad-write-permissions",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 8
+            }
+          }
+        ],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "The prompt passes only an Issue number, not the body. This pinned Action's agent mode does not automatically fetch the body, and its configured Bash allowlist lacks gh issue view. No supported Issue-body ingestion path is established by this fixture; the unrelated shell, secret, and write-permission observations remain.",
+      "assumption_sources": [
+        "event-security",
+        "anthropic-agent-prompt-787",
+        "anthropic-agent-mcp-787",
+        "gh-issue-view",
+        "project-rule-contract"
+      ]
+    },
+    {
+      "id": "same-repo-pr-commenter",
+      "path": "cases/same-repo-pr-commenter",
+      "targets": ["PR head provenance differs from review-comment author"],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["pull_request_review_comment"],
+        "findings": [
+          {
+            "rule_id": "agentci/gated-ai-write-token",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/untrusted-input-in-prompt",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "step": "step 1",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/broad-write-permissions",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [
+          {
+            "code": "agentci/analysis-event-condition",
+            "severity": "warning",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 8
+            }
+          }
+        ],
+        "analysis_complete": false
+      },
+      "rationale": "A same-repository PR head says nothing about who wrote a review comment. The comment body reaches the prompt; the action's default commenter write-access check only changes the write-token severity to high. The provenance-only job condition remains an event-reachability uncertainty.",
+      "assumption_sources": [
+        "event-security",
+        "anthropic-action-access",
+        "project-rule-contract"
+      ]
+    },
+    {
+      "id": "owner-opened-pr-tag-paths",
+      "path": "cases/owner-opened-pr-tag-paths",
+      "targets": [
+        "owner actor does not authenticate fork PR changed-file paths",
+        "track_progress selects tag mode",
+        "potential OIDC App write capability"
+      ],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["pull_request"],
+        "findings": [
+          {
+            "rule_id": "agentci/untrusted-ai-write-token",
+            "severity": "critical",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [
+          {
+            "code": "agentci/analysis-event-condition",
+            "severity": "warning",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 9
+            }
+          }
+        ],
+        "analysis_complete": false
+      },
+      "rationale": "A repository owner may open a PR from another person's fork. track_progress forces tag mode even with a static prompt, and that mode includes PR changed-file paths from the head branch. The owner gate does not authenticate those paths; id-token: write with no supplied github_token models a potential separate App write capability, not a writable fork-PR GITHUB_TOKEN. The actor-only condition leaves event reachability partially unresolved.",
+      "assumption_sources": [
+        "event-security",
+        "anthropic-action-modes",
+        "anthropic-action-access",
+        "anthropic-tag-pr-paths",
+        "anthropic-app-token",
+        "project-rule-contract"
+      ]
+    },
+    {
+      "id": "pr-tag-paths",
+      "path": "cases/pr-tag-paths",
+      "targets": [
+        "fork PR changed-file paths in tag mode",
+        "potential OIDC App write capability"
+      ],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "agent"
+      },
+      "expected": {
+        "reachable_events": ["pull_request"],
+        "findings": [
+          {
+            "rule_id": "agentci/untrusted-ai-write-token",
+            "severity": "critical",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "agent",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "A fork PR author controls changed-file paths that tag mode includes in the agent context. The Action's actor gate cannot downgrade this source-aware finding; the modeled write path is a potential OIDC App token, not the workflow's read-only GITHUB_TOKEN.",
+      "assumption_sources": [
+        "event-security",
+        "anthropic-action-modes",
+        "anthropic-action-access",
+        "anthropic-tag-pr-paths",
+        "anthropic-app-token",
+        "project-rule-contract"
+      ]
     },
     {
       "id": "gemini-write",

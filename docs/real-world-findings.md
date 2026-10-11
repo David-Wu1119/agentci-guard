@@ -70,19 +70,18 @@ A later informal triage also suggested that action-level authorization gates
 could make some matched patterns unreachable. That triage was not preserved as
 a labeled dataset either, so no exploitability or prevalence claim survives.
 
-## Replacement
+## Later research artifacts
 
-v0.1.1 uses:
+Later work preserves:
 
 - a public synthetic adversarial corpus for known semantic regressions;
 - a frozen, licensed 152-workflow v3 candidate corpus with fixed commits,
   hashes, multiple agent families, and a preserved superseded v1 manifest;
-- repository-disjoint development/evaluation splits;
-- a full primary annotation pass, deterministic second-human review plan, and
-  preserved adjudication;
-- scripts for separate agent-detection and rule precision, recall, F1, support,
-  confidence intervals, decision coverage, abstention, diagnostics, and error
-  taxonomy.
+- a blank annotation registry and an unexecuted human review plan, not
+  completed labels or adjudication;
+- development-only metric scripts. The former evaluation split was used for
+  rule tuning and cannot establish held-out accuracy.
 
-The replacement benchmark remains **unscored** until the required human labels
-exist. No accuracy number should appear in project claims before that point.
+These artifacts do not reproduce the historical 75-repository result. The
+real-workflow candidate remains **unscored**. No accuracy number should appear
+in project claims before a valid human-labeled evaluation.

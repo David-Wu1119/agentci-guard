@@ -65,9 +65,10 @@ Do not name a public repository as vulnerable from benchmark data. A credible
 exploitability issue should use private disclosure rather than a public
 benchmark discussion.
 
-Accuracy changes may use only the development split. Evaluation remains sealed
-until human labels are adjudicated. If evaluation errors influence a rule
-change, the affected data must be retired from held-out evaluation.
+The entire v3 corpus is development data after evaluation leakage. Formal
+accuracy work requires a fresh sealed v4 sample and a registry covering all
+current rules. If evaluation errors influence a rule change, those cases must
+be retired from held-out evaluation.
 
 ## Pull requests
 

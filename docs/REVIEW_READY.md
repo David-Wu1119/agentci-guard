@@ -122,6 +122,6 @@ Pending. Five targeted invitations were drafted ([`invitations/README.md`](../ev
 
 ## One résumé bullet (justified by the evidence above)
 
-> Built and shipped a static analyzer for prompt-injection reachability in GitHub Actions workflows that run AI coding agents (TypeScript; GitHub Action, CLI, SARIF, org-wide audit); maintained a frozen 152-workflow behavioral benchmark and a 41-case adversarial corpus; ran a pre-registered spot check that surfaced a silent-no-op packaging defect before release, and closed an external engineering review's three findings, and its follow-up's one, with regression tests in bounded patches.
+> Built and shipped a static analyzer for prompt-injection reachability in GitHub Actions workflows that run AI coding agents (TypeScript; GitHub Action, CLI, SARIF, org-wide audit); maintained a frozen 152-workflow behavioral benchmark and a checked-in adversarial corpus; ran a pre-registered spot check that surfaced a silent-no-op packaging defect before release, and closed an external engineering review's three findings, and its follow-up's one, with regression tests in bounded patches.
 
 Not claimed: accuracy figures, production-gate status, users, revenue, human validation.

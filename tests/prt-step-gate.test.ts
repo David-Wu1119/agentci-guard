@@ -16,8 +16,9 @@ const GATED = "agentci/gated-ai-write-token";
 const CHECKOUT = "agentci/unsafe-checkout";
 
 // The documented gate contract (docs/analysis-model.md, "Actor and provenance
-// guards") says actor-gated *jobs and steps* do not raise the four
-// untrusted-reachability findings, including pull-request-target-ai. At v0.4.0
+// guards") says actor-gated agent steps do not raise the actor-reachability
+// finding, pull-request-target-ai. Unsafe checkout depends on PR code origin,
+// not on who applied a label. At v0.4.0
 // the pull_request_target rule consulted only the job-level gate, so an agent
 // step guarded by `github.actor == github.repository_owner` was still reported
 // as critical. Roadmap Day 2 regression input, reproduced at 5b99fb5.
@@ -124,6 +125,23 @@ jobs:
     const rules = rulesOf(raw);
     expect(rules).toContain(CHECKOUT);
     expect(rules).not.toContain(PRT);
+  });
+
+  it("does not treat an owner-triggered label as protection for attacker PR code", () => {
+    const raw = `
+on:
+  pull_request_target:
+    types: [labeled]
+jobs:
+  review:
+    if: github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          ref: \${{ github.event.pull_request.head.sha }}
+`;
+    expect(rulesOf(raw)).toContain(CHECKOUT);
   });
 
   it("keeps pull-request-target-ai for a read-only job with an unguarded agent", () => {

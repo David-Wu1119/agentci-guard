@@ -8,10 +8,11 @@ analysis entry point, and the frozen benchmark's per-case results are identical
 before and after that extraction.
 
 The accuracy boundary is unchanged from v0.2.0 and still governs every claim:
-experimental scanner, unmeasured accuracy under the labeling protocol, one
-non-blind reader's 86% precision on the critical rule, and no modeling of
-`claude-code-action`'s default write-access gate. An organization report
-inherits all of that; its findings are review hypotheses across more
+experimental scanner, unmeasured accuracy under the labeling protocol, and no
+modeling of `claude-code-action`'s default write-access gate at this historical
+release. The earlier single-reader, non-blind judgments were not a precision
+estimate; this note supersedes the original wording. An organization report
+inherits these limits; its findings are review hypotheses across more
 repositories, not a stronger claim.
 
 ## Pre-release required

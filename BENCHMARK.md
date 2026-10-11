@@ -9,12 +9,14 @@ calibration claim yet**.
 Current immutable data:
 
 - 152 workflow files from 152 public repositories.
-- 57 development workflows and 95 sealed evaluation workflows.
+- 57 originally designated development workflows and 95 originally designated
+  evaluation workflows; all 152 are now development data.
 - 60 Claude-Action-enriched workflows.
 - 60 nonoverlapping `actions/checkout` controls.
 - 16 inspected diversity workflows moved to development: four each for Codex
   Action, Aider CLI, Cursor Agent CLI, and OpenHands configurations/lookalikes.
-- 16 unseen, mechanically selected replacements in evaluation: four per family.
+- 16 mechanically selected replacement workflows originally designated for
+  evaluation: four per family. That designation was later lost to leakage.
 - 7,056 primary annotation units.
 - 5,676 units in the deterministic secondary-pass candidate plan (80.4%).
   Existing formal tooling still names this independent review, but no second
@@ -39,6 +41,15 @@ out, and the per-case results in `evidence/` are behavioral regression
 records, not accuracy evidence. A formal evaluation requires a v4
 repository-disjoint sample that is not opened for rule tuning. A checksum
 freeze proves the snapshots are immutable; it does not make them unseen.
+The scorer now rejects v3 `eval` and `all` runs even if label files or manifest
+status change; only development diagnostics remain possible.
+
+The separate [nine-rule candidate micro-pilot](benchmark/candidate-pilot/README.md)
+uses seven targeted v3 cases as **development** challenges, including one whose
+original manifest split was `eval` before the leakage reclassification. Its
+neutral-ID packet and single-human test–retest checks assess annotation
+feasibility and rule ambiguity only. These labels cannot supply held-out
+precision or recall, and they do not unblock a v4 repository-disjoint sample.
 
 **Formal-evaluation blocker — rule registry mismatch.** The manifest's
 annotation registry (`annotation_schema_version` 2) names eight rules. The
@@ -104,14 +115,18 @@ is `benchmark/schemas/annotation-record.schema.json`.
 
 ## Human review protocol
 
-- Before formal labeling, the sole available human runs the deterministic
-  development-only feasibility pilot under `benchmark/pilot/`.
+- Before formal labeling, the sole available human runs the current nine-rule,
+  160-unit development-only micro-pilot under
+  [`benchmark/candidate-pilot/`](benchmark/candidate-pilot/README.md).
+- The six-workflow, 168-unit eight-rule pilot under `benchmark/pilot/` is a
+  historical v0.1.1 protocol. Do not use its packet or contract for the current
+  candidate pilot, and do not combine labels from the two versions.
 - The same stable pseudonym is used for both pilot passes. Pass 2 starts at
   least seven full days after pass 1 ends, and pass-1 decisions remain closed
   until pass 2 is complete.
-- The pilot measures active time, raw exact agreement, chance-corrected
-  test-retest agreement, and protocol ambiguity on 168 development units. It
-  is not accuracy or inter-rater agreement evidence.
+- The current pilot records self-reported active time and per-rule label
+  distributions and disagreements across 160 development units. It is not
+  accuracy or inter-rater agreement evidence.
 - Formal evaluation labeling has not begun. The current formal comparison,
   adjudication, validation, and scoring path still requires two genuinely
   independent human identities. It must not be bypassed by assigning two
@@ -127,7 +142,10 @@ is `benchmark/schemas/annotation-record.schema.json`.
   commit are frozen. If rules change after evaluation errors are seen, the
   affected evaluation data becomes development data.
 
-See [`ANNOTATION_GUIDE.md`](ANNOTATION_GUIDE.md) for the decision rules.
+For the current candidate pilot, use its standalone
+[`CONTRACT.md`](benchmark/candidate-pilot/CONTRACT.md). The repository
+[`ANNOTATION_GUIDE.md`](ANNOTATION_GUIDE.md) documents the historical eight-rule
+v3 registry and pilot, not this candidate packet.
 
 ## Metrics
 
@@ -188,26 +206,17 @@ pnpm build
 pnpm benchmark:verify
 pnpm benchmark:smoke
 
-# Only after the three human label files exist:
+# Development-only diagnostics, if genuine labels are later created under a
+# valid protocol; the current single-annotator protocol is not yet complete:
 AGENTCI_BENCHMARK_SPLIT=dev \
   node scripts/benchmark/score.mjs benchmark/labels/adjudicated.jsonl
-
-# Generate the error template outside the repository, classify it, and commit
-# the reviewed error-analysis file before the final clean-worktree run:
-eval_tmp="$(mktemp -d)"
-AGENTCI_BENCHMARK_SPLIT=eval \
-  AGENTCI_BENCHMARK_OUTPUT_DIR="$eval_tmp" \
-  node scripts/benchmark/score.mjs benchmark/labels/adjudicated.jsonl
-cp "$eval_tmp/errors-eval.csv" benchmark/labels/error-analysis-eval.csv
-
-# After human classification, set status evaluated, commit, and verify clean:
-final_eval_tmp="$(mktemp -d)"
-AGENTCI_BENCHMARK_SPLIT=eval \
-  AGENTCI_BENCHMARK_OUTPUT_DIR="$final_eval_tmp" \
-  node scripts/benchmark/score.mjs \
-  benchmark/labels/adjudicated.jsonl \
-  benchmark/labels/error-analysis-eval.csv
 ```
+
+No v4 sample, annotation registry, labels, or accuracy results exist yet. The
+v3 `eval`/`all` commands intentionally fail; future formal evaluation needs a
+separate v4 manifest, nine-rule registry, versioned human protocol, and scorer.
+The [v4 intake gate](benchmark/v4/README.md) checks only future sample
+provenance and separation; its synthetic tests do not constitute a v4 sample.
 
 See [`REPRODUCIBILITY.md`](REPRODUCIBILITY.md) and
 [`DATA_CARD.md`](DATA_CARD.md) for provenance and limitations.

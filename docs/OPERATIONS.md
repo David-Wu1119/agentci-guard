@@ -25,24 +25,26 @@ precision or recall figure in any public material.
 
 What can truthfully be said today:
 
-- Eight rules, one threat model, documented in [`RULES.md`](../RULES.md).
-- Deterministic regression against a 41-case adversarial corpus and a frozen
+- Nine rules, one threat model, documented in [`RULES.md`](../RULES.md).
+- Deterministic regression against the checked-in adversarial corpus and a frozen
   152-workflow real-world benchmark, both reproducible from the repository.
   The benchmark is **development and regression evidence**: its v3 evaluation
   split was opened during detector correction on 2–5 September 2026 and may
   not be cited as held out (see `BENCHMARK.md`, "Status change, 2026-09-05").
 - Every critical finding on the benchmark was hand-read during development,
-  and four detection defects were found and fixed by that process; the
+  and six detection defects were found and fixed by that process; the
   defects and their measured effects are recorded in
   [`CHANGELOG.md`](../CHANGELOG.md).
-- On the same 152 workflows, zizmor 1.30.0 flags 146 repositories to this
-  tool's 77, and catches classes this tool does not model. This tool raises a
-  top-severity finding on 8 repositories where zizmor reports nothing
-  equivalent, all of them agent-reachability. Both facts belong together.
+- The earlier numeric comparison with zizmor is withdrawn. This repository
+  lacks the per-workflow zizmor output and rule-equivalence mapping needed to
+  replay it. Do not claim relative accuracy or unique coverage from the
+  152-workflow development corpus.
 - The academic prior art is Wang et al., "Demystifying and Detecting Agentic
   Workflow Injection Vulnerabilities in GitHub Actions" (arXiv 2605.07135),
-  whose TaintAWI analyzes the same class at far larger scale with confirmed
-  exploitability. Cite it; do not compete with it.
+  whose TaintAWI analyzes the same class, including prompt-to-agent and
+  prompt-to-script paths, at far larger scale. Its 496 cases were judged
+  exploitable among 519 reviewed alerts, not demonstrated live attacks. Cite
+  it; do not claim this tool invented the problem or has measured superiority.
 
 ## Running an organization audit
 
@@ -51,8 +53,9 @@ with `GITHUB_TOKEN` set is the audit deliverable: one Markdown report across
 every repository in an organization or user account, fetched through the API
 without cloning. The summary table places every scanned repository in one of
 five categories (complete or incomplete × with or without findings, or no
-workflows); only "Complete, no findings" means the analyzer read everything and
-reported nothing. Read the "Skipped" and "Incomplete analysis" sections before
+workflows); "Complete, no findings" means the analyzer read every fetched
+workflow and reported no pattern within its modeled subset. It does not rule
+out indirect tool or file flows. Read the "Skipped" and "Incomplete analysis" sections before
 sending anything to a client — a skipped repository is a gap in the report, and
 the command exits 1 when one exists. Every finding remains a review hypothesis;
 hand-read each critical before it goes in front of a maintainer or a buyer, and
@@ -190,7 +193,8 @@ Detection is a hand-maintained list in `src/detect.ts` with three shapes:
 - `AI_AGENT_CLI_PATTERNS` — `run:` invocations at a command boundary. Keep
   the boundary and the `--version` / `--help` exclusion; installation and
   version checks are not executions.
-- `AI_AGENT_API_PATTERNS` — HTTP calls to hosted **agent-dispatch** routes.
+- `AI_AGENT_API_PATTERNS` — documented hosted-agent creation/follow-up routes;
+  the detector also requires a direct `curl` POST command.
   Require a scheme so prose does not match. Do not add inference endpoints:
   a `chat/completions` call returns text and holds no tools, so it cannot
   reach the repository, and the `misleading-non-agent` corpus case will
@@ -200,8 +204,8 @@ Actions are presumed to fetch the triggering event's content themselves; CLIs
 and HTTP calls are not, because a shell hands them only what the script puts
 in. Preserve that distinction when adding a pattern.
 
-A quick audit for stale patterns: run the 16 held-out diversity cases
-(`benchmark/snapshots/holdout-*`) and confirm each reports at least one agent
+A quick audit for stale patterns: run the 16 former evaluation diversity cases
+(`benchmark/snapshots/holdout-*`, now development data) and confirm each reports at least one agent
 usage or an explicit unresolvable-workflow diagnostic. A confident clean scan
 on a workflow that visibly names an agent is the failure to look for. Two of
 the sixteen are expected negatives and stay that way: `holdout-aider-003` only
@@ -219,8 +223,9 @@ a defect. Recorded 2026-09-05 in `evidence/sprint-2026-09-05/day7/`.
   environment variable would flag configuration as execution. This is a floor
   on reading workflow files.
 - Conditions on runtime values (`steps.*`, `needs.*`, `env.*`) cannot be
-  resolved and are kept conservative, which errs toward more findings. Roughly
-  two thirds of real workflows carry one; it costs precision, not recall.
+  resolved and are kept conservative, which can produce extra findings. In the
+  v3 development sample, 94 of 152 workflows had an event-condition
+  diagnostic; the effect on precision and recall is unmeasured.
 - Runtime permission checks (a step that queries collaborator access and
   exports an `allowed` output) are not trusted as actor gates, because a static
   reader cannot prove they run before untrusted content is fetched. This is a

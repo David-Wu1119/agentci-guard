@@ -1,0 +1,14 @@
+name: same-repo-pr-commenter
+on:
+  pull_request_review_comment:
+    types: [created]
+permissions:
+  contents: write
+jobs:
+  agent:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc
+        with:
+          prompt: "Respond to ${{ github.event.comment.body }}"

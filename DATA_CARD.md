@@ -3,25 +3,28 @@
 ## Dataset identity
 
 - Name: `agentci-real-workflows-v3`
-- Status: frozen, unlabeled
+- Status: frozen, unlabeled, development-only after evaluation leakage
 - Size: 152 workflow files from 152 public repositories
-- Splits: 57 development, 95 evaluation
+- Historical split designations: 57 development, 95 evaluation; none now held out
 - Primary units: 7,056
 - Secondary-pass candidate plan: 5,676 units. The current formal tooling still
   encodes it as independent review, but no second human is available.
 - Frozen provenance: `benchmark/manifest.json`
 - Record schema: `benchmark/schemas/annotation-record.schema.json`
 
-No accuracy metric has been produced from this dataset.
+No accuracy metric has been produced from this dataset. The former evaluation
+partition was inspected during detector tuning and is development data.
 
 ## Intended use
 
-The dataset is designed to calibrate a narrow static linter:
+The dataset is now suitable for development and regression analysis of a narrow
+static linter:
 
 1. measure reachable AI coding-agent usage detection;
-2. measure eight documented GitHub Actions rule predicates;
+2. inspect eight documented GitHub Actions rule predicates from its original
+   registry; the current scanner has a ninth rule absent from this registry;
 3. expose false positives, false negatives, and scanner abstentions;
-4. reproduce reported metrics from fixed public artifacts.
+4. reproduce scanner behavior from fixed public artifacts.
 
 It is not intended for ecosystem prevalence estimates, repository ranking,
 exploit claims, or training a production security classifier.
@@ -33,7 +36,7 @@ exploit claims, or training a production security classifier.
 | Claude-Action-enriched          |        60 | Concentrate common AI-agent configurations                    |
 | `actions/checkout` control      |        60 | Include ordinary workflows and non-agent lookalikes           |
 | Inspected diversity development |        16 | Preserve viewed Codex/Aider/Cursor/OpenHands cases for tuning |
-| Unseen diversity evaluation     |        16 | Test the same four families on replacement held-out workflows |
+| Former diversity evaluation     |        16 | Preserve replacement cases; no longer held out after leakage  |
 
 One workflow is retained per repository. Base splits are deterministic from the
 recorded seed; v3's leakage correction and replacement IDs are explicit in the
@@ -80,8 +83,8 @@ correction, so v2 is preserved under
 
 V3 moves the 16 inspected cases to development and freezes 16 new
 repository-disjoint evaluation replacements using a new deterministic seed.
-Their contents were not used for scanner changes. All corrections happened
-before human labeling or scanner evaluation.
+Their contents were not used at that freeze. Subsequent detector corrections
+used the v3 evaluation partition, so all v3 cases are now development data.
 
 ## Licensing and attribution
 
@@ -108,8 +111,11 @@ contact maintainers, execute untrusted code, or attempt exploitation.
 
 - The corpus is targeted and heavily enriched; prevalence cannot be inferred.
 - Claude Action remains the largest AI family.
-- Four held-out examples per added family are enough to expose obvious detector
-  gaps but too small for strong family-specific percentages.
+- The four former evaluation examples per added family cannot support held-out
+  percentages; even a fresh four-case family sample would be too small for
+  strong family-specific percentages.
+- The annotation registry omits `agentci/gated-ai-write-token` and cannot
+  measure all current scanner rules.
 - Each snapshot contains the selected workflow file, not an entire repository.
   Local scripts and additional reusable workflows can therefore be
   indeterminate.
@@ -125,9 +131,10 @@ contact maintainers, execute untrusted code, or attempt exploitation.
 
 ## Maintenance and leakage policy
 
-The evaluation split is sealed until adjudication. Rule changes may use only
-development data. If evaluation failures influence scanner changes, those cases
-become development data and cannot remain an unbiased held-out result.
+The v3 evaluation partition is development data. Its `eval` and `all` scoring
+paths reject formal runs. A future v4 sample must be repository-disjoint from
+development data, sealed before rule tuning, and annotated under a versioned
+protocol with all current rules.
 
 New data versions must use a new benchmark ID and preserve earlier manifests,
 labels, metrics, and error analyses.

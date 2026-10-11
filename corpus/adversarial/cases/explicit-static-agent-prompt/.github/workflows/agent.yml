@@ -1,0 +1,13 @@
+name: explicit-static-agent-prompt
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc
+        with:
+          prompt: Summarize the repository README

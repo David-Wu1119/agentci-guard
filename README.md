@@ -2,18 +2,20 @@
 
 [![npm](https://img.shields.io/npm/v/agentci-guard)](https://www.npmjs.com/package/agentci-guard) [![CI](https://github.com/David-Wu1119/agentci-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/David-Wu1119/agentci-guard/actions/workflows/ci.yml) [![license: MIT](https://img.shields.io/npm/l/agentci-guard)](LICENSE)
 
+[Research site](https://cryptoaxiom.net/) · [Site source](site/README.md) (browser-local, single-file scanner; no YAML upload or hosted analysis API)
+
 AgentCI Guard is a static analyzer for GitHub Actions workflows that answers
 one question before a workflow runs: **can text a stranger controls reach an
 AI coding agent that holds a write token or secrets?**
 
 Teams now run Claude Code, Codex, Gemini CLI, OpenHands, and Cursor inside
-Actions to triage issues, review pull requests, and push fixes. Those agents
-read issue and comment text through their own tokens, and they hold
-credentials. That makes the prompt the payload: a stranger opens an issue, the
-agent reads it, and the agent has `contents: write`. AgentCI Guard reads the
-workflow YAML and reports when that chain can close. It ships as a GitHub
-Action, a CLI, a container image, and a pre-commit hook, and it emits SARIF so
-findings land in GitHub's security tab.
+Actions to triage issues, review pull requests, and push fixes. Some agent
+Actions fetch issue or comment text at runtime; others receive only the prompt
+the workflow supplies. That makes untrusted text a possible payload when the
+agent also has authority to write. AgentCI Guard reads the workflow YAML and
+reports supported paths between those inputs and agent authority. It ships as
+a GitHub Action, a CLI, a container image, and a pre-commit hook, and it emits
+SARIF so findings land in GitHub's security tab.
 
 ![AgentCI Guard scanning a vulnerable workflow](docs/demo.gif)
 
@@ -32,8 +34,18 @@ silently disabled by a vendor rename, a status-function trap, and literal-login
 gates the model did not recognize — and every critical finding was then
 hand-read against the agent vendor's documented defaults, which is what
 produced the `gated-ai-write-token` severity. Each is recorded with its measured
-effect in [`CHANGELOG.md`](CHANGELOG.md). A 41-case adversarial corpus is
-frozen and has overruled two proposed changes; both times it was right.
+effect in [`CHANGELOG.md`](CHANGELOG.md). The original 41-case adversarial
+regression set overruled two proposed changes; the public corpus has since
+grown with source-provenance cases. It is not an accuracy benchmark.
+
+The source-provenance behavior described below is an **unreleased candidate in
+this checkout**, not a property of the published `v0.6.2` Action or CLI. The
+historical v0.1.1 eight-rule annotation contract remains unchanged in
+[`benchmark/pilot/contracts/v0.1.1/RULES.md`](benchmark/pilot/contracts/v0.1.1/RULES.md);
+these edits do not retroactively validate its labels or establish accuracy for
+the new classifier. In particular, the candidate reverses the older
+literal-login shortcut: a hard-coded username does not prove that account has
+repository write access.
 
 The benchmark's evaluation split is **no longer held out**: it was opened
 during this week's detector correction and is development data under the
@@ -42,41 +54,51 @@ freeze proves the snapshots are immutable, not that they were unseen. Its
 annotation registry also predates the ninth rule. Any future accuracy claim
 needs a fresh, sealed sample.
 
-On the same 152 workflows, [zizmor](https://github.com/zizmorcore/zizmor)
-1.30.0 flags 146 repositories to this tool's 77 and covers classes this tool
-does not model. This tool raises a top-severity finding on 8 repositories where
-zizmor reports nothing equivalent, all of them agent reachability. Run both.
+An earlier numeric comparison with [zizmor](https://github.com/zizmorcore/zizmor)
+is withdrawn: this repository does not preserve the per-workflow zizmor output
+or rule-equivalence mapping needed to replay it. The 152 workflows are
+development data, not evidence of relative accuracy or unique coverage.
 
-The academic treatment of this vulnerability class is Wang et al.,
+Prior research on this vulnerability class includes Wang et al.,
 [_Demystifying and Detecting Agentic Workflow Injection Vulnerabilities in
-GitHub Actions_](https://arxiv.org/abs/2605.07135), whose taint analysis
-covers 13,392 workflows with confirmed exploitability. If you need a
-production-grade detector, start there.
+GitHub Actions_](https://arxiv.org/abs/2605.07135). Its TaintAWI models
+untrusted event data reaching agents and AI-derived output reaching later
+scripts; it analyzed 13,392 workflows and judged 496 of 519 reviewed alerts
+exploitable under its threat model. Those are not 496 demonstrated attacks.
+AgentCI Guard has not demonstrated a novel detector or comparative advantage.
 
 ## What it detects
 
-Nine rules, one threat model — the full contract is in [`RULES.md`](RULES.md)
-and the reasoning in [`THREAT_MODEL.md`](THREAT_MODEL.md).
+Nine rules, one threat model — the baseline and unreleased candidate are
+documented in [`RULES.md`](RULES.md), with the reasoning in
+[`THREAT_MODEL.md`](THREAT_MODEL.md). A current nine-rule human annotation
+contract has not been frozen.
 
-| Rule                        | Severity | Fires when                                                                                                                                                                                |
-| --------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `untrusted-ai-write-token`  | critical | Untrusted event content reaches an agent in a job holding a sensitive write scope                                                                                                         |
-| `gated-ai-write-token`      | high     | The same pattern, but the agent is `anthropics/claude-code-action` with its default write-access gate intact, on an event its docs say it checks, with no untrusted text in a `run:` step |
-| `pull-request-target-ai`    | critical | An agent is reachable on `pull_request_target`, which runs in base-repo context with secrets                                                                                              |
-| `untrusted-input-in-prompt` | high     | Attacker-controlled context is interpolated into an agent's prompt or inputs                                                                                                              |
-| `ai-shell-access`           | high     | The agent step can execute shell commands                                                                                                                                                 |
-| `unsafe-checkout`           | high     | Untrusted PR head code is checked out without GitHub's built-in protection                                                                                                                |
-| `ai-with-secrets`           | medium   | An agent job's environment references a secret — baseline exposure, not a vulnerability alone                                                                                             |
-| `broad-write-permissions`   | medium   | The job holds write scopes wider than its purpose needs                                                                                                                                   |
-| `unpinned-ai-action`        | medium   | The agent action is referenced by tag rather than commit SHA                                                                                                                              |
+| Rule                        | Severity | Fires when                                                                                                                                                                                  |
+| --------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `untrusted-ai-write-token`  | critical | Untrusted event content reaches an agent with a modeled sensitive write capability, including a narrow Anthropic App-token path in this candidate                                           |
+| `gated-ai-write-token`      | high     | The same pattern, but only when `anthropics/claude-code-action` checks the actor tied to all modeled input sources, its default gate is intact, and no untrusted text reaches a `run:` step |
+| `pull-request-target-ai`    | critical | An agent is reachable on `pull_request_target` without a recognized actor gate; that event runs in base-repo context with secrets                                                           |
+| `untrusted-input-in-prompt` | high     | Attacker-controlled context is interpolated into an agent's prompt or inputs                                                                                                                |
+| `ai-shell-access`           | high     | A local AI CLI runs through the runner shell, or an AI Action explicitly enables a command tool                                                                                             |
+| `unsafe-checkout`           | high     | Untrusted PR head code is checked out without GitHub's built-in protection                                                                                                                  |
+| `ai-with-secrets`           | medium   | An AI step's inputs or environment reference a secret — baseline exposure, not a vulnerability alone                                                                                        |
+| `broad-write-permissions`   | medium   | An AI job has an effective sensitive write scope in its workflow token                                                                                                                      |
+| `unpinned-ai-action`        | medium   | The agent action is referenced by tag rather than commit SHA                                                                                                                                |
 
-Two things the reachability model understands that a trigger-only check would
-not: a job gated to the repository owner, to same-repository pull requests, or
-to a trusted `author_association` is **not** reachable by a stranger and is not
-flagged; and an agent _action_ reads the triggering event's content itself, so
-it is flagged even when no `${{ }}` expression appears in the workflow. A
-`contains(github.event.comment.body, '@claude')` check is a trigger phrase, not
-an actor gate — anyone can type it. Details in
+Two things the unreleased source-aware model checks beyond the event name:
+whether a guard authenticates the author of the **specific text** being read,
+and whether the Action actually fetches event content in its selected mode. An
+owner-only `issues: [opened]` event can authenticate its original Issue body;
+an owner applying `labeled` to someone else's Issue cannot. A PR opener also
+need not be the author of its head branch or changed-file paths; the candidate
+tracks PR title/body separately from PR-head context. For Anthropic's Action,
+tag mode can fetch the parent Issue or PR and changed-file paths without a `${{ }}` expression,
+while a nonempty static `prompt` normally uses agent mode and does not automatically
+fetch that event unless `track_progress` forces tag mode. A lone unresolved `${{ ... }}` prompt may evaluate to empty,
+so the candidate keeps tag-mode ingestion possible.
+`contains(github.event.comment.body, '@claude')` is merely a trigger phrase,
+not an actor gate — anyone can type it. Details in
 [`docs/analysis-model.md`](docs/analysis-model.md).
 
 ## Run it
@@ -96,7 +118,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # Pin an immutable release tag. The floating `v0` is moved to each
+      # Pin a release-specific tag (use a full SHA for immutability). The floating `v0` is moved to each
       # release only after its published-Action smoke passes.
       - uses: David-Wu1119/agentci-guard@v0.6.2
         with:
@@ -130,7 +152,7 @@ The npm registry may lag the Action release (publication is a separate,
 human-authorized step; see [`docs/OPERATIONS.md`](docs/OPERATIONS.md)). To
 evaluate exactly the tested candidate, install the tarball attached to the
 release — its SHA-256 is in the release notes and in
-`evidence/sprint-2026-09-05/day4/`:
+`evidence/sprint-2026-09-05/day9/SHA256SUMS-v0.6.2.txt`:
 
 ```bash
 npm install -g https://github.com/David-Wu1119/agentci-guard/releases/download/v0.6.2/agentci-guard-0.6.2.tgz
@@ -212,7 +234,8 @@ induced to modify code, comments, workflows, or releases.
 
 Fix:
 - Do not run privileged AI agents on untrusted triggers.
-- Use read-only GITHUB_TOKEN permissions for untrusted events.
+- Use read-only GITHUB_TOKEN permissions for untrusted events; separately review
+  any Action-minted token and avoid unnecessary `id-token: write`.
 - Require maintainer approval before running the agent.
 - Sanitize and summarize untrusted content before passing it to an agent.
 ```
@@ -263,17 +286,33 @@ Concretely:
 - Remote reusable workflows are reported as unresolvable, not guessed at.
 - Agent detection is a maintained list of vendors, actions, CLIs, and dispatch
   endpoints. A new or renamed agent is invisible until a pattern is added.
-- `anthropics/claude-code-action` refuses users without write access by
-  default. That is modeled: a bare `@claude` workflow on an untrusted trigger
-  reports `gated-ai-write-token` at **high**, and stays **critical** only when
-  `allowed_non_write_users` or `allowed_bots` is set, the trigger is
-  `pull_request_target` or a discussion event, untrusted text is expanded into a
-  `run:` step, or the agent is one whose default has not been verified. The
-  gate lives inside the action at runtime — a bypass was disclosed in January
-  2026 — and a maintainer can still hand the agent attacker-authored content,
-  which is why it is high rather than gone.
-  For the runtime layer, see
-  [StepSecurity Harden-Runner](https://github.com/step-security/harden-runner).
+- Direct hosted-agent `curl` POSTs are analyzed at request-body level; opaque
+  shell flow is reported as incomplete. Runner `GITHUB_TOKEN` permissions do
+  not establish the hosted agent's write capability.
+- The unreleased source-aware candidate only lowers Anthropic's default-gated
+  Action to `gated-ai-write-token` at **high** when its modeled input sources
+  belong to the checked triggering actor. A maintainer comment or label can
+  activate tag mode on an attacker-authored parent Issue or PR; with a modeled
+  write capability, that remains **critical**. A nonempty static prompt does
+  not imply event ingestion. These mode assumptions are pinned to
+  [Anthropic's detector](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/modes/detector.ts)
+  and [tag-mode data fetch](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/modes/tag/index.ts).
+  It conservatively treats pre-trigger comments/reviews fetched in tag mode as
+  separate untrusted history, without resolving each author's identity or
+  Action-side actor filters; see the [pinned fetcher](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/github/data/fetcher.ts).
+- `broad-write-permissions` models the workflow's effective `GITHUB_TOKEN`
+  scopes. The unreleased write-token rule also recognizes one separate path:
+  full `anthropics/claude-code-action` without `with.github_token` and with a
+  known effective `id-token: write` can exchange OIDC for an App token whose
+  documented permissions include contents, issues, and pull requests at write
+  level. This is a **possible capability**, not proof that the App is installed
+  or token exchange succeeded. Other third-party credentials remain outside
+  the model. A read-only YAML `contents:` scope alone is not a safety proof;
+  see [Anthropic's token path](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/github/token.ts)
+  and [App permissions](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/docs/security.md#github-app-permissions).
+
+For the runtime layer, see
+[StepSecurity Harden-Runner](https://github.com/step-security/harden-runner).
 
 ## Development and operations
 
@@ -302,7 +341,8 @@ security issues per [`SECURITY.md`](SECURITY.md).
 See also the [adversarial regression corpus](corpus/adversarial/README.md),
 the [benchmark protocol](BENCHMARK.md), and the retained
 [historical 75-repository scan](docs/real-world-findings.md), which is
-exploratory and not accuracy evidence.
+exploratory, not accuracy evidence, and not fully reproducible from retained
+raw inputs.
 
 ## License
 

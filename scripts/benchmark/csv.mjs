@@ -1,4 +1,5 @@
 export function parseCsv(text) {
+  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
   const rows = [];
   let row = [];
   let cell = "";

@@ -1,8 +1,9 @@
 # Rules
 
-The normative predicate and severity contract is
-[`../RULES.md`](../RULES.md). This shorter page is retained for package and
-historical links.
+The nine-rule working reference is [`../RULES.md`](../RULES.md). The frozen
+v0.1.1 eight-rule pilot contract is
+[`../benchmark/pilot/contracts/v0.1.1/RULES.md`](../benchmark/pilot/contracts/v0.1.1/RULES.md).
+This shorter page is retained for package and historical links.
 
 Rules are security hypotheses over an explicit workflow model. YAML parse
 failures, unknown permission defaults, unsupported reachability expressions,
@@ -11,26 +12,47 @@ diagnostics—not forced into a security rule.
 
 ## `agentci/untrusted-ai-write-token`
 
-Untrusted trigger content reaches an AI agent with repository write permissions.
+Untrusted content reaches an AI agent with modeled sensitive write capability
+without qualifying for the documented actor-gate downgrade.
+For a hosted agent dispatched by HTTP, the runner job's `GITHUB_TOKEN` scope
+does not establish remote write capability; that path emits
+`analysis-remote-agent-capability-unknown` rather than this finding.
+
+## `agentci/gated-ai-write-token`
+
+Untrusted content reaches a write-capable Claude Code Action whose default
+actor write-access gate is modeled as intact. The unreleased candidate narrows
+this rating to content attributable to the actor that gate checks.
 
 ## `agentci/pull-request-target-ai`
 
-An AI agent runs on `pull_request_target`.
+An AI step is reachable on `pull_request_target` by an untrusted actor, with
+no recognized actor gate on the job or that step. PR-head provenance alone
+does not authenticate the triggering actor.
 
 ## `agentci/ai-with-secrets`
 
 An AI step's effective workflow → job → step environment or inputs reference a
-secret.
+secret. `secrets: inherit` makes secrets available to a called workflow but
+does not alone expose them to each Action; the built-in workflow token is
+modeled through permissions.
 
 ## `agentci/untrusted-input-in-prompt`
 
-Raw PR, issue, comment, review, branch, or commit text is passed into an AI
-prompt, shell command, or the AI step's effective environment.
+Raw PR, issue, comment, review, branch, or commit text is interpolated into
+an AI Action input or a recognized local CLI command. For a direct hosted
+HTTP dispatch, the request body is the input sink. Environment values count
+as proven CLI or HTTP prompt input only when expanded in those inputs;
+unreferenced inherited CLI environment values leave analysis incomplete.
+Display metadata such as the step name is not an input sink.
 
 ## `agentci/ai-shell-access`
 
-An AI CLI executes through `run:`, or an AI Action explicitly enables a shell
-or command tool. Incidental prose such as “Python” is not shell capability.
+A local AI CLI executes through runner `run:`, or an AI Action explicitly
+enables a shell or command tool. This does not prove every local CLI agent has
+its own shell tool. An HTTP dispatch does not satisfy the rule merely because
+`curl` runs on the runner. Incidental prose such as “Python” is not shell
+capability.
 
 ## `agentci/broad-write-permissions`
 

@@ -1,5 +1,12 @@
 # AgentCI Guard Annotation Guide
 
+**Historical eight-rule v3/v0.1.1 guide.** Do not use this guide or its
+168-unit `benchmark/pilot/` packet for the current nine-rule, 160-unit
+candidate micro-pilot. Use only
+[`benchmark/candidate-pilot/CONTRACT.md`](benchmark/candidate-pilot/CONTRACT.md)
+and its [packet instructions](benchmark/candidate-pilot/PACKET_README.md) for
+that study. Do not combine labels across the two protocols.
+
 Write labels from the frozen workflow snapshot and the rule contract. Do not
 run AgentCI Guard, inspect SARIF, inspect scanner findings, or read decisions
 from another person or an earlier pass during blind annotation.
@@ -8,7 +15,8 @@ from another person or an earlier pass during blind annotation.
 
 - Primary blank sheet: `benchmark/annotation-sheet.csv`
 - Independent-review sheet: `benchmark/review-sheet.csv`
-- Rule contract: `RULES.md`
+- Rule contract for the frozen eight-rule registry:
+  `benchmark/pilot/contracts/v0.1.1/RULES.md`
 - Frozen provenance: `benchmark/manifest.json`
 - Snapshots: `benchmark/snapshots/<case-id>/`
 
@@ -16,7 +24,7 @@ The sheets are generated from YAML structure only. Their job/step units and
 configured triggers do not contain scanner predictions.
 
 The development-only feasibility pilot under `benchmark/pilot/` uses the same
-schema and decision rules. Because only one human annotator is available, that
+eight-rule registry and decision rules. Because only one human annotator is available, that
 person labels the same 168 units twice under the same stable pseudonym, with a
 minimum seven-day washout and no access to pass-1 decisions during pass 2. Its
 timing and test-retest results measure feasibility and intra-annotator

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import YAML from "yaml";
-import { scanWorkflow, type WorkflowFile } from "../src/index.js";
+import {
+  looksLikeAiUsage,
+  scanWorkflow,
+  scanWorkflowFiles,
+} from "../src/index.js";
 
 function ruleIds(raw: string): Set<string> {
   return new Set(
@@ -30,11 +34,117 @@ jobs:
             -d "{\\"prompt\\": \\"triage\\"}"
 `);
     expect(rules).toContain("agentci/ai-with-secrets");
-    expect(rules).toContain("agentci/ai-shell-access");
+    expect(rules).not.toContain("agentci/ai-shell-access");
   });
 
-  it("reports untrusted content interpolated into the request payload", () => {
+  it("does not count status polling as a new agent invocation", () => {
     const rules = ruleIds(`
+on: push
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -X GET https://api.cursor.com/v1/agents/abc123
+`);
+    expect(rules.size).toBe(0);
+    expect(
+      looksLikeAiUsage("curl -X GET https://api.cursor.com/v1/agents"),
+    ).toBe(false);
+  });
+
+  it("requires a command rather than a quoted endpoint mention", () => {
+    expect(
+      looksLikeAiUsage("echo 'curl -X POST https://api.cursor.com/v1/agents'"),
+    ).toBe(false);
+  });
+
+  it("uses documented create routes and methods", () => {
+    for (const request of [
+      "curl -X POST https://api.cursor.com/v1/agents",
+      "curl -X POST https://api.cursor.com/v1/agents/agent-1/runs",
+      "curl -X POST https://api.cursor.com/v0/agents",
+      "curl --request POST https://api.devin.ai/v1/sessions",
+      'curl --request="POST" https://api.cursor.com/v1/agents',
+      'curl -d\'{"prompt":"hi"}\' https://api.cursor.com/v1/agents',
+      "curl -d '{}' https://api.devin.ai/v3/organizations/org-1/sessions",
+      "curl -X POST https://api.github.com/agents/repos/owner/repo/tasks",
+      "curl -X POST -i https://api.cursor.com/v1/agents",
+      "curl -X POST --include --http1.1 https://api.cursor.com/v1/agents",
+    ]) {
+      expect(looksLikeAiUsage(request), request).toBe(true);
+    }
+    for (const request of [
+      "curl -X GET https://api.cursor.com/v1/agents",
+      "curl -G -d status=active https://api.cursor.com/v1/agents",
+      "curl -X GET -d '{}' https://api.cursor.com/v1/agents",
+      "curl -X GET https://api.devin.ai/v1/sessions",
+      "curl -X GET https://api.devin.ai/v3/organizations/org-1/sessions",
+      "curl -X GET https://api.github.com/agents/repos/owner/repo/tasks",
+      "curl -X POST https://api.githubcopilot.com/v1/agents",
+      "curl -X POST https://api.cursor.com/v1/agents/agent-1",
+    ]) {
+      expect(looksLikeAiUsage(request), request).toBe(false);
+    }
+  });
+
+  it("does not let a prior GET hide a later POST command", () => {
+    expect(
+      looksLikeAiUsage(
+        "curl -X GET https://api.cursor.com/v1/agents; curl -X POST https://api.cursor.com/v1/agents",
+      ),
+    ).toBe(true);
+  });
+
+  it("does not treat an endpoint in a request body or heredoc as dispatch", () => {
+    expect(
+      looksLikeAiUsage(
+        `curl -X POST https://example.com -d '{"link":"https://api.cursor.com/v1/agents"}'`,
+      ),
+    ).toBe(false);
+    expect(
+      looksLikeAiUsage(
+        "cat <<'EOF'\ncurl -X POST https://api.cursor.com/v1/agents\nEOF",
+      ),
+    ).toBe(false);
+    expect(
+      looksLikeAiUsage(
+        "curl -X POST https://example.com # https://api.cursor.com/v1/agents",
+      ),
+    ).toBe(false);
+    expect(
+      looksLikeAiUsage(
+        "curl -X POST https://example.com --referer https://api.cursor.com/v1/agents",
+      ),
+    ).toBe(false);
+    expect(
+      looksLikeAiUsage(
+        "curl -X POST -e https://api.cursor.com/v1/agents https://example.com",
+      ),
+    ).toBe(false);
+  });
+
+  it("recognizes an explicit POST without a request body", () => {
+    const raw = `
+on: push
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -X POST --url https://api.cursor.com/v1/agents
+`;
+    const rules = ruleIds(raw);
+    expect(rules).not.toContain("agentci/ai-shell-access");
+    const result = scanWorkflowFiles(
+      [{ path: ".github/workflows/test.yml", document: YAML.parse(raw), raw }],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(result.agent_usages).toHaveLength(1);
+    expect(result.agent_usages[0]?.kind).toBe("http");
+  });
+
+  it("reports payload ingestion without assigning the runner token to the remote agent", () => {
+    const raw = `
 on:
   issues:
     types: [opened]
@@ -49,9 +159,265 @@ jobs:
           curl https://api.cursor.com/v1/agents \\
             -H "Authorization: Bearer \${{ secrets.CURSOR_API_KEY }}" \\
             -d "{\\"prompt\\":\\"\${{ github.event.issue.body }}\\"}"
-`);
-    expect(rules).toContain("agentci/untrusted-ai-write-token");
+`;
+    const result = scanWorkflowFiles(
+      [{ path: ".github/workflows/test.yml", document: YAML.parse(raw), raw }],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    const rules = new Set(result.findings.map((finding) => finding.rule_id));
+    expect(rules).not.toContain("agentci/untrusted-ai-write-token");
     expect(rules).toContain("agentci/untrusted-input-in-prompt");
+    expect(rules).toContain("agentci/broad-write-permissions");
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+      "agentci/analysis-remote-agent-capability-unknown",
+    );
+  });
+
+  it("does not attribute text in another command to the HTTP agent", () => {
+    const raw = `
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          curl -X POST https://api.cursor.com/v1/agents -d '{"prompt":"safe"}'
+          echo "\${{ github.event.issue.body }}"
+`;
+    const result = scanWorkflowFiles(
+      [{ path: ".github/workflows/test.yml", document: YAML.parse(raw), raw }],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    const rules = result.findings.map((finding) => finding.rule_id);
+    expect(rules).not.toContain("agentci/untrusted-input-in-prompt");
+    expect(rules).not.toContain("agentci/untrusted-ai-write-token");
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+      "agentci/analysis-run-dataflow-unknown",
+    );
+  });
+
+  it("does not attribute a secret printed by another command to the HTTP agent", () => {
+    const raw = `
+on: push
+permissions:
+  contents: read
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          curl -X POST https://api.cursor.com/v1/agents -d '{"prompt":"safe"}'
+          echo "\${{ secrets.BOT_TOKEN }}"
+`;
+    const result = scanWorkflowFiles(
+      [{ path: ".github/workflows/test.yml", document: YAML.parse(raw), raw }],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(result.findings.map((finding) => finding.rule_id)).not.toContain(
+      "agentci/ai-with-secrets",
+    );
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+      "agentci/analysis-run-dataflow-unknown",
+    );
+  });
+
+  it("does not attribute a secret in a shell comment to the HTTP agent", () => {
+    const rules = ruleIds(`
+on: push
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          curl -X POST https://api.cursor.com/v1/agents -d '{}' # \${{ secrets.BOT_TOKEN }}
+`);
+    expect(rules).not.toContain("agentci/ai-with-secrets");
+  });
+
+  it("does not attribute an unused workflow env value to a fixed HTTP payload", () => {
+    const raw = `
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+env:
+  BODY: \${{ github.event.issue.body }}
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -X POST https://api.cursor.com/v1/agents -d '{"prompt":"safe"}'
+`;
+    const result = scanWorkflowFiles(
+      [{ path: ".github/workflows/test.yml", document: YAML.parse(raw), raw }],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    const rules = result.findings.map((finding) => finding.rule_id);
+    expect(rules).not.toContain("agentci/untrusted-input-in-prompt");
+    expect(rules).not.toContain("agentci/untrusted-ai-write-token");
+  });
+
+  it("follows a referenced env value into the HTTP request body", () => {
+    const raw = `
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+env:
+  BODY: \${{ github.event.issue.body }}
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -X POST https://api.cursor.com/v1/agents -d "$BODY"
+`;
+    const result = scanWorkflowFiles(
+      [{ path: ".github/workflows/test.yml", document: YAML.parse(raw), raw }],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    const rules = result.findings.map((finding) => finding.rule_id);
+    expect(rules).toContain("agentci/untrusted-input-in-prompt");
+    expect(rules).not.toContain("agentci/untrusted-ai-write-token");
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+      "agentci/analysis-remote-agent-capability-unknown",
+    );
+  });
+
+  it("does not expand shell variables inside single-quoted HTTP data", () => {
+    const rules = ruleIds(`
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+env:
+  BODY: \${{ github.event.issue.body }}
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -X POST https://api.cursor.com/v1/agents -d '$BODY'
+`);
+    expect(rules).not.toContain("agentci/untrusted-input-in-prompt");
+  });
+
+  it("tracks an expandable variable inside mixed-quoted JSON data", () => {
+    const raw = `
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+env:
+  BODY: \${{ github.event.issue.body }}
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          curl -X POST https://api.cursor.com/v1/agents -d '{"prompt":"'"$BODY"'"}'
+`;
+    const result = scanWorkflowFiles(
+      [{ path: ".github/workflows/test.yml", document: YAML.parse(raw), raw }],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(result.findings.map((finding) => finding.rule_id)).toContain(
+      "agentci/untrusted-input-in-prompt",
+    );
+  });
+
+  it("does not expand an escaped dollar sign in HTTP data", () => {
+    const rules = ruleIds(`
+on:
+  issues:
+    types: [opened]
+env:
+  BODY: \${{ github.event.issue.body }}
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -X POST https://api.cursor.com/v1/agents -d "\\$BODY"
+`);
+    expect(rules).not.toContain("agentci/untrusted-input-in-prompt");
+  });
+
+  it("traces a GitHub env index expression in HTTP data", () => {
+    const rules = ruleIds(`
+on:
+  issues:
+    types: [opened]
+env:
+  BODY: \${{ github.event.issue.body }}
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -X POST https://api.cursor.com/v1/agents -d "\${{ env['BODY'] }}"
+`);
+    expect(rules).toContain("agentci/untrusted-input-in-prompt");
+  });
+
+  it("abstains when a shell-local variable supplies the HTTP body", () => {
+    const raw = `
+on:
+  issues:
+    types: [opened]
+env:
+  BODY: \${{ github.event.issue.body }}
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          PROMPT="$BODY"
+          curl -X POST https://api.cursor.com/v1/agents -d "$PROMPT"
+`;
+    const result = scanWorkflowFiles(
+      [{ path: ".github/workflows/test.yml", document: YAML.parse(raw), raw }],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(result.findings.map((finding) => finding.rule_id)).not.toContain(
+      "agentci/untrusted-input-in-prompt",
+    );
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+      "agentci/analysis-run-dataflow-unknown",
+    );
+  });
+
+  it("counts a secret env value only when the HTTP command uses it", () => {
+    const raw = (header: string) => `
+on: push
+permissions:
+  contents: read
+env:
+  API_KEY: \${{ secrets.CURSOR_API_KEY }}
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          curl -X POST https://api.cursor.com/v1/agents ${header} -d '{"prompt":"safe"}'
+`;
+    expect(ruleIds(raw("")).has("agentci/ai-with-secrets")).toBe(false);
+    expect(
+      ruleIds(raw('-H "Authorization: Bearer $API_KEY"')).has(
+        "agentci/ai-with-secrets",
+      ),
+    ).toBe(true);
   });
 
   it("does not presume ingestion without interpolation, as with any CLI", () => {

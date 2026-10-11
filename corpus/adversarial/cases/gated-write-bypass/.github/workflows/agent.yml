@@ -1,7 +1,7 @@
 name: gated-write-bypass
 on:
-  issue_comment:
-    types: [created]
+  issues:
+    types: [opened]
 permissions:
   contents: write
   issues: write
@@ -9,7 +9,9 @@ jobs:
   agent:
     runs-on: ubuntu-latest
     steps:
-      - uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567
+      - uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          prompt: "Fix: ${{ github.event.issue.title }}"
           allowed_non_write_users: "*"

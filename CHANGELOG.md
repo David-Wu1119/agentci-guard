@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Literal `github.event.*` names in prompt text no longer count as GitHub
+  expression interpolation. This classifier change has a workflow-level
+  regression but has not been remeasured on the human corpus.
+- A parent Issue or pull-request author is no longer mistaken for the actor
+  who wrote a triggering comment; a re-run initiator is no longer mistaken
+  for the original event actor. Explicit parent-object interpolation on
+  comment/review events remains flagged even when the commenter is trusted.
+  An owner-triggered `pull_request_target` checkout of attacker PR code is
+  still unsafe. These fixes do not complete source-provenance analysis for
+  Action self-fetching or all event activities.
+- Replaced the scanner's fixed `fast-glob` pattern with direct workflow-directory
+  enumeration, removing the vulnerable `braces` dependency chain without
+  changing the intended one-level `.yml`/`.yaml` discovery contract. Pinned
+  patched `source-map-js` and `fast-uri` releases and aligned Vitest with its
+  coverage plugin. Directory and symlink behavior is covered by a regression
+  test.
+- The browser file picker now preserves existing pasted YAML when a selected
+  file is too large or cannot be read.
+
 ## [0.6.2] - 2026-09-09
 
 ### Fixed
@@ -48,7 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   owner identity is exact"), `tests/agent-gemini.test.ts`; corpus case
   `lookalike-prefixed-owner` (41 cases). Frozen benchmark and corpus contain
   no `uses:` value where a pattern matched anywhere but the start, so 0 of 152
-  cases changed. Detector precision changed, so this is a new candidate
+  cases changed. Detector matcher behavior changed, so this is a new candidate
   identity.
 
 ## [0.6.0] - 2026-09-05
@@ -270,9 +291,9 @@ install -g` bin entry is a symlink, so `agentci --version` and `agentci scan`
   allowlists are not accepted. Eval corpus effect: critical 33 to 30, confined
   to those three cases. All 31 critical findings on the benchmark were read by
   hand for this change: 24 are confirmed, these 3 were this class, and 4 are the
-  documented runtime-gate limit — 77% precision on the critical rule before
-  this fix, 86% after, as measured by a single non-blind reader, not by the
-  benchmark's labeling protocol.
+  documented runtime-gate limit. The historical single-reader, non-blind
+  judgments were 24 of 31 findings before this fix and 24 of 28 after it;
+  these are not protocol-based precision estimates or public accuracy claims.
 - Event reachability now treats a condition made only of `always()`,
   `success()`, `failure()`, and `cancelled()` as complete and non-narrowing.
   These depend on prior step status, never on the trigger, so they cannot
@@ -433,9 +454,8 @@ permissions, shell access, or performs unsafe checkout.
 ### Changed
 
 - Recalibrated severities after a self-audit. The first scan of the 75-repo
-  corpus reported **59 criticals**; auditing those against well-configured
-  repositories exposed three false-positive classes in the tool itself, each
-  since fixed:
+  corpus reported **59 criticals**; selected workflow inspections exposed two
+  detection mistakes and one severity-calibration mistake, later changed:
   1. `id-token: write` was counted as repo-write. OIDC token minting cannot
      modify a repo; only `contents` / `pull-requests` / `issues` / `packages` /
      `deployments` now count toward write scope.
@@ -445,7 +465,9 @@ permissions, shell access, or performs unsafe checkout.
      key, so this is a baseline exposure to review rather than a vulnerability
      on its own. Recalibrated to medium.
 
-  After these fixes: **59 → 13 criticals.**
+  The historical reported critical count changed from **59 to 13**. Raw
+  pre/post scan outputs and human labels were not preserved, so this is not a
+  measured false-positive reduction.
 
 [Unreleased]: https://github.com/David-Wu1119/agentci-guard/compare/v0.1.1...HEAD
 [0.1.1]: https://github.com/David-Wu1119/agentci-guard/compare/v0.1.0...v0.1.1

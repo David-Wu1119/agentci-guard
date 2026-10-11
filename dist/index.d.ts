@@ -26,7 +26,7 @@ type AgentUsage = {
     step: string;
     /** Zero-based index in the job's steps array. */
     step_index: number;
-    kind: "action" | "cli" | "other";
+    kind: "action" | "cli" | "http" | "other";
     evidence: string;
     line: number;
     reachable_events: string[];
@@ -188,6 +188,12 @@ declare const AI_AGENT_ACTION_PATTERNS: RegExp[];
 declare const AI_AGENT_CLI_PATTERNS: RegExp[];
 declare const AI_AGENT_API_PATTERNS: RegExp[];
 declare const AI_AGENT_PATTERNS: RegExp[];
+declare const UNTRUSTED_CONTEXT_PATTERNS: Array<{
+    pattern: RegExp;
+    events: string[];
+    parentEvents?: string[];
+    source: "issue" | "pull_request" | "pr_head_ref" | "discussion" | "comment" | "review" | "commit" | "other";
+}>;
 /**
  * anthropics/claude-code-action refuses to run for users without repository
  * write access by default (docs/security.md: "The action can only be
@@ -197,16 +203,15 @@ declare const AI_AGENT_PATTERNS: RegExp[];
  */
 declare function isSelfGatingAgentAction(uses: string): boolean;
 /**
- * The default gate is removed by allowlisting non-write users or bots. The
- * docs mark `allowed_non_write_users` "a significant security risk" and note
- * that `allowed_bots` entries are not permission-checked at all, so any
- * non-empty value for either counts as a bypass.
+ * The default gate is removed by allowlisting non-write users with an explicit
+ * token or by allowlisting bots. The latter are not permission-checked.
  */
 declare function hasAgentGateBypass(withBlock: unknown): boolean;
 /**
  * Events on which the action's docs state the write-access check applies.
  * `discussion`, `discussion_comment`, and `pull_request_target` are not listed;
- * a job reachable on any of those keeps its full severity.
+ * paths that can reach the Action on those events keep full severity. The
+ * scanner separately excludes events rejected by a verified pinned revision.
  */
 declare const SELF_GATED_EVENTS: Set<string>;
 declare function looksLikeAiUsage(value: string): boolean;
@@ -223,14 +228,42 @@ declare function looksLikeAiUsage(value: string): boolean;
  */
 declare function looksLikeAiAction(value: string): boolean;
 /**
- * A shell-driven agent invocation: a local CLI, or an HTTP call to a hosted
- * agent endpoint. Both are grouped here rather than with actions because they
- * receive only what the surrounding script hands them, so untrusted content
- * still has to be interpolated for it to reach the agent.
+ * A local CLI invocation, separate from an HTTP dispatch to a remote agent.
  */
 declare function looksLikeAiCli(value: string): boolean;
+declare function looksLikeAiHttpDispatch(value: string): boolean;
+type AiCliInvocation = {
+    command: string;
+    expandableCommand: string;
+    pipedInput: string;
+    opaqueInput: boolean;
+};
+type AiHttpDispatch = {
+    command: string;
+    payload: string;
+    expandablePayload: string;
+    expandableCommand: string;
+    opaquePayload: boolean;
+};
+/** Direct local CLI commands, excluding sibling commands and shell comments. */
+declare function aiCliInvocations(value: string): AiCliInvocation[];
+/**
+ * A CLI named inside a nested command substitution can execute even when the
+ * bounded command splitter cannot attribute its arguments. Do not report it
+ * as a proven direct invocation; let the scanner mark analysis incomplete.
+ */
+declare function hasOpaqueAiCliSubstitution(value: string): boolean;
+/** A shell -c string may execute an agent, but its nested dataflow is opaque. */
+declare function hasOpaqueAiCliShellCommand(value: string): boolean;
+declare function aiHttpDispatches(value: string): AiHttpDispatch[];
 declare function containsUntrustedGitHubContext(value: string): boolean;
-declare function untrustedGitHubContextEvents(value: string): string[];
+type ContextPattern = (typeof UNTRUSTED_CONTEXT_PATTERNS)[number];
+declare function untrustedGitHubContextMatches(value: string): Array<{
+    event: string;
+    source: ContextPattern["source"];
+}>;
+/** With parentOnly, keep only fields whose author can differ from the commenter. */
+declare function untrustedGitHubContextEvents(value: string, parentOnly?: boolean): string[];
 declare function containsSecretReference(value: string): boolean;
 declare function containsShellAccess(value: unknown): boolean;
 declare function isPinnedAction(uses: string): boolean;
@@ -388,5 +421,6 @@ declare function narrowEvents(events: string[], rawCondition: unknown): Reachabi
  * else, negation included, is treated as untrusted.
  */
 declare function hasTrustedActorGate(rawCondition: unknown): boolean;
+declare function hasTrustedPrProvenanceGate(rawCondition: unknown): boolean;
 
-export { AI_AGENT_ACTION_PATTERNS, AI_AGENT_API_PATTERNS, AI_AGENT_CLI_PATTERNS, AI_AGENT_PATTERNS, type AgentUsage, type AgentciConfig, type Diagnostic, type EffectivePermissions, type FailOn, type Finding, type OrgCategories, type OrgRepository, type OrgRepositoryResult, type OrgScanOptions, type OrgScanResult, type PermissionDefault, type PermissionLevel, RULES, type Reachability, type RuleDefinition, SELF_GATED_EVENTS, SENSITIVE_WRITE_SCOPES, SEVERITY_ORDER, type SarifLog, type SarifNotification, type SarifScanInput, type ScanOptions, type ScanResult, type Severity, UNTRUSTED_EVENTS, type WorkflowFile, containsSecretReference, containsShellAccess, containsUntrustedGitHubContext, describePermissions, formatGithubOutputs, hasAgentGateBypass, hasFindingAtOrAbove, hasSensitiveWrite, hasTrustedActorGate, hasUnknownSensitivePermission, isPinnedAction, isSelfGatingAgentAction, loadConfig, loadWorkflowFiles, looksLikeAiAction, looksLikeAiCli, looksLikeAiUsage, matchesPath, mergeEnvironment, narrowEvents, normalizeTriggers, parseFailOn, parseInlineIgnores, parseWorkflowFile, permissionLevel, renderMarkdownReport, renderOrgMarkdownReport, renderTextReport, resolvePermissions, scanOrganization, scanRepository, scanWorkflow, scanWorkflowFiles, toSarif, untrustedGitHubContextEvents };
+export { AI_AGENT_ACTION_PATTERNS, AI_AGENT_API_PATTERNS, AI_AGENT_CLI_PATTERNS, AI_AGENT_PATTERNS, type AgentUsage, type AgentciConfig, type AiCliInvocation, type Diagnostic, type EffectivePermissions, type FailOn, type Finding, type OrgCategories, type OrgRepository, type OrgRepositoryResult, type OrgScanOptions, type OrgScanResult, type PermissionDefault, type PermissionLevel, RULES, type Reachability, type RuleDefinition, SELF_GATED_EVENTS, SENSITIVE_WRITE_SCOPES, SEVERITY_ORDER, type SarifLog, type SarifNotification, type SarifScanInput, type ScanOptions, type ScanResult, type Severity, UNTRUSTED_EVENTS, type WorkflowFile, aiCliInvocations, aiHttpDispatches, containsSecretReference, containsShellAccess, containsUntrustedGitHubContext, describePermissions, formatGithubOutputs, hasAgentGateBypass, hasFindingAtOrAbove, hasOpaqueAiCliShellCommand, hasOpaqueAiCliSubstitution, hasSensitiveWrite, hasTrustedActorGate, hasTrustedPrProvenanceGate, hasUnknownSensitivePermission, isPinnedAction, isSelfGatingAgentAction, loadConfig, loadWorkflowFiles, looksLikeAiAction, looksLikeAiCli, looksLikeAiHttpDispatch, looksLikeAiUsage, matchesPath, mergeEnvironment, narrowEvents, normalizeTriggers, parseFailOn, parseInlineIgnores, parseWorkflowFile, permissionLevel, renderMarkdownReport, renderOrgMarkdownReport, renderTextReport, resolvePermissions, scanOrganization, scanRepository, scanWorkflow, scanWorkflowFiles, toSarif, untrustedGitHubContextEvents, untrustedGitHubContextMatches };

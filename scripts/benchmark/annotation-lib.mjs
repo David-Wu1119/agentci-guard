@@ -27,9 +27,12 @@ const SOURCE_REVIEW_STATUS_BY_ROLE = new Map([
   ["test-retest pass 2", "test-retest-pass-2"],
 ]);
 
-export function loadContext(registryName = "annotation-sheet.csv") {
+export function loadContext(
+  registryName = "annotation-sheet.csv",
+  manifestName = "manifest.json",
+) {
   const manifest = JSON.parse(
-    fs.readFileSync(path.join(benchmarkRoot, "manifest.json"), "utf8"),
+    fs.readFileSync(path.join(benchmarkRoot, manifestName), "utf8"),
   );
   const registryRows = csvObjects(
     fs.readFileSync(path.join(benchmarkRoot, registryName), "utf8"),
@@ -117,11 +120,12 @@ export function validateAnnotationSet(
   records,
   {
     registryName = "annotation-sheet.csv",
+    manifestName = "manifest.json",
     role = "independent",
     expectedAnnotator,
   } = {},
 ) {
-  const context = loadContext(registryName);
+  const context = loadContext(registryName, manifestName);
   const recordsByUnit = uniqueMap(records, (entry) => entry.unit_id, role);
   if (recordsByUnit.size !== context.registry.size) {
     throw new Error(
@@ -266,6 +270,7 @@ export function writeJsonLines(file, records) {
   fs.writeFileSync(
     file,
     `${records.map((record) => JSON.stringify(record)).join("\n")}\n`,
+    { flag: "wx" },
   );
 }
 
