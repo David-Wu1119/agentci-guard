@@ -7583,11 +7583,6 @@ var UNTRUSTED_CONTEXT_PATTERNS = [
     events: ["pull_request_review"]
   },
   {
-    pattern: /github\.event\.review_comment\.body/i,
-    source: "comment",
-    events: ["pull_request_review_comment"]
-  },
-  {
     pattern: /github\.event\.head_commit\.message/i,
     source: "commit",
     events: ["push"]
