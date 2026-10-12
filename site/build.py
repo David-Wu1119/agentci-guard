@@ -31,6 +31,9 @@ if clean:
 else:
     provenance='Uncommitted local build (no exact source commit)' if source_commit else 'Source revision unavailable (non-Git build)'
 html=(dest/'index.html').read_text()
+assert html.count('__METHODS_COMMIT__')==3
+# shortcut: dirty previews link to older published methods; production requires clean main.
+html=html.replace('__METHODS_COMMIT__',source_commit if clean else '07537106d6557db9262ba0d506f1dfb8f3ce3123')
 for placeholder,value in (
     ('__SCANNER_SHA256__',digest),
     ('__SOURCE_PROVENANCE__',provenance),

@@ -2,13 +2,15 @@
 
 ## Current status
 
-The v3 candidate corpus is frozen and mechanically verified. Human labels are
-absent. Therefore AgentCI Guard has **no measured precision, recall, F1, or
-calibration claim yet**.
+The v3 candidate corpus is frozen and mechanically verified for local snapshot
+integrity. A [dated upstream audit](REPRODUCIBILITY.md#upstream-origin-check)
+matched 146 pinned sources and found six HTTP 404s; those six recorded origins
+remain unverified. Human labels are absent. Therefore AgentCI Guard has **no
+measured precision, recall, F1, or calibration claim yet**.
 
 Current immutable data:
 
-- 152 workflow files from 152 public repositories.
+- 152 workflow files from 152 repositories recorded as public at collection.
 - 57 originally designated development workflows and 95 originally designated
   evaluation workflows; all 152 are now development data.
 - 60 Claude-Action-enriched workflows.

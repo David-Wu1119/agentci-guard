@@ -129,16 +129,18 @@ separate from routine CI because it depends on mutable repository availability
 and GitHub API access. It does not prove when or how the original collector
 obtained a snapshot.
 
-At `2026-10-12T02:20:31.944Z`, the check of manifest SHA-256
-`e66632f3926ac9a02c9107907e91d4ff12820fd3c9057f012d272cb8bd00830a`
-found **146 matches, 0 mismatches, 6 HTTP 404 unavailable upstreams, and 0
+The [checked-in per-case receipt](evidence/upstream-v3-2026-10-12.json), taken
+at `2026-10-12T02:38:08.478Z` against manifest SHA-256
+`e66632f3926ac9a02c9107907e91d4ff12820fd3c9057f012d272cb8bd00830a`,
+records **146 matches, 0 mismatches, 6 HTTP 404 unavailable upstreams, and 0
 other API errors**. The six cases were `ai-008`, `ai-009`, `ai-018`, `ai-021`,
-`ai-040`, and `control-028`. Their repository endpoints also returned HTTP 404
-when checked separately. HTTP 404 establishes that they were inaccessible at
-those names to this account then; it does not establish whether they were
-renamed, made private, or deleted. The six checked-in snapshots still pass the
-offline integrity check, but their repository/commit/path origins are not
-currently independently verifiable. A later run may produce different counts.
+`ai-040`, and `control-028`. HTTP 404 means the requests for their exact
+repository, path, and commit were unavailable to this authenticated check then;
+it does not establish whether the repositories were renamed, made private, or
+deleted. The six checked-in snapshots still pass the offline integrity check,
+but their recorded origins are not currently independently verifiable. The
+receipt records this tool run, not a GitHub attestation; a later run may
+produce different counts.
 
 ## Annotation toolchain smoke
 

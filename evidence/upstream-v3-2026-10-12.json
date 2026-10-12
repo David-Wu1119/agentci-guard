@@ -1,0 +1,627 @@
+{
+  "benchmark_id": "agentci-real-workflows-v3",
+  "manifest_sha256": "e66632f3926ac9a02c9107907e91d4ff12820fd3c9057f012d272cb8bd00830a",
+  "checked_at": "2026-10-12T02:38:08.478Z",
+  "counts": {
+    "match": 146,
+    "mismatch": 0,
+    "upstream-unavailable": 6,
+    "api-error": 0
+  },
+  "results": [
+    {
+      "case_id": "ai-001",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-002",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-003",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-004",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-005",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-006",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-007",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-008",
+      "status": "upstream-unavailable",
+      "reason": "HTTP 404"
+    },
+    {
+      "case_id": "ai-009",
+      "status": "upstream-unavailable",
+      "reason": "HTTP 404"
+    },
+    {
+      "case_id": "ai-010",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-011",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-012",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-013",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-014",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-015",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-016",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-017",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-018",
+      "status": "upstream-unavailable",
+      "reason": "HTTP 404"
+    },
+    {
+      "case_id": "ai-019",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-020",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-021",
+      "status": "upstream-unavailable",
+      "reason": "HTTP 404"
+    },
+    {
+      "case_id": "ai-022",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-023",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-024",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-025",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-026",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-027",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-028",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-029",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-030",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-031",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-032",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-033",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-034",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-035",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-036",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-037",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-038",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-039",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-040",
+      "status": "upstream-unavailable",
+      "reason": "HTTP 404"
+    },
+    {
+      "case_id": "ai-041",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-042",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-043",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-044",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-045",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-046",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-047",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-048",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-049",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-050",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-051",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-052",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-053",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-054",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-055",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-056",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-057",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-058",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-059",
+      "status": "match"
+    },
+    {
+      "case_id": "ai-060",
+      "status": "match"
+    },
+    {
+      "case_id": "control-001",
+      "status": "match"
+    },
+    {
+      "case_id": "control-002",
+      "status": "match"
+    },
+    {
+      "case_id": "control-003",
+      "status": "match"
+    },
+    {
+      "case_id": "control-006",
+      "status": "match"
+    },
+    {
+      "case_id": "control-007",
+      "status": "match"
+    },
+    {
+      "case_id": "control-008",
+      "status": "match"
+    },
+    {
+      "case_id": "control-009",
+      "status": "match"
+    },
+    {
+      "case_id": "control-010",
+      "status": "match"
+    },
+    {
+      "case_id": "control-013",
+      "status": "match"
+    },
+    {
+      "case_id": "control-014",
+      "status": "match"
+    },
+    {
+      "case_id": "control-015",
+      "status": "match"
+    },
+    {
+      "case_id": "control-016",
+      "status": "match"
+    },
+    {
+      "case_id": "control-017",
+      "status": "match"
+    },
+    {
+      "case_id": "control-018",
+      "status": "match"
+    },
+    {
+      "case_id": "control-020",
+      "status": "match"
+    },
+    {
+      "case_id": "control-021",
+      "status": "match"
+    },
+    {
+      "case_id": "control-022",
+      "status": "match"
+    },
+    {
+      "case_id": "control-024",
+      "status": "match"
+    },
+    {
+      "case_id": "control-028",
+      "status": "upstream-unavailable",
+      "reason": "HTTP 404"
+    },
+    {
+      "case_id": "control-029",
+      "status": "match"
+    },
+    {
+      "case_id": "control-030",
+      "status": "match"
+    },
+    {
+      "case_id": "control-031",
+      "status": "match"
+    },
+    {
+      "case_id": "control-032",
+      "status": "match"
+    },
+    {
+      "case_id": "control-033",
+      "status": "match"
+    },
+    {
+      "case_id": "control-034",
+      "status": "match"
+    },
+    {
+      "case_id": "control-035",
+      "status": "match"
+    },
+    {
+      "case_id": "control-036",
+      "status": "match"
+    },
+    {
+      "case_id": "control-037",
+      "status": "match"
+    },
+    {
+      "case_id": "control-038",
+      "status": "match"
+    },
+    {
+      "case_id": "control-039",
+      "status": "match"
+    },
+    {
+      "case_id": "control-040",
+      "status": "match"
+    },
+    {
+      "case_id": "control-041",
+      "status": "match"
+    },
+    {
+      "case_id": "control-042",
+      "status": "match"
+    },
+    {
+      "case_id": "control-043",
+      "status": "match"
+    },
+    {
+      "case_id": "control-044",
+      "status": "match"
+    },
+    {
+      "case_id": "control-047",
+      "status": "match"
+    },
+    {
+      "case_id": "control-048",
+      "status": "match"
+    },
+    {
+      "case_id": "control-051",
+      "status": "match"
+    },
+    {
+      "case_id": "control-052",
+      "status": "match"
+    },
+    {
+      "case_id": "control-053",
+      "status": "match"
+    },
+    {
+      "case_id": "control-054",
+      "status": "match"
+    },
+    {
+      "case_id": "control-055",
+      "status": "match"
+    },
+    {
+      "case_id": "control-056",
+      "status": "match"
+    },
+    {
+      "case_id": "control-058",
+      "status": "match"
+    },
+    {
+      "case_id": "control-059",
+      "status": "match"
+    },
+    {
+      "case_id": "codex-001",
+      "status": "match"
+    },
+    {
+      "case_id": "codex-002",
+      "status": "match"
+    },
+    {
+      "case_id": "codex-003",
+      "status": "match"
+    },
+    {
+      "case_id": "codex-004",
+      "status": "match"
+    },
+    {
+      "case_id": "aider-001",
+      "status": "match"
+    },
+    {
+      "case_id": "aider-002",
+      "status": "match"
+    },
+    {
+      "case_id": "aider-003",
+      "status": "match"
+    },
+    {
+      "case_id": "aider-004",
+      "status": "match"
+    },
+    {
+      "case_id": "cursor-001",
+      "status": "match"
+    },
+    {
+      "case_id": "cursor-002",
+      "status": "match"
+    },
+    {
+      "case_id": "cursor-003",
+      "status": "match"
+    },
+    {
+      "case_id": "cursor-004",
+      "status": "match"
+    },
+    {
+      "case_id": "openhands-001",
+      "status": "match"
+    },
+    {
+      "case_id": "openhands-002",
+      "status": "match"
+    },
+    {
+      "case_id": "openhands-003",
+      "status": "match"
+    },
+    {
+      "case_id": "openhands-004",
+      "status": "match"
+    },
+    {
+      "case_id": "control-v2-001",
+      "status": "match"
+    },
+    {
+      "case_id": "control-v2-002",
+      "status": "match"
+    },
+    {
+      "case_id": "control-v2-003",
+      "status": "match"
+    },
+    {
+      "case_id": "control-v2-004",
+      "status": "match"
+    },
+    {
+      "case_id": "control-v2-005",
+      "status": "match"
+    },
+    {
+      "case_id": "control-v2-006",
+      "status": "match"
+    },
+    {
+      "case_id": "control-v2-007",
+      "status": "match"
+    },
+    {
+      "case_id": "control-v2-008",
+      "status": "match"
+    },
+    {
+      "case_id": "control-v2-009",
+      "status": "match"
+    },
+    {
+      "case_id": "control-v2-010",
+      "status": "match"
+    },
+    {
+      "case_id": "control-v2-011",
+      "status": "match"
+    },
+    {
+      "case_id": "control-v2-012",
+      "status": "match"
+    },
+    {
+      "case_id": "control-v2-013",
+      "status": "match"
+    },
+    {
+      "case_id": "control-v2-014",
+      "status": "match"
+    },
+    {
+      "case_id": "control-v2-015",
+      "status": "match"
+    },
+    {
+      "case_id": "holdout-codex-001",
+      "status": "match"
+    },
+    {
+      "case_id": "holdout-codex-002",
+      "status": "match"
+    },
+    {
+      "case_id": "holdout-codex-003",
+      "status": "match"
+    },
+    {
+      "case_id": "holdout-codex-004",
+      "status": "match"
+    },
+    {
+      "case_id": "holdout-aider-001",
+      "status": "match"
+    },
+    {
+      "case_id": "holdout-aider-002",
+      "status": "match"
+    },
+    {
+      "case_id": "holdout-aider-003",
+      "status": "match"
+    },
+    {
+      "case_id": "holdout-aider-004",
+      "status": "match"
+    },
+    {
+      "case_id": "holdout-cursor-001",
+      "status": "match"
+    },
+    {
+      "case_id": "holdout-cursor-002",
+      "status": "match"
+    },
+    {
+      "case_id": "holdout-cursor-003",
+      "status": "match"
+    },
+    {
+      "case_id": "holdout-cursor-004",
+      "status": "match"
+    },
+    {
+      "case_id": "holdout-openhands-001",
+      "status": "match"
+    },
+    {
+      "case_id": "holdout-openhands-002",
+      "status": "match"
+    },
+    {
+      "case_id": "holdout-openhands-003",
+      "status": "match"
+    },
+    {
+      "case_id": "holdout-openhands-004",
+      "status": "match"
+    }
+  ]
+}

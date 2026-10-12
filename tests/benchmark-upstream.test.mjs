@@ -1,4 +1,6 @@
 import { expect, it } from "vitest";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import {
   auditUpstreamCase,
   fetchPinnedWorkflow,
@@ -21,6 +23,48 @@ const remote = {
   encoding: "base64",
   content: snapshot.toString("base64"),
 };
+
+it("keeps the dated v3 origin receipt aligned with its frozen manifest", () => {
+  const manifestBytes = readFileSync(
+    new URL("../benchmark/manifest.json", import.meta.url),
+  );
+  const manifest = JSON.parse(manifestBytes);
+  const receipt = JSON.parse(
+    readFileSync(
+      new URL("../evidence/upstream-v3-2026-10-12.json", import.meta.url),
+    ),
+  );
+  expect(receipt.manifest_sha256).toBe(
+    createHash("sha256").update(manifestBytes).digest("hex"),
+  );
+  expect(receipt.results.map((result) => result.case_id)).toEqual(
+    manifest.cases.map((item) => item.case_id),
+  );
+  expect(receipt.counts).toEqual({
+    match: 146,
+    mismatch: 0,
+    "upstream-unavailable": 6,
+    "api-error": 0,
+  });
+  for (const [status, count] of Object.entries(receipt.counts)) {
+    expect(
+      receipt.results.filter((result) => result.status === status),
+    ).toHaveLength(count);
+  }
+  expect(
+    receipt.results.filter(
+      (result) => result.status === "upstream-unavailable",
+    ),
+  ).toEqual(
+    ["ai-008", "ai-009", "ai-018", "ai-021", "ai-040", "control-028"].map(
+      (case_id) => ({
+        case_id,
+        status: "upstream-unavailable",
+        reason: "HTTP 404",
+      }),
+    ),
+  );
+});
 
 it("requests the exact workflow path at the pinned commit", () => {
   let request;

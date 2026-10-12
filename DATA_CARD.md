@@ -4,7 +4,7 @@
 
 - Name: `agentci-real-workflows-v3`
 - Status: frozen, unlabeled, development-only after evaluation leakage
-- Size: 152 workflow files from 152 public repositories
+- Size: 152 workflow files from 152 repositories recorded as public at collection
 - Historical split designations: 57 development, 95 evaluation; none now held out
 - Primary units: 7,056
 - Secondary-pass candidate plan: 5,676 units. The current formal tooling still
@@ -48,10 +48,14 @@ actually runs an agent; human agent-usage labels make that distinction.
 
 ## Sources and collection
 
-All items came from authenticated GitHub code search over public, non-fork
+The collection records authenticated GitHub code search over public, non-fork
 repositories. Collection metadata records the exact query, requested frame
 size, deterministic selection seed, repository, source path, source commit,
 blob SHA, source URL, SHA-256, byte count, and detected SPDX license.
+The [dated upstream audit](REPRODUCIBILITY.md#upstream-origin-check) matched
+146 pinned sources and found six HTTP 404s, with no byte mismatches. Those six
+snapshots pass local integrity checks, but their recorded upstream origins
+could not be independently verified at audit time.
 
 The base frames searched for:
 
@@ -64,8 +68,9 @@ Targeted diversity frames searched for exact Codex Action, Aider, Cursor Agent,
 and OpenHands tokens. The final control correction required an exact-case direct
 child of `.github/workflows` and a literal `actions/checkout` reference.
 
-The checked-in snapshots—not live search results—are the reproducible research
-input. Search ranking and public repositories can change over time.
+The checked-in snapshots—not live search results—are the reproducible scanner
+input. Their hashes support reruns, not proof that every recorded upstream
+origin remains fetchable. Search ranking and repository availability can change.
 
 ## Version history and sampling corrections
 
