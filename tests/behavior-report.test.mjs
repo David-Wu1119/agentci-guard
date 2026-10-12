@@ -30,7 +30,22 @@ it("reports attribution-only changes in the behavioral diff", () => {
     step_index: 0,
     line: 5,
   };
+  const agentUsage = {
+    file: "wf.yml",
+    job: "agent",
+    step: "same name",
+    step_index: 0,
+    kind: "action",
+    line: 5,
+    reachable_events: ["push"],
+    call_chain: [],
+  };
   const cases = [
+    [
+      "agent-usage-step",
+      { agent_usage_records: [agentUsage] },
+      { agent_usage_records: [{ ...agentUsage, step_index: 1 }] },
+    ],
     [
       "finding-step",
       { findings: [finding] },
@@ -67,6 +82,8 @@ it("reports attribution-only changes in the behavioral diff", () => {
     repository: "example/repo",
     scanned: true,
     analysis_complete: false,
+    agent_usages: data.agent_usage_records?.length ?? 0,
+    agent_usage_records: data.agent_usage_records ?? [],
     findings: data.findings ?? [],
     diagnostics: data.diagnostics ?? [],
     by_severity: {
@@ -80,7 +97,8 @@ it("reports attribution-only changes in the behavioral diff", () => {
     commit: "abcdef123456",
     scanner_version: "test",
     dist_cli_sha256: "test",
-    report_schema_version: 2,
+    report_schema_version: 3,
+    manifest_sha256: "same-manifest",
   };
   try {
     writeFileSync(
@@ -104,7 +122,10 @@ it("reports attribution-only changes in the behavioral diff", () => {
     );
     for (const [id] of cases)
       expect(output).toContain(`## ${id} (example/repo)`);
-    expect(output).toContain("6 of 6 cases changed.");
+    expect(output).toContain("7 of 7 cases changed.");
+    expect(output).toMatch(
+      /## agent-usage-step \(example\/repo\)\n- agent usage removed:/,
+    );
     expect(output).toMatch(
       /## diagnostic-multiplicity \(example\/repo\)\n- diagnostic added:/,
     );
@@ -120,9 +141,10 @@ it("rejects comparisons with an old or unknown report schema", () => {
   const meta = { commit: "abcdef123456", scanner_version: "test" };
   try {
     for (const [beforeVersion, afterVersion] of [
-      [undefined, 2],
-      [1, 2],
-      [1, 1],
+      [undefined, 3],
+      [1, 3],
+      [2, 3],
+      [2, 2],
     ]) {
       writeFileSync(
         beforePath,
@@ -151,6 +173,36 @@ it("rejects comparisons with an old or unknown report schema", () => {
         "Regenerate both reports with this reporter",
       );
     }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+it("rejects comparisons across different manifest bytes", () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "agentci-behavior-"));
+  const beforePath = path.join(directory, "before.json");
+  const afterPath = path.join(directory, "after.json");
+  const meta = {
+    commit: "abcdef123456",
+    scanner_version: "test",
+    report_schema_version: 3,
+  };
+  try {
+    writeFileSync(
+      beforePath,
+      JSON.stringify({ meta: { ...meta, manifest_sha256: "one" }, cases: [] }),
+    );
+    writeFileSync(
+      afterPath,
+      JSON.stringify({ meta: { ...meta, manifest_sha256: "two" }, cases: [] }),
+    );
+    const result = spawnSync(
+      process.execPath,
+      [script, "--compare", beforePath, afterPath],
+      { encoding: "utf8" },
+    );
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("same manifest SHA-256");
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

@@ -9256,7 +9256,10 @@ function scanWorkflowFiles(workflows, scanRoot, config) {
     findings,
     summary: summarize(findings),
     diagnostics,
-    analysis_complete: diagnostics.length === 0
+    // A verified unsupported Action event is a closed path, not uncertainty.
+    analysis_complete: diagnostics.every(
+      (diagnostic) => diagnostic.code === "agentci/analysis-agent-event-unsupported"
+    )
   };
 }
 async function loadWorkflowFiles(root) {

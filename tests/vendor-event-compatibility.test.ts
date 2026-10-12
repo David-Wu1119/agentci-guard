@@ -35,7 +35,7 @@ jobs:
       expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
         "agentci/analysis-agent-event-unsupported",
       ]);
-      expect(result.analysis_complete).toBe(false);
+      expect(result.analysis_complete).toBe(true);
     },
   );
 
@@ -68,6 +68,27 @@ jobs:
     expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
       "agentci/analysis-agent-event-unsupported",
     ]);
+    expect(result.analysis_complete).toBe(true);
+  });
+
+  it("remains incomplete when an unsupported event accompanies an unresolved condition", () => {
+    const result = scan(`
+on: discussion
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@${VERIFIED_REF}
+        with:
+          prompt: hello
+      - if: steps.gate.outputs.ok
+        run: echo hello
+`);
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+      "agentci/analysis-agent-event-unsupported",
+      "agentci/analysis-event-condition",
+    ]);
+    expect(result.analysis_complete).toBe(false);
   });
 
   it("keeps a mutable v1 ref conservative and explicitly incomplete", () => {
@@ -160,7 +181,7 @@ jobs:
     expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
       "agentci/analysis-agent-event-unsupported",
     ]);
-    expect(result.analysis_complete).toBe(false);
+    expect(result.analysis_complete).toBe(true);
   });
 
   it("retains an accepted activity even when another is rejected", () => {
@@ -192,7 +213,7 @@ jobs:
     );
     expect(result.agent_usages).toEqual([]);
     expect(result.findings).toEqual([]);
-    expect(result.analysis_complete).toBe(false);
+    expect(result.analysis_complete).toBe(true);
   });
 
   it("retains a pinned PR Action with a prompt in default agent mode", () => {
@@ -261,7 +282,7 @@ jobs:
     );
     expect(result.agent_usages).toEqual([]);
     expect(result.findings).toEqual([]);
-    expect(result.analysis_complete).toBe(false);
+    expect(result.analysis_complete).toBe(true);
   });
 
   it("preserves caller PR activities through a local reusable workflow", () => {
@@ -306,5 +327,6 @@ jobs:
     expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
       "agentci/analysis-agent-event-unsupported",
     );
+    expect(result.analysis_complete).toBe(true);
   });
 });

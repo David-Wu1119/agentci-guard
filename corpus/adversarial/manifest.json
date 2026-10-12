@@ -624,9 +624,9 @@
             }
           }
         ],
-        "analysis_complete": false
+        "analysis_complete": true
       },
-      "rationale": "GitHub can trigger this workflow, but the verified Anthropic Action revision rejects discussion before Claude starts. No agent-mediated write path is claimed.",
+      "rationale": "GitHub can trigger this workflow, but the verified Anthropic Action revision rejects discussion before Claude starts. That closed path has an informational diagnostic without making analysis incomplete; no agent-mediated write path is claimed.",
       "assumption_sources": [
         "event-security",
         "anthropic-action-event-support",

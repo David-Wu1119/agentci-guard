@@ -228,7 +228,7 @@ medium finding can matter more than a critical finding in a particular
 repository, and a critical pattern can be mitigated by controls outside the
 workflow file.
 
-## Diagnostics that prevent invented certainty
+## Diagnostics and analysis completeness
 
 The following are not security findings:
 
@@ -248,8 +248,10 @@ The following are not security findings:
 - `agentci/analysis-reusable-cycle`
 - `agentci/analysis-reusable-without-caller`
 
-They mark analysis incomplete. Benchmark scoring treats a relevant diagnostic
-as a scanner abstention unless the scanner already emitted a positive
+All except `agentci/analysis-agent-event-unsupported` mark analysis incomplete.
+That exception records a verified closed event path, so it may coexist with
+`analysis_complete: true`. Benchmark scoring treats a relevant unresolved
+diagnostic as a scanner abstention unless the scanner already emitted a positive
 observation at that annotation unit. The implicit-ingestion diagnostic affects
 only the two write-token rules; a verified unsupported Action event does not
 create a scoring abstention.

@@ -31,13 +31,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A vendor-verified unsupported Action event remains visible as a diagnostic but
+  no longer makes the whole scan `analysis_complete: false`: that path is
+  conclusively closed. Any unresolved diagnostic still marks the scan
+  incomplete. This changes completeness/abstention reporting, not measured
+  accuracy.
+- Development behavioral-report schema v3 keeps the numeric `agent_usages`
+  count and adds agent-use identity, so moving one recognized agent step no
+  longer disappears from same-count comparisons. Existing schema-v2 reports
+  must be regenerated for v3 comparisons, which also reject differing manifest
+  hashes; the 90/152 figure above is a v2 behavioral count, not an accuracy
+  result.
 - Text/Markdown reports and the browser now show job-local step indices for
   findings; the browser also shows them for agent-use steps. Same-line or
   identically named steps therefore remain distinct in those outputs.
   The development behavioral report also preserves step indices and compares
-  location/severity changes and duplicate counts. Its schema is now v2;
-  historical reports must be regenerated before comparison. No scanner rule
-  changed, and these reports are not accuracy measurements.
+  location/severity changes and duplicate counts. That change introduced
+  schema v2, now superseded by v3 above; historical reports must be regenerated
+  before comparison. These reports are not accuracy measurements.
 - Step-scoped diagnostics now carry `step_index` in JSON, SARIF, text,
   Markdown, and the browser display. The development scorer no longer assigns
   one step's uncertainty to another step in the same job.

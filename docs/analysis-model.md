@@ -101,8 +101,9 @@ version reports clean.
 The `run:` CLI matcher is not a general shell parser. It handles common direct
 commands, assignments, branches, pipes, and literal nested shell strings, but
 dynamically constructed shell scripts can still hide an agent invocation.
-An `analysis_complete: true` result means no supported construct triggered a
-diagnostic; it does not prove the workflow is safe.
+An `analysis_complete: true` result means no unresolved or parse diagnostic
+remains; a verified unsupported Action event can still produce a diagnostic
+for provenance. Completeness does not prove the workflow is safe.
 
 ## The agent's own gate
 

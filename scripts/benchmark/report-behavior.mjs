@@ -19,7 +19,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-const REPORT_SCHEMA_VERSION = 2;
+const REPORT_SCHEMA_VERSION = 3;
 const args = process.argv.slice(2);
 const flag = (name) => {
   const index = args.indexOf(name);
@@ -35,7 +35,8 @@ if (args.includes("--compare")) {
 }
 
 function report(outDir) {
-  const manifest = JSON.parse(readFileSync("benchmark/manifest.json", "utf8"));
+  const manifestBytes = readFileSync("benchmark/manifest.json");
+  const manifest = JSON.parse(manifestBytes.toString("utf8"));
   const cases = [...manifest.cases].sort((a, b) =>
     a.case_id.localeCompare(b.case_id),
   );
@@ -84,6 +85,18 @@ function report(outDir) {
       workflow_count: scan.workflow_count,
       analysis_complete: scan.analysis_complete,
       agent_usages: scan.agent_usages.length,
+      agent_usage_records: scan.agent_usages
+        .map((usage) => ({
+          file: usage.file,
+          job: usage.job,
+          step: usage.step,
+          step_index: usage.step_index,
+          kind: usage.kind,
+          line: usage.line ?? null,
+          reachable_events: [...usage.reachable_events].sort(),
+          call_chain: usage.call_chain ?? [],
+        }))
+        .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
       findings: scan.findings
         .map((finding) => ({
           rule_id: finding.rule_id,
@@ -117,6 +130,7 @@ function report(outDir) {
     working_tree_changes: git("status --porcelain").split("\n").filter(Boolean)
       .length,
     benchmark_id: manifest.benchmark_id,
+    manifest_sha256: createHash("sha256").update(manifestBytes).digest("hex"),
     manifest_case_count: manifest.cases.length,
     scanner_version: JSON.parse(readFileSync("package.json", "utf8")).version,
     // The bundle that actually scanned. A commit plus a dirty tree does not
@@ -241,6 +255,12 @@ function compare(beforePath, afterPath) {
       `Unsupported behavioral report schema (before: ${before.meta?.report_schema_version ?? "missing"}, after: ${after.meta?.report_schema_version ?? "missing"}). Regenerate both reports with this reporter before comparing.`,
     );
   }
+  if (
+    !before.meta.manifest_sha256 ||
+    before.meta.manifest_sha256 !== after.meta.manifest_sha256
+  ) {
+    throw new Error("Behavioral reports must use the same manifest SHA-256.");
+  }
   const byId = (doc) => new Map(doc.cases.map((c) => [c.case_id, c]));
   const a = byId(before);
   const b = byId(after);
@@ -248,6 +268,20 @@ function compare(beforePath, afterPath) {
   const sig = (c) =>
     c && c.scanned
       ? {
+          agent_usages: c.agent_usage_records
+            .map((usage) =>
+              JSON.stringify([
+                usage.file,
+                usage.job,
+                usage.step ?? null,
+                usage.step_index ?? null,
+                usage.kind,
+                usage.line ?? null,
+                usage.reachable_events,
+                usage.call_chain ?? [],
+              ]),
+            )
+            .sort(),
           findings: c.findings
             .map((f) =>
               JSON.stringify([
@@ -286,6 +320,18 @@ function compare(beforePath, afterPath) {
     if (JSON.stringify(x) === JSON.stringify(y)) continue;
     changed++;
     console.log(`## ${id} (${(b.get(id) ?? a.get(id)).repository})`);
+    const usageRemoved = multisetDifference(
+      x.agent_usages ?? [],
+      y.agent_usages ?? [],
+    );
+    const usageAdded = multisetDifference(
+      y.agent_usages ?? [],
+      x.agent_usages ?? [],
+    );
+    for (const usage of usageRemoved)
+      console.log(`- agent usage removed: ${usage}`);
+    for (const usage of usageAdded)
+      console.log(`- agent usage added:   ${usage}`);
     const removed = multisetDifference(x.findings ?? [], y.findings ?? []);
     const added = multisetDifference(y.findings ?? [], x.findings ?? []);
     for (const f of removed) console.log(`- removed: ${f}`);
