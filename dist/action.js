@@ -10932,7 +10932,7 @@ async function runAction(environment = process.env, io = DEFAULT_IO) {
     const target = input(environment, "PATH", ".");
     const sarifPath = input(environment, "SARIF", "agentci-results.sarif");
     const jsonInput = environment.INPUT_JSON;
-    const jsonPath = jsonInput?.trim();
+    const jsonPath = jsonInput && jsonInput.trim() ? jsonInput : void 0;
     const failOn = parseFailOn(
       input(environment, "FAIL-ON", "high").toLowerCase()
     );

@@ -36,7 +36,7 @@ export async function runAction(
     const sarifPath = input(environment, "SARIF", "agentci-results.sarif");
     // The runner passes an omitted optional input as an empty environment value.
     const jsonInput = environment.INPUT_JSON;
-    const jsonPath = jsonInput?.trim();
+    const jsonPath = jsonInput && jsonInput.trim() ? jsonInput : undefined;
     const failOn = parseFailOn(
       input(environment, "FAIL-ON", "high").toLowerCase(),
     );
