@@ -114,6 +114,23 @@ for (const [index, result] of (run?.results ?? []).entries()) {
       `${prefix}.properties.agentci/reachableEvents must be a string array`,
     );
   }
+  const uncertainEvents =
+    result?.properties?.["agentci/uncertainReachableEvents"];
+  if (
+    uncertainEvents !== undefined &&
+    (!Array.isArray(uncertainEvents) ||
+      uncertainEvents.some(
+        (event) =>
+          typeof event !== "string" ||
+          event.length === 0 ||
+          !Array.isArray(reachableEvents) ||
+          !reachableEvents.includes(event),
+      ))
+  ) {
+    errors.push(
+      `${prefix}.properties.agentci/uncertainReachableEvents must be a string-array subset of agentci/reachableEvents`,
+    );
+  }
   const stepIndex = result?.properties?.["agentci/stepIndex"];
   if (
     stepIndex !== undefined &&

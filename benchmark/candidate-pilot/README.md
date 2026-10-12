@@ -9,6 +9,13 @@ commit/blob/SHA-256/bytes/license, the candidate scanner commit/bundle hash,
 and the standalone contract hash. The exported annotator manifest uses neutral
 IDs and omits historical strata/IDs/selection reasons.
 
+This packet is pinned to scanner commit `38a3272436fc91877aca13509a56afd32051fc92`
+and its own frozen contract. The scanner and rule semantics on current `main`
+have since changed. These labels can measure one human's test–retest consistency
+under this contract, but cannot validate the current scanner or its rules.
+Evaluating current rules requires a separately versioned contract and packet
+frozen before the human starts labeling them. Do not repin this packet.
+
 This is a targeted mechanism check, not a representative sample, calibrated
 precision/recall, independent reviewer study, or production gate. The human
 decision contract was prepared with scanner design context; no scanner
@@ -16,12 +23,15 @@ predictions or labels are exported. The single human annotator labels twice.
 
 ## Freeze and export
 
-Build the pinned source first, then verify the generated blank packet:
+From a checkout whose Git history contains the pinned scanner commit, verify
+the generated blank packet:
 
 ```bash
-pnpm build
 node scripts/benchmark/candidate-pilot.mjs --check
 ```
+
+This check reads the pinned Git objects; it does not check the scanner built
+from the current checkout.
 
 Export only pass 1 initially, to a new private directory:
 

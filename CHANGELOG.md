@@ -7,15 +7,129 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Clarified that the 160-unit candidate pilot is pinned to `38a3272` and
+  cannot validate the current scanner's rule semantics. Its frozen contract
+  and packet are unchanged; no human labels were created.
+- The browser trial lists findings by review severity (critical before high,
+  medium, and low), keeping their original order within a severity. The scanner
+  result and rule priorities are unchanged.
+- Findings and agent uses now distinguish event paths resolved by modeled
+  `if` predicates from paths retained only because a predicate is unknown.
+  Text, Markdown, SARIF, and the browser show that distinction; the development
+  scorer abstains on possible-only paths. A schema-v4 before/after report on
+  the fixed 152-workflow development corpus changed 55 case signatures solely
+  in certainty metadata (166 findings and 59 agent uses carry possible paths);
+  finding identity/counts, agent-use identity/counts, diagnostics, and
+  completeness were unchanged. This is not an accuracy measurement or a
+  formal-v4 scoring result.
+- Implicit Issue/PR/comment ingestion now requires evidence for the exact AI
+  Action revision and event path. Unverified Action refs with write capability
+  produce `analysis-agent-implicit-ingestion-unknown` instead of a definite
+  write-token finding solely from their trigger. Explicit event expressions
+  remain analyzable. The high-severity actor-gate downgrade now requires an
+  inspected immutable gate for every ingesting step and no other reachable
+  path with unresolved implicit ingestion, tool fetch, or CLI input flow.
+  Synthetic tests and adversarial fixtures pin these boundaries; accuracy on
+  human labels is not yet measured.
+  The earlier `f1cdf51` candidate versus clean `5ad017c` changed 51 case
+  signatures under the then-current comparison. A fresh schema-v2 comparison
+  of published `4369c9e` versus `52d43cc` on the same 152-workflow manifest
+  records 90 cases with changed finding/diagnostic identity or completeness;
+  the legacy narrower signature reports 54. Schema v2 additionally tracks
+  step index, line, severity, and duplicate counts, so these totals must not
+  be treated as interchangeable detection counts. Critical findings are
+  32→4, high 36→36, medium 180→180, and complete scans 57→48. This is
+  coverage/behavior evidence, not proof that removed alerts were false
+  positives.
+
 ### Fixed
 
+- AI inputs consuming unresolved prior step or cross-job outputs no longer
+  report a complete clean analysis. They emit the path-scoped
+  `analysis-output-provenance-unknown` diagnostic
+  rather than a definite untrusted-input finding; literal first-step/job
+  outputs and disjoint event paths remain closed. This also covers an output
+  routed through `strategy.matrix` into the AI input. Development scoring now keeps
+  that uncertainty off unrelated rules, and keeps hosted-agent capability
+  uncertainty off the runner's broad-permissions rule. These are synthetic
+  regressions, not a human-label accuracy result. Against the fixed 152-workflow
+  public development set at 88e8f59, 11 workflows changed only by 13 added
+  output-provenance diagnostics; agent usages stayed at 80, findings at 220,
+  and complete scans changed from 48 to 46. No formal v4 sample or human label
+  was used for this comparison.
+- AI inputs reading a matrix built directly from supported untrusted event text
+  now leave analysis incomplete instead of appearing clean. The bounded model
+  abstains rather than claiming that matrix expansion proves prompt ingestion.
+- Composed local reusable-workflow inputs now carry unresolved caller output
+  aliases into AI sink diagnostics; an opaque dynamic input after further
+  forwarding also leaves analysis incomplete. These bounded uncertainties also
+  follow `GITHUB_ENV` relays to AI steps. Dynamic matrices on reusable caller
+  jobs also propagate uncertainty to the callee AI step. Literal inputs remain
+  closed.
+- For a job's first step on a default Ubuntu shell without startup overrides,
+  a single literal `echo "NAME=value" >> "$GITHUB_ENV"` no longer treats unused
+  untrusted or secret step environment values as exported to later AI steps.
+  Variable expansion, environment dumps, pipelines, file hops, later steps,
+  custom shells, and shell-startup overrides remain analysis-incomplete.
+  Synthetic regressions cover both sides; the schema-v4
+  comparison changed 0 of 152 fixed development workflows (4 critical, 36
+  high, 180 medium in both). This is not measured accuracy.
+- Write-token findings now partition disjoint trigger events: a critical path on
+  one event no longer makes a separately gated event critical, and uncertainty
+  on one event no longer erases a proven finding on another. CLI shell-variable,
+  pipe, inherited-environment, and earlier `GITHUB_ENV` input paths that cannot
+  be proven are marked analysis-incomplete instead of clean. Synthetic
+  regressions cover these boundaries. A schema-v4 comparison against `ba3fa61`
+  changed 0 of 152 fixed public development workflows (4 critical, 36 high,
+  180 medium; 48 complete in both); this is behavior, not accuracy evidence.
+- Unverified Anthropic Action discussion-event support now marks matching agent
+  uses and findings as possible paths, not confirmed execution. The development
+  scorer also keeps that diagnostic from making unrelated step rules unknown.
+  Synthetic regressions cover both; the schema-v4 behavioral comparison changed
+  0 of 152 public development workflows, with critical/high/medium counts
+  unchanged at 4/36/180. This is not a human-label accuracy result.
+- Local Action CI now expects the vulnerable fixture's documented incomplete
+  scan (one implicit-ingestion diagnostic) instead of incorrectly requiring
+  `analysis-complete=true`.
+- A vendor-verified unsupported Action event remains visible as a diagnostic but
+  no longer makes the whole scan `analysis_complete: false`: that path is
+  conclusively closed. Any unresolved diagnostic still marks the scan
+  incomplete. This changes completeness/abstention reporting, not measured
+  accuracy.
+- Development behavioral-report schema v3 keeps the numeric `agent_usages`
+  count and adds agent-use identity, so moving one recognized agent step no
+  longer disappears from same-count comparisons. Existing schema-v2 reports
+  must be regenerated for v3 comparisons, which also reject differing manifest
+  hashes; the 90/152 figure above is a v2 behavioral count, not an accuracy
+  result.
+- Text/Markdown reports and the browser now show job-local step indices for
+  findings; the browser also shows them for agent-use steps. Same-line or
+  identically named steps therefore remain distinct in those outputs.
+  The development behavioral report also preserves step indices and compares
+  location/severity changes and duplicate counts. That change introduced
+  schema v2, now superseded by v3 above; historical reports must be regenerated
+  before comparison. These reports are not accuracy measurements.
+- Step-scoped diagnostics now carry `step_index` in JSON, SARIF, text,
+  Markdown, and the browser display. The development scorer no longer assigns
+  one step's uncertainty to another step in the same job.
+  A two-step checkout/Claude regression covers the previous false abstention;
+  job-level uncertainty still applies across the job. This corrects scoring
+  attribution, not measured accuracy.
+- The website now serves its scanner and result renderer from
+  content-addressed filenames with Subresource Integrity. Cached HTML can no
+  longer silently run newer JavaScript under an older page-source label; if
+  an old script is unavailable, scanning stops. The real-browser test confirms
+  that tampered scanner bytes are rejected. This does not change scanner rules
+  or establish precision or recall.
 - The verified Anthropic Action revision `1d6de8c` no longer produces AI
   findings when its configured `track_progress` event/activity is rejected
   before Claude starts, or when a PR path has no prompt and progress tracking
   is off. Caller PR activities are preserved through local reusable workflows.
   Synthetic regressions cover accepted and rejected paths. This does not
-  establish implicit-ingestion behavior for mutable or unverified Action refs;
-  the stricter D2 unknown policy remains pending. A scanner-bundle comparison
+  establish implicit-ingestion behavior for mutable or unverified Action refs.
+  A scanner-bundle comparison
   against clean `b63ac94` changed 0 of 152 public development workflows
   (critical 32→32, high 36→36, medium 180→180); those counts are behavior, not
   accuracy, and the new pinned-version edge cases are synthetic.

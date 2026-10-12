@@ -13,7 +13,11 @@ describe("Markdown report", () => {
     expect(markdown).toContain("# AgentCI Guard Scan");
     expect(markdown).toContain(`- Findings: ${result.findings.length}`);
     expect(markdown).toContain(`- Critical: ${result.summary.critical}`);
-    expect(markdown).toContain("- Analysis complete: yes");
+    expect(markdown).toContain("- Analysis complete: no");
+    expect(markdown).toContain("## Diagnostics");
+    expect(markdown).toContain(
+      "agentci/analysis-agent-implicit-ingestion-unknown",
+    );
 
     for (const finding of result.findings) {
       expect(markdown).toContain(
@@ -22,7 +26,6 @@ describe("Markdown report", () => {
       expect(markdown).toContain(`**File:** ${finding.file}`);
       for (const fix of finding.fix) expect(markdown).toContain(`- ${fix}`);
     }
-    expect(markdown).not.toContain("## Diagnostics");
   });
 
   it("escapes backticks in evidence so the Markdown stays well formed", () => {
@@ -75,6 +78,114 @@ describe("Markdown report", () => {
 });
 
 describe("text report", () => {
+  it("separates resolved and possible event paths without changing finding severity", () => {
+    const result = {
+      scanned_at: "2026-01-01T00:00:00.000Z",
+      root: ".",
+      workflow_count: 1,
+      agent_usages: [],
+      findings: [
+        {
+          id: "uncertain",
+          rule_id: "agentci/ai-shell-access",
+          title: "Shell access",
+          severity: "high" as const,
+          file: "wf.yml",
+          message: "m",
+          why: "w",
+          fix: [],
+          evidence: "e",
+          reachable_events: ["issues", "discussion_comment"],
+          uncertain_reachable_events: ["discussion_comment"],
+        },
+      ],
+      summary: { critical: 0, high: 1, medium: 0, low: 0 },
+      diagnostics: [],
+      analysis_complete: false,
+    };
+    for (const report of [
+      renderTextReport(result),
+      renderMarkdownReport(result),
+    ]) {
+      expect(report).toContain("Resolved event paths");
+      expect(report).toContain("issues");
+      expect(report).toContain(
+        "Possible event paths (unresolved reachability)",
+      );
+      expect(report).toContain("discussion_comment");
+      expect(report).toContain("HIGH");
+    }
+    const legacy = { ...result, findings: [{ ...result.findings[0] }] };
+    delete (legacy.findings[0] as { uncertain_reachable_events?: string[] })
+      .uncertain_reachable_events;
+    expect(renderTextReport(legacy)).not.toContain("Possible event paths");
+  });
+
+  it("distinguishes same-line findings with duplicate step names", () => {
+    const result = {
+      scanned_at: "2026-01-01T00:00:00.000Z",
+      root: ".",
+      workflow_count: 1,
+      agent_usages: [],
+      findings: [0, 1].map((step_index) => ({
+        id: `finding-${step_index}`,
+        rule_id: "agentci/ai-shell-access",
+        title: "Shell access",
+        severity: "high" as const,
+        file: "wf.yml",
+        job: "agent",
+        step: "Duplicate",
+        step_index,
+        line: 5,
+        message: "same finding",
+        why: "same reason",
+        fix: [],
+        evidence: "same evidence",
+      })),
+      summary: { critical: 0, high: 2, medium: 0, low: 0 },
+      diagnostics: [],
+      analysis_complete: true,
+    };
+    const text = renderTextReport(result);
+    const markdown = renderMarkdownReport(result);
+    expect(text).toContain(
+      "wf.yml:5 / job: agent / step: Duplicate / step_index: 0",
+    );
+    expect(text).toContain(
+      "wf.yml:5 / job: agent / step: Duplicate / step_index: 1",
+    );
+    expect(markdown).toContain("**Step index:** 0");
+    expect(markdown).toContain("**Step index:** 1");
+  });
+
+  it("distinguishes step diagnostics that share one YAML line", () => {
+    const result = {
+      scanned_at: "2026-01-01T00:00:00.000Z",
+      root: ".",
+      workflow_count: 1,
+      agent_usages: [],
+      findings: [],
+      summary: { critical: 0, high: 0, medium: 0, low: 0 },
+      diagnostics: [0, 1].map((step_index) => ({
+        code: "agentci/analysis-agent-event-unknown",
+        kind: "analysis" as const,
+        severity: "warning" as const,
+        file: "wf.yml",
+        line: 5,
+        step_index,
+        message: "Unknown Action event path",
+      })),
+      analysis_complete: false,
+    };
+    for (const report of [
+      renderTextReport(result),
+      renderMarkdownReport(result),
+    ]) {
+      expect(report).toContain("wf.yml:5 [step_index=0]");
+      expect(report).toContain("wf.yml:5 [step_index=1]");
+    }
+  });
+
   it("labels every severity level", () => {
     const base = {
       scanned_at: "2026-01-01T00:00:00.000Z",

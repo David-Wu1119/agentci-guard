@@ -48,7 +48,7 @@ jobs:
 ${calleePermissions}
     steps:
 ${precedingSteps}
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc
         with:
           prompt: "Triage: \${{ github.event.issue.title }}"
 ${agentInputs}
@@ -160,8 +160,8 @@ describe("reusable-workflow permission ceiling", () => {
       "permissions:\n  contents: write\n  issues: write",
       "    permissions:\n      contents: write\n      issues: write",
     );
-    // Write survives the ceiling; the callee is bare claude-code-action so the
-    // write-token finding is the gated (high) variant.
+    // Write survives the ceiling; this pinned Action revision has a verified
+    // actor gate for the explicitly passed Issue title.
     expect(await ruleIds(root)).toContain("agentci/gated-ai-write-token");
   });
 

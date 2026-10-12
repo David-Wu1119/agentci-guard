@@ -103,12 +103,18 @@ pnpm benchmark:behavior                       # writes evidence/behavior/{cases.
 node scripts/benchmark/report-behavior.mjs --compare before/cases.json after/cases.json
 ```
 
-It scans exactly the manifest's cases, records findings, diagnostics, and
-completeness per case with stable ordering, splits cases four ways
-(complete/incomplete × findings/none), and lists every case that moved between
-two runs. A failure to load a case is an explicit failed row, never a dropped
-one. It is a behavioral report, not an accuracy measurement. The manual
-pattern it replaces:
+It scans exactly the manifest's cases, retains the numeric `agent_usages`
+count, and records per-use file/job/step/kind/event/call-chain identity and
+unresolved event paths, along with finding and diagnostic identity (including
+job-local step index and line)
+and completeness per case with stable ordering. It splits cases four ways
+(complete/incomplete × findings/none) and lists changes to those recorded
+fields between two runs. Schema v4 requires regenerating both reports before
+comparison; both reports must also contain the same manifest SHA-256. Older
+schema-v2/v3 counts are not directly interchangeable. A failure
+to load a case is an explicit failed row, never a dropped one. This does not
+compare message or evidence wording and is not an accuracy measurement. The
+manual pattern it replaces:
 
 ```bash
 # before the change
@@ -200,9 +206,11 @@ Detection is a hand-maintained list in `src/detect.ts` with three shapes:
   reach the repository, and the `misleading-non-agent` corpus case will
   reject it.
 
-Actions are presumed to fetch the triggering event's content themselves; CLIs
-and HTTP calls are not, because a shell hands them only what the script puts
-in. Preserve that distinction when adding a pattern.
+Only inspected immutable Action revisions and event paths inherit a documented
+implicit-fetch model; do not infer self-fetching for other refs. Local CLIs and
+direct HTTP dispatches are traced through modeled command, request-body, and
+environment inputs; unresolved flow stays unknown. Preserve that distinction
+when adding a pattern.
 
 A quick audit for stale patterns: run the 16 former evaluation diversity cases
 (`benchmark/snapshots/holdout-*`, now development data) and confirm each reports at least one agent

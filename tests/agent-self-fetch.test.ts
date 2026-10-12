@@ -3,6 +3,8 @@ import YAML from "yaml";
 import { scanWorkflow, type WorkflowFile } from "../src/index.js";
 import { parseWorkflowFile, scanWorkflowFiles } from "../src/scanner.js";
 
+const VERIFIED_TAG_REF = "1d6de8cb0c237e7c15e9e1bdf973826ebae490cc";
+
 function ruleIds(raw: string): Set<string> {
   return new Set(
     scanWorkflow(
@@ -31,7 +33,7 @@ jobs:
     if: contains(github.event.comment.body, '@claude')
     runs-on: ubuntu-latest
     steps:
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@${VERIFIED_TAG_REF}
         with:
           claude_code_oauth_token: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 `);
@@ -49,7 +51,7 @@ jobs:
   dedupe:
     runs-on: ubuntu-latest
     steps:
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@${VERIFIED_TAG_REF}
         with:
           claude_code_oauth_token: \${{ secrets.TOKEN }}
 `);
@@ -68,7 +70,7 @@ jobs:
   fix:
     runs-on: ubuntu-latest
     steps:
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@${VERIFIED_TAG_REF}
         with:
           prompt: "Fix \${{ github.event.issue.title }}"
 `);
@@ -88,7 +90,7 @@ jobs:
     if: github.event.comment.author_association == 'OWNER'
     runs-on: ubuntu-latest
     steps:
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@${VERIFIED_TAG_REF}
         with:
           claude_code_oauth_token: \${{ secrets.TOKEN }}
 `);
@@ -213,7 +215,7 @@ jobs:
   summarize:
     runs-on: ubuntu-latest
     steps:
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@${VERIFIED_TAG_REF}
         with:
           prompt: "\${{ vars.CLAUDE_PROMPT }}"
 `);
@@ -231,7 +233,7 @@ jobs:
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@${VERIFIED_TAG_REF}
 `);
     expect(rules).toContain("agentci/untrusted-ai-write-token");
   });
@@ -248,7 +250,7 @@ jobs:
     if: github.actor == github.repository_owner
     runs-on: ubuntu-latest
     steps:
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@${VERIFIED_TAG_REF}
         with:
           track_progress: true
 `);

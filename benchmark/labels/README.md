@@ -79,9 +79,10 @@ preserves abbreviated source annotations, and names a stable human
 - `adjudicated`
 
 For formal accuracy, follow the [v4 and sole-human protocol requirements in
-`../../BENCHMARK.md`](../../BENCHMARK.md#human-review-protocol). A fresh
-repository-disjoint sample, nine-rule registry, versioned human resolution
-protocol, and compatible scorer are still needed. The candidate micro-pilot
-remains development-only and cannot supply v4 accuracy labels. After a valid
-sealed v4 evaluation, classify every generated error according to
-`../../ERROR_ANALYSIS.md`; no v4 error-analysis path exists yet.
+`../../BENCHMARK.md`](../../BENCHMARK.md#human-review-protocol). Formal accuracy
+requires a qualified, separately sealed repository-disjoint v4 sample, a
+nine-rule registry, a versioned human resolution protocol, and a compatible
+scorer. The candidate micro-pilot remains development-only and cannot supply
+v4 accuracy labels. After a valid sealed v4 evaluation, classify every
+generated error according to `../../ERROR_ANALYSIS.md`; no v4 error-analysis
+path exists yet.

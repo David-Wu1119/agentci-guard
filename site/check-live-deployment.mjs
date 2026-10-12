@@ -5,16 +5,47 @@ import fs from "node:fs/promises";
 const base = new URL(process.argv[2] ?? "https://cryptoaxiom.net/");
 assert.ok(["http:", "https:"].includes(base.protocol));
 assert.ok(base.pathname.endsWith("/") && !base.search && !base.hash);
-const assets = [
-  "index.html",
-  "styles.css",
-  "app.js",
-  "scanner-browser.js",
-  "THIRD_PARTY_LICENSES.txt",
-];
 const manifest = JSON.parse(
   await fs.readFile(new URL("./BUILD_MANIFEST.json", import.meta.url), "utf8"),
 );
+const scannerNames = Object.keys(manifest).filter((name) =>
+  /^scanner-browser\.[a-f0-9]{64}\.js$/.test(name),
+);
+assert.equal(scannerNames.length, 1, "Build must contain one scanner filename");
+const scannerName = scannerNames[0];
+assert.equal(scannerName, `scanner-browser.${manifest[scannerName]}.js`);
+const appNames = Object.keys(manifest).filter((name) =>
+  /^app\.[a-f0-9]{64}\.js$/.test(name),
+);
+assert.equal(appNames.length, 1, "Build must contain one app filename");
+const appName = appNames[0];
+assert.equal(appName, `app.${manifest[appName]}.js`);
+const assets = [
+  "index.html",
+  "styles.css",
+  appName,
+  scannerName,
+  "THIRD_PARTY_LICENSES.txt",
+];
+// The nosniff check accepts every JavaScript MIME type in the MIME Sniffing Standard.
+const javaScriptMimeTypes = new Set([
+  "application/ecmascript",
+  "application/javascript",
+  "application/x-ecmascript",
+  "application/x-javascript",
+  "text/ecmascript",
+  "text/javascript",
+  "text/javascript1.0",
+  "text/javascript1.1",
+  "text/javascript1.2",
+  "text/javascript1.3",
+  "text/javascript1.4",
+  "text/javascript1.5",
+  "text/jscript",
+  "text/livescript",
+  "text/x-ecmascript",
+  "text/x-javascript",
+]);
 assert.deepEqual(
   Object.keys(manifest).sort(),
   [...assets, "_headers"].sort(),
@@ -34,7 +65,7 @@ for (const name of assets) {
   const assetUrl =
     name === "index.html"
       ? "."
-      : ["styles.css", "app.js", "scanner-browser.js"].includes(name)
+      : name === "styles.css"
         ? `${name}?v=${manifest[name]}`
         : name;
   const response = await fetch(new URL(assetUrl, base), {
@@ -46,6 +77,25 @@ for (const name of assets) {
     base.origin,
     `${name}: redirected away`,
   );
+  const contentType = response.headers.get("content-type");
+  // shortcut: reject comma-separated values; parse Fetch's header list if production needs them.
+  const mimeType = contentType?.includes(",")
+    ? "ambiguous"
+    : contentType?.split(";", 1)[0].trim().toLowerCase();
+  const mimeMatches =
+    name === "index.html"
+      ? mimeType === "text/html"
+      : name === "styles.css"
+        ? mimeType === "text/css"
+        : name.endsWith(".js")
+          ? javaScriptMimeTypes.has(mimeType)
+          : true;
+  if (name !== "THIRD_PARTY_LICENSES.txt") {
+    console.log(
+      `${mimeMatches ? "MATCH" : "DRIFT"} MIME ${name}: ${mimeType ?? "missing"}`,
+    );
+    stale ||= !mimeMatches;
+  }
   assert.ok(response.body, `${name}: empty response`);
   const hash = createHash("sha256");
   let bytes = 0;
@@ -87,11 +137,11 @@ for (const name of assets) {
 // shortcut: Cloudflare consumes _headers instead of serving it; compare its effective response headers.
 if (stale) {
   console.error(
-    `FAIL: ${base.href} differs from the local build; do not claim it is current.`,
+    `FAIL: ${base.href} failed asset, header, or MIME checks; do not claim it is current or usable.`,
   );
   process.exitCode = 1;
 } else {
   console.log(
-    `PASS: ${base.href} matches the five served assets and effective headers.`,
+    `PASS: ${base.href} matches the five served assets, effective headers, and browser-compatible MIME types.`,
   );
 }

@@ -397,7 +397,7 @@ function shellScriptWithoutHeredocBodies(value: string): string {
 }
 
 /** Find GitHub's closing expression delimiter outside quoted string literals. */
-function githubExpressionEnd(value: string, start: number): number {
+export function githubExpressionEnd(value: string, start: number): number {
   let quoted = false;
   for (let index = start + 3; index < value.length; index++) {
     if (value[index] === "'") {

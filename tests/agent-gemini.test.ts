@@ -10,8 +10,8 @@ import { looksLikeAiAction } from "../src/detect.js";
 // upstream main): `prompt` goes to the CLI's --prompt; `github_issue_number`
 // and `github_pr_number` default to the triggering event's payload; `settings`
 // writes .gemini/settings.json (where MCP servers are configured). It has no
-// documented write-access gate, so it is treated like the other agent actions:
-// presumed to read the event itself, not self-gating.
+// documented write-access gate. Event ingestion without explicit interpolation
+// is unknown until this exact Action revision/event contract is verified.
 
 function scan(raw: string) {
   const file: WorkflowFile = {
@@ -104,11 +104,11 @@ describe("google-github-actions/run-gemini-cli is an agent action", () => {
     expect(found).not.toContain(GATED); // no documented write-access gate
   });
 
-  it("still flags the write-token job without interpolation: the action operates on the event's issue itself", () => {
+  it("does not assert an implicit write-token path without version/event evidence", () => {
     const found = rules(
       RISKY.replace("          prompt: ${{ github.event.comment.body }}\n", ""),
     );
-    expect(found).toContain(UAWT);
+    expect(found).not.toContain(UAWT);
     expect(found).not.toContain(PROMPT);
   });
 

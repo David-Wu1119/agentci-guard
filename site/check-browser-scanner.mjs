@@ -8,41 +8,56 @@ import { parseWorkflowFile, scanWorkflowFiles } from "../dist/index.js";
 
 const root = "/agentci-browser";
 const file = `${root}/.github/workflows/input.yml`;
+const buildManifest = JSON.parse(
+  await fs.readFile(new URL("./BUILD_MANIFEST.json", import.meta.url), "utf8"),
+);
+const scannerNames = Object.keys(buildManifest).filter((name) =>
+  /^scanner-browser\.[a-f0-9]{64}\.js$/.test(name),
+);
+assert.equal(scannerNames.length, 1, "Expected one content-addressed scanner");
+const scannerName = scannerNames[0];
 const bundle = await fs.readFile(
-  new URL("./dist/scanner-browser.js", import.meta.url),
+  new URL(`./dist/${scannerName}`, import.meta.url),
   "utf8",
 );
 const digest = createHash("sha256").update(bundle).digest("hex");
+assert.equal(scannerName, `scanner-browser.${digest}.js`);
+assert.equal(buildManifest[scannerName], digest);
 const html = await fs.readFile(
   new URL("./dist/index.html", import.meta.url),
   "utf8",
 );
+const appNames = Object.keys(buildManifest).filter((name) =>
+  /^app\.[a-f0-9]{64}\.js$/.test(name),
+);
+assert.equal(appNames.length, 1, "Expected one content-addressed renderer");
+const appName = appNames[0];
+const appDigest = createHash("sha256")
+  .update(await fs.readFile(new URL(`./dist/${appName}`, import.meta.url)))
+  .digest("hex");
+assert.equal(appName, `app.${appDigest}.js`);
+assert.equal(buildManifest[appName], appDigest);
 assert.ok(
-  html.includes(`<script src="scanner-browser.js?v=${digest}" defer></script>`),
+  html.includes(
+    `<script src="${appName}" integrity="sha256-${Buffer.from(appDigest, "hex").toString("base64")}" defer></script>`,
+  ),
 );
-assert.doesNotMatch(
-  html,
-  /<script[^>]*scanner-browser\.js[^>]*\bintegrity=/,
-  "A mutable scanner URL must not use SRI across deployments",
+assert.ok(
+  html.includes(
+    `<script src="${scannerName}" integrity="sha256-${Buffer.from(digest, "hex").toString("base64")}" defer></script>`,
+  ),
 );
-for (const [name, tag] of [
-  ["styles.css", "link"],
-  ["app.js", "script"],
-]) {
+for (const name of ["styles.css"]) {
   const bytes = await fs.readFile(new URL(`./dist/${name}`, import.meta.url));
   const version = createHash("sha256").update(bytes).digest("hex");
   const reference = `${name}?v=${version}`;
   assert.ok(
-    html.includes(
-      tag === "link"
-        ? `<link rel="stylesheet" href="${reference}">`
-        : `<script src="${reference}" defer></script>`,
-    ),
+    html.includes(`<link rel="stylesheet" href="${reference}">`),
     `${name} must use its content hash in the page URL`,
   );
 }
 assert.ok(html.includes(`<code id="scanner-digest">${digest}</code>`));
-assert.match(html, /Expected scanner bundle SHA-256 at page build/);
+assert.match(html, /Scanner bundle SHA-256/);
 let sourceCommit = "";
 let sourceDirty = true;
 try {
@@ -93,7 +108,7 @@ const sandbox = {
   },
 };
 vm.runInNewContext(bundle, sandbox, {
-  filename: "scanner-browser.js",
+  filename: scannerName,
   timeout: 5000,
 });
 const scan = sandbox.agentciScanWorkflow;
@@ -153,7 +168,7 @@ assert.deepEqual(
 assert.equal(featuredResult.analysis_complete, true);
 assert.equal(featuredResult.diagnostics.length, 0);
 assert.match(
-  await fs.readFile(new URL("./dist/app.js", import.meta.url), "utf8"),
+  await fs.readFile(new URL(`./dist/${appName}`, import.meta.url), "utf8"),
   /allowed_non_write_users requires an explicit github_token/,
 );
 assert.doesNotMatch(

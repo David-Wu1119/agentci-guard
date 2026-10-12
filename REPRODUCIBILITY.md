@@ -2,7 +2,8 @@
 
 This document reproduces the current scanner, the frozen v3 development corpus,
 and its annotation toolchain. No human-labeled accuracy metric exists. Formal
-evaluation requires a separate, fresh v4 sample and nine-rule registry.
+evaluation requires a qualified, separately sealed v4 sample and a compatible
+nine-rule registry.
 
 ## Environment
 
@@ -92,8 +93,10 @@ pnpm benchmark:verify
 This command:
 
 - validates every snapshot byte count, SHA-256, and computed Git blob SHA;
-- verifies fixed commits, blob SHAs, exact workflow paths, unique repositories,
-  licenses, and attribution;
+- checks commit SHA format, local blob hashes, exact claimed GitHub
+  repository/commit/workflow URLs, unique repositories, licenses, and
+  attribution; it does not fetch upstream commits or independently establish
+  snapshot origin;
 - checks the archived v1/v2 provenance and v3 historical split correction;
 - regenerates the 7,056-unit blank annotation registry in memory and compares
   it byte-for-byte with the checked-in CSV;
@@ -109,6 +112,48 @@ This command:
 The collection scripts document how the frozen files were selected, but rerun
 search is not the reproduction unit because public search ranking changes. The
 manifest and snapshots are.
+
+### Upstream origin check
+
+With GitHub CLI access and a network connection, run:
+
+```bash
+pnpm benchmark:verify-upstream
+```
+
+This optional command first validates the checked-in v3 manifest and snapshots,
+then requests each workflow through the GitHub Contents API at the manifest's
+exact repository, path, and commit. It compares returned blob SHA, size, and
+bytes with the frozen snapshot and emits a timestamped JSON receipt. It exits
+nonzero for any mismatch, unavailable upstream, or API error. This check is
+separate from routine CI because it depends on mutable repository availability
+and GitHub API access. It does not prove when or how the original collector
+obtained a snapshot.
+
+The [checked-in per-case receipt](evidence/upstream-v3-2026-10-12.json), taken
+at `2026-10-12T02:38:08.478Z` against manifest SHA-256
+`e66632f3926ac9a02c9107907e91d4ff12820fd3c9057f012d272cb8bd00830a`,
+records **146 matches, 0 mismatches, 6 HTTP 404 unavailable upstreams, and 0
+other API errors**. The six cases were `ai-008`, `ai-009`, `ai-018`, `ai-021`,
+`ai-040`, and `control-028`. HTTP 404 means the requests for their exact
+repository, path, and commit were unavailable to this authenticated check then;
+it does not establish whether the repositories were renamed, made private, or
+deleted. The six checked-in snapshots still pass the offline integrity check,
+but their recorded origins are not currently independently verifiable. The
+receipt records this tool run, not a GitHub attestation; a later run may
+produce different counts.
+
+A 2026-10-12 follow-up left the six original 404 results unchanged. Running
+the same blob-SHA, size, and byte comparison against alternate GitHub
+repositories found exact pinned matches for
+[`ai-018`](https://github.com/amir-deriv/deriv-analytics/blob/f60d5e198aa102ed97b2264e5634d38dc10ae164/.github/workflows/claude.yml)
+(`amir-deriv/deriv-analytics`) and
+[`ai-040`](https://github.com/pydantic/pydantic-ai/blob/e7c9b823cf99c75cf9b3633351b75a84ecbd9091/.github/workflows/bots.yml)
+(`pydantic/pydantic-ai`). This independently verifies those two snapshot files
+at the alternate pinned commits, but does **not** prove that either repository
+is a rename or transfer of the repository recorded in the frozen manifest.
+The other four have no verified alternate pinned source. The original-owner
+provenance of all six remains unresolved.
 
 ## Annotation toolchain smoke
 
@@ -144,8 +189,8 @@ benchmark/labels/adjudicated.jsonl
 
 Even a genuine two-human review of v3 would produce development evidence, not
 held-out accuracy. Do not change the v3 manifest status to bypass the scorer's
-`eval`/`all` rejection. Wait for a separate v4 sample and a versioned human
-protocol before formal evaluation.
+`eval`/`all` rejection. Use only a qualified, separately sealed v4 sample and a
+versioned human protocol for formal evaluation.
 
 ## Metrics and error analysis
 
@@ -160,8 +205,8 @@ AGENTCI_BENCHMARK_SPLIT=dev \
 
 This output is explicitly development-only and lists scanner rules absent from
 the v3 registry. The scorer rejects v3 `eval` and `all` even if labels exist or
-the v3 manifest status changes. A future v4 scoring path must be built around
-new repository-disjoint snapshots, a registry for every current rule, a frozen
+the v3 manifest status changes. A v4 scoring path must be built around
+repository-disjoint snapshots, a registry for every current rule, a frozen
 human review protocol, and complete error classification before any formal
 accuracy claim.
 

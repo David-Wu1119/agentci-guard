@@ -35,7 +35,7 @@ jobs:
       expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
         "agentci/analysis-agent-event-unsupported",
       ]);
-      expect(result.analysis_complete).toBe(false);
+      expect(result.analysis_complete).toBe(true);
     },
   );
 
@@ -68,6 +68,27 @@ jobs:
     expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
       "agentci/analysis-agent-event-unsupported",
     ]);
+    expect(result.analysis_complete).toBe(true);
+  });
+
+  it("remains incomplete when an unsupported event accompanies an unresolved condition", () => {
+    const result = scan(`
+on: discussion
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@${VERIFIED_REF}
+        with:
+          prompt: hello
+      - if: steps.gate.outputs.ok
+        run: echo hello
+`);
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+      "agentci/analysis-agent-event-unsupported",
+      "agentci/analysis-event-condition",
+    ]);
+    expect(result.analysis_complete).toBe(false);
   });
 
   it("keeps a mutable v1 ref conservative and explicitly incomplete", () => {
@@ -84,11 +105,20 @@ jobs:
           prompt: "Fix \${{ github.event.comment.body }}"
 `);
     expect(result.agent_usages).toHaveLength(1);
+    expect(result.agent_usages[0]?.uncertain_reachable_events).toEqual([
+      "discussion_comment",
+    ]);
     expect(result.findings.map((finding) => finding.rule_id)).toContain(
       "agentci/untrusted-ai-write-token",
     );
+    expect(
+      result.findings.find(
+        (finding) => finding.rule_id === "agentci/untrusted-ai-write-token",
+      )?.uncertain_reachable_events,
+    ).toEqual(["discussion_comment"]);
     expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
       "agentci/analysis-agent-event-unknown",
+      "agentci/analysis-agent-implicit-ingestion-unknown",
     ]);
     expect(result.analysis_complete).toBe(false);
   });
@@ -129,7 +159,10 @@ jobs:
     expect(result.findings.map((finding) => finding.rule_id)).toContain(
       "agentci/untrusted-ai-write-token",
     );
-    expect(result.diagnostics).toEqual([]);
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+      "agentci/analysis-agent-implicit-ingestion-unknown",
+    ]);
+    expect(result.analysis_complete).toBe(false);
   });
 });
 
@@ -156,7 +189,7 @@ jobs:
     expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
       "agentci/analysis-agent-event-unsupported",
     ]);
-    expect(result.analysis_complete).toBe(false);
+    expect(result.analysis_complete).toBe(true);
   });
 
   it("retains an accepted activity even when another is rejected", () => {
@@ -168,11 +201,14 @@ jobs:
     expect(result.diagnostics).toEqual([]);
   });
 
-  it("does not extrapolate this revision's rejection to a mutable ref", () => {
+  it("does not claim implicit ingestion for an unverified mutable ref", () => {
     const result = scan(workflow("v1", "closed"));
     expect(result.agent_usages).toHaveLength(1);
-    expect(result.findings.map((finding) => finding.rule_id)).toContain(
+    expect(result.findings.map((finding) => finding.rule_id)).not.toContain(
       "agentci/untrusted-ai-write-token",
+    );
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+      "agentci/analysis-agent-implicit-ingestion-unknown",
     );
   });
 
@@ -185,7 +221,7 @@ jobs:
     );
     expect(result.agent_usages).toEqual([]);
     expect(result.findings).toEqual([]);
-    expect(result.analysis_complete).toBe(false);
+    expect(result.analysis_complete).toBe(true);
   });
 
   it("retains a pinned PR Action with a prompt in default agent mode", () => {
@@ -254,7 +290,7 @@ jobs:
     );
     expect(result.agent_usages).toEqual([]);
     expect(result.findings).toEqual([]);
-    expect(result.analysis_complete).toBe(false);
+    expect(result.analysis_complete).toBe(true);
   });
 
   it("preserves caller PR activities through a local reusable workflow", () => {
@@ -299,5 +335,6 @@ jobs:
     expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
       "agentci/analysis-agent-event-unsupported",
     );
+    expect(result.analysis_complete).toBe(true);
   });
 });

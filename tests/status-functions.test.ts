@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { narrowEvents } from "../src/index.js";
+import { narrowEventsDetailed } from "../src/workflow-model.js";
 
 const EVENTS = ["push", "pull_request", "issue_comment"];
 
@@ -48,4 +49,22 @@ describe("status functions in event reachability", () => {
     expect(narrowEvents(EVENTS, "()").complete).toBe(false);
     expect(narrowEvents(EVENTS, "status()").complete).toBe(false);
   });
+
+  it.each([
+    "always() &&",
+    "success() ||",
+    "always() && || success()",
+    "(always()",
+    "always())",
+    "always() success()",
+  ])(
+    "does not mark malformed status-only condition %s complete",
+    (condition) => {
+      expect(narrowEventsDetailed(EVENTS, condition)).toEqual({
+        events: EVENTS,
+        unknownEvents: EVENTS,
+        complete: false,
+      });
+    },
+  );
 });

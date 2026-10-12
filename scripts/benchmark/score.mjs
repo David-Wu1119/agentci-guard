@@ -13,6 +13,7 @@ import {
   validateFinalAgainstSources,
 } from "./annotation-lib.mjs";
 import { csvObjects, renderCsv } from "./csv.mjs";
+import { predict, relevantDiagnostics, sameUnit } from "./scoring-unit.mjs";
 
 const manifest = JSON.parse(
   fs.readFileSync(path.join(benchmarkRoot, "manifest.json"), "utf8"),
@@ -106,7 +107,11 @@ for (const item of manifest.cases) {
     diagnostics: result.diagnostics.map((diagnostic) => diagnostic.code),
   });
   for (const annotation of caseRecords.get(item.case_id) ?? []) {
-    const prediction = predict(annotation, result);
+    const prediction = predict(
+      annotation,
+      result,
+      manifest.agent_detection_task,
+    );
     predictions.push({
       ...annotation,
       prediction,
@@ -235,21 +240,6 @@ fs.writeFileSync(jsonOutput, `${JSON.stringify(report, null, 2)}\n`);
 fs.writeFileSync(markdownOutput, markdownReport(report));
 console.log(JSON.stringify(report, null, 2));
 
-function predict(annotation, result) {
-  const positive =
-    annotation.rule_id === manifest.agent_detection_task
-      ? result.agent_usages.some((usage) => sameUnit(annotation, usage))
-      : result.findings.some(
-          (finding) =>
-            finding.rule_id === annotation.rule_id &&
-            sameUnit(annotation, finding),
-        );
-  if (positive) return "positive";
-  return relevantDiagnostics(annotation, result).length > 0
-    ? "unknown"
-    : "negative";
-}
-
 function predictedEvents(annotation, result) {
   const candidates =
     annotation.rule_id === manifest.agent_detection_task
@@ -264,53 +254,6 @@ function predictedEvents(annotation, result) {
       candidates.flatMap((candidate) => candidate.reachable_events ?? []),
     ),
   ].sort();
-}
-
-function sameUnit(annotation, candidate) {
-  if (
-    candidate.file !== annotation.workflow_file ||
-    candidate.job !== annotation.job_id
-  ) {
-    return false;
-  }
-  if (annotation.scope === "job") return candidate.step_index === undefined;
-  if (annotation.scope === "step") {
-    return candidate.step_index === annotation.step_index;
-  }
-  return false;
-}
-
-function relevantDiagnostics(annotation, result) {
-  const permissionDependent = new Set([
-    "agentci/untrusted-ai-write-token",
-    "agentci/broad-write-permissions",
-  ]);
-  return result.diagnostics.filter((diagnostic) => {
-    if (diagnostic.file !== annotation.workflow_file) return false;
-    if (diagnostic.job && diagnostic.job !== annotation.job_id) return false;
-    if (
-      diagnostic.code === "agentci/analysis-permissions-unknown" &&
-      !permissionDependent.has(annotation.rule_id)
-    ) {
-      return false;
-    }
-    if (
-      diagnostic.code === "agentci/analysis-checkout-protection-unknown" &&
-      annotation.rule_id !== "agentci/unsafe-checkout"
-    ) {
-      return false;
-    }
-    if (
-      diagnostic.code === "agentci/analysis-agent-tool-fetch-unknown" &&
-      ![
-        "agentci/untrusted-ai-write-token",
-        "agentci/gated-ai-write-token",
-      ].includes(annotation.rule_id)
-    ) {
-      return false;
-    }
-    return true;
-  });
 }
 
 function metricBundle(items, minimumSupport) {

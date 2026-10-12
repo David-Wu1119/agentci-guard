@@ -1,8 +1,8 @@
 # Static Analysis Model
 
 AgentCI Guard evaluates each AI step under an explicit effective context. This
-document describes the **unreleased source-provenance candidate in this
-checkout**. The published v0.1.1 annotation predicates in
+document describes the **source-provenance candidate in this source tree**, not
+the tagged `v0.6.2` Action/CLI. The published v0.1.1 annotation predicates in
 [`benchmark/pilot/contracts/v0.1.1/RULES.md`](../benchmark/pilot/contracts/v0.1.1/RULES.md)
 remain a historical contract; changed candidate outcomes cannot be scored
 against those labels as independent accuracy evidence. The documented vendor
@@ -36,6 +36,12 @@ unknown.
 Any nonconstant job or step condition outside this subset does not silently
 choose a reachability state. It retains the conservative event set and emits
 `agentci/analysis-event-condition`.
+
+When such a condition leaves an event path unresolved, the result keeps that
+event in `reachable_events` and also lists it in the optional
+`uncertain_reachable_events` subset. Text, Markdown, SARIF, and browser output
+expose the distinction. An event absent from the uncertainty subset has its
+modeled event predicates resolved; that does **not** prove the job or step ran.
 
 ## Coverage floor: agents invoked outside the workflow
 
@@ -101,8 +107,9 @@ version reports clean.
 The `run:` CLI matcher is not a general shell parser. It handles common direct
 commands, assignments, branches, pipes, and literal nested shell strings, but
 dynamically constructed shell scripts can still hide an agent invocation.
-An `analysis_complete: true` result means no supported construct triggered a
-diagnostic; it does not prove the workflow is safe.
+An `analysis_complete: true` result means no unresolved or parse diagnostic
+remains; a verified unsupported Action event can still produce a diagnostic
+for provenance. Completeness does not prove the workflow is safe.
 
 ## The agent's own gate
 
@@ -117,23 +124,29 @@ an explicit `github_token` input; the candidate checks for that input before
 modeling a bypass, but cannot resolve whether a dynamic token expression is
 empty. `allowed_bots` entries are not permission-checked.
 
-When the untrusted-trigger, agent, write-token pattern is present and **all** of
-the following hold, the finding is `agentci/gated-ai-write-token` at high rather
-than `agentci/untrusted-ai-write-token` at critical:
+The candidate classifies each reachable event path independently. When the
+untrusted-trigger, agent, write-token pattern is present and **all** of the
+following hold on that event, the finding is `agentci/gated-ai-write-token` at
+high rather than `agentci/untrusted-ai-write-token` at critical:
 
-- every AI step that ingests untrusted content is `anthropics/claude-code-action`
-  (not `-base-action`) with neither `allowed_non_write_users` nor `allowed_bots`
-  set to a non-empty value;
-- every reachable untrusted event is one the docs list as checked — `issues`,
+- every AI step that ingests untrusted content on that event is an inspected immutable
+  `anthropics/claude-code-action` revision (not `-base-action`) with neither
+  `allowed_non_write_users` nor `allowed_bots` set to a non-empty value;
+- the event is one the docs list as checked — `issues`,
   `issue_comment`, `pull_request`, `pull_request_review`,
   `pull_request_review_comment`; `pull_request_target` and the discussion events
   are not listed and keep potential critical findings when Action event support
   is unverified;
-- every **modeled** ingested source belongs to the actor checked by that gate. Parent Issue,
+- every relevant text source belongs to the actor checked by that gate, and
+  no other AI path reachable on that event has unresolved implicit, tool-fetch,
+  or CLI input flow. Parent Issue,
   PR, or discussion content may have a different author on comment, review, or
   label activity and therefore prevents the downgrade;
-- no `run:` step in the job expands untrusted event text, because that path
-  bypasses the agent's gate entirely.
+- no `run:` step reachable on that event expands untrusted event text, because that path
+  bypasses the agent's gate entirely. If another agent's inherited input is
+  unresolved, neither the high nor the critical write-token finding is
+  asserted from that unknown path. A job can have high and critical findings
+  on different events without attributing either severity to the other event.
 
 The Action's gate answers "who activated this run?", not "who authored every
 piece of text the agent reads?" A trusted maintainer can label an attacker
@@ -161,11 +174,44 @@ environment variables expanded in it. A source used solely by a sibling
 command is not a proven CLI input. The local CLI nevertheless inherits its
 environment: an unreferenced untrusted environment value leaves analysis
 incomplete instead of proving ingestion or safety. Shell assignments, pipes,
-stdin redirection, and other unresolved flow likewise emit
+stdin redirection, earlier untrusted `GITHUB_ENV` writes, and other unresolved
+flow likewise emit
 `agentci/analysis-run-dataflow-unknown`. For a direct hosted-agent HTTP POST,
 the candidate traces the request body and only environment variables
 referenced by that body. These bounded parsers are not general shell dataflow
 analysis.
+
+GitHub can pass data from a completed step through
+[`$GITHUB_OUTPUT` and `steps.<id>.outputs`](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts),
+or from another job through
+[`needs.<job>.outputs`](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/pass-job-outputs).
+An AI input that consumes such an alias with unresolved provenance now emits
+`analysis-output-provenance-unknown` on the overlapping event path, rather than
+claiming a complete clean analysis. This does not create a definite prompt or
+write-token finding. A first-step literal output on the default Ubuntu shell,
+or a literal declared job output, can be closed; computed outputs and values
+forwarded across a reusable-workflow boundary cannot. This is a limited
+abstention rule, not transitive output tracing. The development scorer assigns
+this uncertainty to write-token rules, not to the separate direct-event prompt
+predicate. Serialization of a whole `steps`/`needs` context and a known output
+alias forwarded through `GITHUB_ENV` are covered by the same abstention; the
+scanner does not infer a definite source-to-agent flow from either.
+An unresolved job output used to build `strategy.matrix` also abstains when
+the AI input references that matrix; a literal job output does not.
+An AI input that reads a matrix built directly from a supported untrusted
+event field emits `analysis-matrix-provenance-unknown`, not a definite prompt
+finding. Matrix expansion and arbitrary shell dataflow are not proven.
+Composed `inputs.*` expressions in local reusable workflows inspect the
+caller's value for output aliases. Dynamic values that remain opaque across a
+further reusable boundary emit `analysis-reusable-input-provenance-unknown`;
+this is an abstention, not transitive input evaluation. Literal values remain
+closed. Output, matrix, and opaque reusable-input uncertainty can also flow
+through an earlier `GITHUB_ENV` write to the later AI step. Matrix tracking is
+whole-matrix, so an unused dynamic axis can cause a conservative abstention.
+A reusable-workflow caller job can itself have a dynamic matrix and pass a
+`matrix.*` value through `with`; the callee's AI step receives a scoped
+reusable-input diagnostic. Caller matrix expressions currently keep every
+reachable caller event possible rather than tracking individual members.
 
 The second route is Action self-fetching, which depends on vendor and mode.
 At the pinned Anthropic revision, [tag mode fetches parent Issue/PR data](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/modes/tag/index.ts)
@@ -184,11 +230,19 @@ into the Action's inputs or effective environment.
 
 On a PR, the [pinned tag prompt](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/create-prompt/index.ts) also includes changed-file paths. An owner can open a PR from an attacker-authored fork, so the actor gate does not authenticate those paths. Because `issue_comment` can target a PR, the candidate conservatively keeps that path possible there too.
 
-`claude-code-base-action` has no modeled self-fetch route. Other recognized
-agent Actions still use a conservative event-ingestion heuristic; their modes
-have not been verified to this specificity. A `run:` invocation of an agent
-CLI or HTTP dispatch is treated differently: it only receives what the shell
-passes, so untrusted content requires interpolation.
+`claude-code-base-action` has no modeled self-fetch route. For other Action
+refs, including a mutable Anthropic tag, the candidate does not infer
+implicit ingestion from the event alone. When the Action is reachable on an
+untrusted event with a modeled write capability, it emits
+`analysis-agent-implicit-ingestion-unknown` instead of a definite write-token
+finding for that route; explicit interpolation is still judged separately.
+At the other [inspected Anthropic revision](https://github.com/anthropics/claude-code-action/blob/787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251/src/modes/detector.ts),
+a nonempty static prompt with `track_progress` off selects
+[agent mode](https://github.com/anthropics/claude-code-action/blob/787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251/src/modes/agent/index.ts),
+which does not automatically fetch the parent Issue body. Other modes at that
+revision are not modeled as verified. A `run:` invocation of an agent CLI or
+HTTP dispatch is treated differently: it only receives what the shell passes,
+so untrusted content requires interpolation.
 
 Anthropic tag mode's [data fetcher](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/github/data/fetcher.ts)
 also loads pre-trigger comments and reviews. The candidate attributes its
@@ -314,8 +368,9 @@ are included. GitHub currently documents those events as public preview.
 The verified Anthropic Action revision
 [`1d6de8c`](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/github/context.ts#L250-L251)
 rejects both events before Claude starts. The scanner excludes only those event
-paths for that immutable ref and emits an incomplete-analysis diagnostic. A
-mutable or unverified ref retains potential findings with a separate
+paths for that immutable ref and emits a provenance diagnostic; this
+conclusively closed path does not make the analysis incomplete. A mutable or
+unverified ref retains potential findings with a separate
 compatibility diagnostic; CLI agents and other Actions remain in scope.
 
 ## Permissions
@@ -340,7 +395,7 @@ known policy through `agentci.config.json`:
 map.
 
 `broad-write-permissions` is a model of the workflow's `GITHUB_TOKEN`. The
-unreleased write-token rule also recognizes one separate capability path. At
+source-aware write-token rule also recognizes one separate capability path. At
 the pinned Anthropic revision, the full Action without an explicit
 `github_token` input [exchanges an OIDC token for its GitHub App
 token](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/github/token.ts);
@@ -373,6 +428,8 @@ effective environment or inputs. The built-in `GITHUB_TOKEN` is handled by
 the permissions model.
 An earlier step that may write a secret to `GITHUB_ENV` marks a later AI step's
 analysis incomplete; cross-step secret flow is not a positive finding yet.
+The same incomplete result applies to an earlier untrusted event-text write to
+`GITHUB_ENV`; the scanner does not claim that the later agent consumed it.
 `workflow_call` entrypoints with no reachable local caller are also marked
 incomplete because their caller-supplied context is unavailable; any separate
 direct trigger is still analyzed on its own event set.

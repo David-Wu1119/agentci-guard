@@ -19,6 +19,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
+const REPORT_SCHEMA_VERSION = 4;
 const args = process.argv.slice(2);
 const flag = (name) => {
   const index = args.indexOf(name);
@@ -34,7 +35,8 @@ if (args.includes("--compare")) {
 }
 
 function report(outDir) {
-  const manifest = JSON.parse(readFileSync("benchmark/manifest.json", "utf8"));
+  const manifestBytes = readFileSync("benchmark/manifest.json");
+  const manifest = JSON.parse(manifestBytes.toString("utf8"));
   const cases = [...manifest.cases].sort((a, b) =>
     a.case_id.localeCompare(b.case_id),
   );
@@ -83,6 +85,21 @@ function report(outDir) {
       workflow_count: scan.workflow_count,
       analysis_complete: scan.analysis_complete,
       agent_usages: scan.agent_usages.length,
+      agent_usage_records: scan.agent_usages
+        .map((usage) => ({
+          file: usage.file,
+          job: usage.job,
+          step: usage.step,
+          step_index: usage.step_index,
+          kind: usage.kind,
+          line: usage.line ?? null,
+          reachable_events: [...usage.reachable_events].sort(),
+          uncertain_reachable_events: [
+            ...(usage.uncertain_reachable_events ?? []),
+          ].sort(),
+          call_chain: usage.call_chain ?? [],
+        }))
+        .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
       findings: scan.findings
         .map((finding) => ({
           rule_id: finding.rule_id,
@@ -90,7 +107,13 @@ function report(outDir) {
           file: finding.file,
           job: finding.job ?? null,
           step: finding.step ?? null,
+          step_index: finding.step_index ?? null,
           line: finding.line ?? null,
+          reachable_events: [...(finding.reachable_events ?? [])].sort(),
+          uncertain_reachable_events: [
+            ...(finding.uncertain_reachable_events ?? []),
+          ].sort(),
+          call_chain: finding.call_chain ?? [],
         }))
         .sort(sortFinding),
       by_severity: bySeverity,
@@ -100,6 +123,7 @@ function report(outDir) {
           severity: diagnostic.severity,
           file: diagnostic.file,
           job: diagnostic.job ?? null,
+          step_index: diagnostic.step_index ?? null,
           line: diagnostic.line ?? null,
         }))
         .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
@@ -108,11 +132,13 @@ function report(outDir) {
 
   mkdirSync(outDir, { recursive: true });
   const meta = {
+    report_schema_version: REPORT_SCHEMA_VERSION,
     generated_at: new Date().toISOString(),
     commit: git("rev-parse HEAD"),
     working_tree_changes: git("status --porcelain").split("\n").filter(Boolean)
       .length,
     benchmark_id: manifest.benchmark_id,
+    manifest_sha256: createHash("sha256").update(manifestBytes).digest("hex"),
     manifest_case_count: manifest.cases.length,
     scanner_version: JSON.parse(readFileSync("package.json", "utf8")).version,
     // The bundle that actually scanned. A commit plus a dirty tree does not
@@ -229,6 +255,20 @@ function summarize(meta, records) {
 function compare(beforePath, afterPath) {
   const before = JSON.parse(readFileSync(beforePath, "utf8"));
   const after = JSON.parse(readFileSync(afterPath, "utf8"));
+  if (
+    before.meta?.report_schema_version !== REPORT_SCHEMA_VERSION ||
+    after.meta?.report_schema_version !== REPORT_SCHEMA_VERSION
+  ) {
+    throw new Error(
+      `Unsupported behavioral report schema (before: ${before.meta?.report_schema_version ?? "missing"}, after: ${after.meta?.report_schema_version ?? "missing"}). Regenerate both reports with this reporter before comparing.`,
+    );
+  }
+  if (
+    !before.meta.manifest_sha256 ||
+    before.meta.manifest_sha256 !== after.meta.manifest_sha256
+  ) {
+    throw new Error("Behavioral reports must use the same manifest SHA-256.");
+  }
   const byId = (doc) => new Map(doc.cases.map((c) => [c.case_id, c]));
   const a = byId(before);
   const b = byId(after);
@@ -236,15 +276,49 @@ function compare(beforePath, afterPath) {
   const sig = (c) =>
     c && c.scanned
       ? {
+          agent_usages: c.agent_usage_records
+            .map((usage) =>
+              JSON.stringify([
+                usage.file,
+                usage.job,
+                usage.step ?? null,
+                usage.step_index ?? null,
+                usage.kind,
+                usage.line ?? null,
+                usage.reachable_events,
+                usage.uncertain_reachable_events,
+                usage.call_chain ?? [],
+              ]),
+            )
+            .sort(),
           findings: c.findings
-            .map(
-              (f) =>
-                `${f.rule_id}|${f.severity}|${f.file}|${f.job ?? ""}|${f.step ?? ""}`,
+            .map((f) =>
+              JSON.stringify([
+                f.rule_id,
+                f.severity,
+                f.file,
+                f.job ?? null,
+                f.step ?? null,
+                f.step_index ?? null,
+                f.line ?? null,
+                f.reachable_events,
+                f.uncertain_reachable_events,
+                f.call_chain ?? [],
+              ]),
             )
             .sort(),
           complete: c.analysis_complete,
           diagnostics: c.diagnostics
-            .map((d) => `${d.code}|${d.file}|${d.job ?? ""}`)
+            .map((d) =>
+              JSON.stringify([
+                d.code,
+                d.severity,
+                d.file,
+                d.job ?? null,
+                d.step_index ?? null,
+                d.line ?? null,
+              ]),
+            )
             .sort(),
         }
       : { scanned: false };
@@ -258,22 +332,29 @@ function compare(beforePath, afterPath) {
     if (JSON.stringify(x) === JSON.stringify(y)) continue;
     changed++;
     console.log(`## ${id} (${(b.get(id) ?? a.get(id)).repository})`);
-    const removed = (x.findings ?? []).filter(
-      (f) => !(y.findings ?? []).includes(f),
+    const usageRemoved = multisetDifference(
+      x.agent_usages ?? [],
+      y.agent_usages ?? [],
     );
-    const added = (y.findings ?? []).filter(
-      (f) => !(x.findings ?? []).includes(f),
+    const usageAdded = multisetDifference(
+      y.agent_usages ?? [],
+      x.agent_usages ?? [],
     );
+    for (const usage of usageRemoved)
+      console.log(`- agent usage removed: ${usage}`);
+    for (const usage of usageAdded)
+      console.log(`- agent usage added:   ${usage}`);
+    const removed = multisetDifference(x.findings ?? [], y.findings ?? []);
+    const added = multisetDifference(y.findings ?? [], x.findings ?? []);
     for (const f of removed) console.log(`- removed: ${f}`);
     for (const f of added) console.log(`- added:   ${f}`);
     if (x.complete !== y.complete)
       console.log(`- analysis_complete: ${x.complete} → ${y.complete}`);
-    const dRemoved = (x.diagnostics ?? []).filter(
-      (d) => !(y.diagnostics ?? []).includes(d),
+    const dRemoved = multisetDifference(
+      x.diagnostics ?? [],
+      y.diagnostics ?? [],
     );
-    const dAdded = (y.diagnostics ?? []).filter(
-      (d) => !(x.diagnostics ?? []).includes(d),
-    );
+    const dAdded = multisetDifference(y.diagnostics ?? [], x.diagnostics ?? []);
     for (const d of dRemoved) console.log(`- diagnostic removed: ${d}`);
     for (const d of dAdded) console.log(`- diagnostic added:   ${d}`);
     console.log("");
@@ -292,11 +373,23 @@ function compare(beforePath, afterPath) {
   console.log(`\n${changed} of ${ids.length} cases changed.`);
 }
 
+function multisetDifference(left, right) {
+  const unmatched = [...right];
+  return left.filter((item) => {
+    const index = unmatched.indexOf(item);
+    if (index === -1) return true;
+    unmatched.splice(index, 1);
+    return false;
+  });
+}
+
 function sortFinding(a, b) {
   return (
     a.file.localeCompare(b.file) ||
     (a.job ?? "").localeCompare(b.job ?? "") ||
     (a.step ?? "").localeCompare(b.step ?? "") ||
+    (a.step_index ?? -1) - (b.step_index ?? -1) ||
+    (a.line ?? -1) - (b.line ?? -1) ||
     a.rule_id.localeCompare(b.rule_id)
   );
 }

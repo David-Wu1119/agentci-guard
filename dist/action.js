@@ -8743,39 +8743,40 @@ function mergeEnvironment(...layers) {
   }
   return merged;
 }
-function narrowEvents(events, rawCondition) {
+function narrowEventsDetailed(events, rawCondition) {
   if (rawCondition === void 0 || rawCondition === null) {
-    return { events: [...events], complete: true };
+    return { events: [...events], unknownEvents: [], complete: true };
   }
   if (rawCondition === true) {
-    return { events: [...events], complete: true };
+    return { events: [...events], unknownEvents: [], complete: true };
   }
   if (rawCondition === false) {
-    return { events: [], complete: true };
+    return { events: [], unknownEvents: [], complete: true };
   }
   if (typeof rawCondition !== "string") {
-    return { events: [...events], complete: false };
+    return { events: [...events], unknownEvents: [...events], complete: false };
   }
   const condition = unwrapExpression(rawCondition);
   if (condition === "true") {
-    return { events: [...events], complete: true };
+    return { events: [...events], unknownEvents: [], complete: true };
   }
   if (condition === "false") {
-    return { events: [], complete: true };
+    return { events: [], unknownEvents: [], complete: true };
   }
-  if (STATUS_ONLY_CONDITION.test(condition)) {
-    return { events: [...events], complete: true };
+  if (STATUS_ONLY_CONDITION.test(condition) && isWellFormedStatusCondition(condition)) {
+    return { events: [...events], unknownEvents: [], complete: true };
   }
-  let complete = true;
   const reachable = [];
+  const unknownEvents = [];
   for (const event of events) {
     const result = evaluateEventCondition(condition, event);
-    if (result === "unknown") complete = false;
+    if (result === "unknown") unknownEvents.push(event);
     if (result !== false) reachable.push(event);
   }
   return {
     events: reachable,
-    complete
+    unknownEvents,
+    complete: unknownEvents.length === 0
   };
 }
 function evaluateEventCondition(condition, event) {
@@ -8882,6 +8883,36 @@ function tokenizeExpression(value) {
     index += identifier.length;
   }
   return tokens;
+}
+function isWellFormedStatusCondition(condition) {
+  const tokens = tokenizeExpression(condition);
+  if (!tokens) return false;
+  let needsOperand = true;
+  let depth = 0;
+  for (let index = 0; index < tokens.length; index++) {
+    const token = tokens[index];
+    if (needsOperand) {
+      if (token.kind === "operator" && token.value === "!") continue;
+      if (token.kind === "left-paren") {
+        depth++;
+        continue;
+      }
+      if (token.kind === "identifier" && /^(?:always|success|failure|cancelled)$/i.test(token.value) && tokens[index + 1]?.kind === "left-paren" && tokens[index + 2]?.kind === "right-paren") {
+        index += 2;
+        needsOperand = false;
+        continue;
+      }
+      return false;
+    }
+    if (token.kind === "right-paren" && depth > 0) {
+      depth--;
+    } else if (token.kind === "operator" && (token.value === "&&" || token.value === "||")) {
+      needsOperand = true;
+    } else {
+      return false;
+    }
+  }
+  return !needsOperand && depth === 0;
 }
 var EventExpressionParser = class {
   constructor(tokens, event) {
@@ -9164,8 +9195,9 @@ var EMPTY_REUSABLE_CONTEXT = {
   callChain: []
 };
 var ANTHROPIC_ACTION_WITHOUT_DISCUSSION = "1d6de8cb0c237e7c15e9e1bdf973826ebae490cc";
+var ANTHROPIC_ACTION_AGENT_PROMPT_VERIFIED = "787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251";
 var VERIFIED_ANTHROPIC_WRITE_GATES = /* @__PURE__ */ new Set([
-  "787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251",
+  ANTHROPIC_ACTION_AGENT_PROMPT_VERIFIED,
   ANTHROPIC_ACTION_WITHOUT_DISCUSSION
 ]);
 async function scanRepository(root, options = {}) {
@@ -9239,7 +9271,10 @@ function scanWorkflowFiles(workflows, scanRoot, config) {
     findings,
     summary: summarize(findings),
     diagnostics,
-    analysis_complete: diagnostics.length === 0
+    // A verified unsupported Action event is a closed path, not uncertainty.
+    analysis_complete: diagnostics.every(
+      (diagnostic) => diagnostic.code === "agentci/analysis-agent-event-unsupported"
+    )
   };
 }
 async function loadWorkflowFiles(root) {
@@ -9320,7 +9355,10 @@ function analyzeWorkflow(workflow, repository, context) {
   for (const [jobName, rawJob] of Object.entries(jobs)) {
     if (!isRecord2(rawJob)) continue;
     const jobLine = locateJobLine(workflow.raw, jobName);
-    const jobReachability = narrowEvents(workflowEvents, rawJob.if);
+    const jobReachability = narrowEventsDetailed(workflowEvents, rawJob.if);
+    const jobUncertainEvents = jobReachability.events.filter(
+      (event) => context.uncertainEvents?.includes(event) || jobReachability.unknownEvents.includes(event)
+    );
     const jobActorGate = Boolean(context.actorGate) || hasTrustedActorGate(rawJob.if);
     const jobPrGate = Boolean(context.prGate) || hasTrustedPrProvenanceGate(rawJob.if);
     if (!jobReachability.complete) {
@@ -9331,7 +9369,7 @@ function analyzeWorkflow(workflow, repository, context) {
         file,
         job: jobName,
         line: jobLine,
-        message: "Could not fully interpret this job's github.event_name condition; event reachability was kept conservative."
+        message: "Could not fully interpret this job's if condition; unresolved branches retain possible event paths, so findings in this job may depend on those paths."
       });
     }
     if (jobReachability.events.length === 0) continue;
@@ -9350,6 +9388,7 @@ function analyzeWorkflow(workflow, repository, context) {
           rawJob,
           jobLine,
           jobReachability.events,
+          jobUncertainEvents,
           [...creationOnlyEvents],
           jobPermissions,
           repository,
@@ -9361,13 +9400,94 @@ function analyzeWorkflow(workflow, repository, context) {
     const steps = Array.isArray(rawJob.steps) ? rawJob.steps : [];
     const jobEnvironment = mergeEnvironment(workflowEnvironment, rawJob.env);
     const aiSteps = [];
-    let untrustedInRun = false;
+    const runDataflowUnknownEvents = [];
+    const priorStepOutputEvents = /* @__PURE__ */ new Map();
+    const untrustedEnvTransferEvents = /* @__PURE__ */ new Set();
+    const outputEnvTransferEvents = /* @__PURE__ */ new Set();
+    const matrixEnvTransferEvents = /* @__PURE__ */ new Set();
+    const reusableInputEnvTransferEvents = /* @__PURE__ */ new Set();
+    const untrustedRunPaths = [];
     const secretEnvTransferEvents = /* @__PURE__ */ new Set();
+    const unresolvedOutputEvents = (material, reachable) => unionEvents([
+      ...outputContextReferences(material, "steps").flatMap(
+        ({ id }) => id === null ? [...priorStepOutputEvents.values()].flat() : priorStepOutputEvents.get(id) ?? []
+      ),
+      ...outputContextReferences(material, "needs").flatMap(
+        ({ id, output: outputName }) => {
+          const declaredNeeds = Array.isArray(rawJob.needs) ? rawJob.needs : [rawJob.needs];
+          if (id === null && rawJob.needs === void 0 && Object.keys(context.inputValues).length === 0) {
+            return [];
+          }
+          if (id === null && Object.keys(context.inputValues).length === 0 && declaredNeeds.every((name) => {
+            const dependency = jobs[name];
+            return isRecord2(dependency) && dependency.uses === void 0 && (!isRecord2(dependency.outputs) || Object.values(dependency.outputs).every(
+              (value) => typeof value === "string" && !value.includes("${{")
+            ));
+          })) {
+            return [];
+          }
+          const producer = id === null ? void 0 : jobs[id];
+          const direct = id !== null && declaredNeeds.includes(id);
+          const outputs = isRecord2(producer) && isRecord2(producer.outputs) ? producer.outputs : void 0;
+          if (direct && outputs && (outputName === null ? Object.values(outputs).every(
+            (value) => typeof value === "string" && !value.includes("${{")
+          ) : typeof outputs[outputName] === "string" && !outputs[outputName].includes("${{"))) {
+            return [];
+          }
+          return isRecord2(producer) ? narrowEventsDetailed(workflowEvents, producer.if).events : reachable;
+        }
+      )
+    ]).filter((event) => reachable.includes(event));
+    const inputProvenance = (material) => {
+      const references = outputContextReferences(material, "inputs");
+      return {
+        material: references.flatMap(
+          ({ id }) => id === null ? Object.values(context.inputValues) : [context.inputValues[id] ?? ""]
+        ).join("\n"),
+        opaque: context.callChain.length > 0 && references.some(
+          ({ id }) => id === null ? Object.values(context.inputValues).some(
+            (value) => value.includes("${{")
+          ) : context.inputValues[id] === void 0 || context.inputValues[id].includes("${{")
+        )
+      };
+    };
+    const unknownCallerInputEvents = (material, reachable) => unionEvents(
+      outputContextReferences(material, "inputs").flatMap(
+        ({ id }) => id === null ? Object.values(context.inputUnknownEvents ?? {}).flat() : context.inputUnknownEvents?.[id] ?? []
+      )
+    ).filter((event) => reachable.includes(event));
+    const matrixMaterial = isRecord2(rawJob.strategy) ? JSON.stringify(rawJob.strategy.matrix ?? "") : "";
+    const matrixInput = inputProvenance(matrixMaterial);
+    const matrixProvenanceMaterial = `${matrixMaterial}
+${matrixInput.material}`;
+    const unresolvedMatrixEvents = unresolvedOutputEvents(
+      matrixProvenanceMaterial,
+      jobReachability.events
+    );
+    const matrixSourceMatches = untrustedGitHubContextMatches(
+      matrixProvenanceMaterial
+    );
+    const activeMatrixSourceEvents = (reachable, actorGated, prGated) => unionEvents(
+      matrixSourceMatches.filter(
+        (match) => contextCanReach(reachable, [match.event]) && !sourceTrustedByGate(
+          match.source,
+          match.event,
+          actorGated,
+          prGated,
+          creationOnlyEvents
+        )
+      ).flatMap(
+        (match) => match.event === "*" ? reachable : [match.event]
+      )
+    );
     for (const [index, rawStep] of steps.entries()) {
       if (!isRecord2(rawStep)) continue;
       const stepName = typeof rawStep.name === "string" ? rawStep.name : `step ${index + 1}`;
       const stepLine = locateStepLine(workflow.raw, jobName, index);
-      let stepReachability = narrowEvents(jobReachability.events, rawStep.if);
+      let stepReachability = narrowEventsDetailed(
+        jobReachability.events,
+        rawStep.if
+      );
       if (!stepReachability.complete) {
         output.diagnostics.push({
           code: "agentci/analysis-event-condition",
@@ -9375,8 +9495,9 @@ function analyzeWorkflow(workflow, repository, context) {
           severity: "warning",
           file,
           job: jobName,
+          step_index: index,
           line: stepLine,
-          message: "Could not fully interpret this step's github.event_name condition; event reachability was kept conservative."
+          message: "Could not fully interpret this step's if condition; unresolved branches retain possible event paths, so findings at this step may depend on those paths."
         });
       }
       if (stepReachability.events.length === 0) continue;
@@ -9390,6 +9511,7 @@ function analyzeWorkflow(workflow, repository, context) {
       const discussionEvents = isSelfGatingAgentAction(actionReference) ? stepReachability.events.filter(
         (event) => event === "discussion" || event === "discussion_comment"
       ) : [];
+      const vendorUnknownEvents = pinnedAnthropicRef === ANTHROPIC_ACTION_WITHOUT_DISCUSSION ? [] : discussionEvents;
       if (discussionEvents.length > 0) {
         const knownUnsupported = pinnedAnthropicRef === ANTHROPIC_ACTION_WITHOUT_DISCUSSION;
         output.diagnostics.push({
@@ -9398,6 +9520,7 @@ function analyzeWorkflow(workflow, repository, context) {
           severity: "warning",
           file,
           job: jobName,
+          step_index: index,
           line: stepLine,
           message: knownUnsupported ? "This verified Anthropic Action revision rejects discussion events before Claude starts; those paths were excluded from AI findings." : "This Anthropic Action ref's discussion-event support is unverified; findings on those paths are potential, not confirmed execution."
         });
@@ -9452,6 +9575,7 @@ function analyzeWorkflow(workflow, repository, context) {
             severity: "warning",
             file,
             job: jobName,
+            step_index: index,
             line: stepLine,
             message: "This verified Anthropic Action revision skips or rejects the configured event/input paths before Claude starts; those paths were excluded from AI findings."
           });
@@ -9464,6 +9588,9 @@ function analyzeWorkflow(workflow, repository, context) {
           if (stepReachability.events.length === 0) continue;
         }
       }
+      const stepUncertainEvents = stepReachability.events.filter(
+        (event) => jobUncertainEvents.includes(event) || stepReachability.unknownEvents.includes(event) || vendorUnknownEvents.includes(event)
+      );
       const effectiveEnvironment = mergeEnvironment(
         jobEnvironment,
         rawStep.env
@@ -9493,17 +9620,20 @@ function analyzeWorkflow(workflow, repository, context) {
           severity: "warning",
           file,
           job: jobName,
+          step_index: index,
           line: stepLine,
           message: "An AI invocation appears in a shell branch or group whose reachability cannot be resolved statically; findings describe a possible path, not guaranteed execution."
         });
       }
       if (hasOpaqueAiCliSubstitution(materializedRun) || hasOpaqueAiHttpSubstitution(materializedRun) || hasOpaqueAiShellFunction(materializedRun) || hasOpaqueAiCliShellCommand(materializedRun) || hasOpaqueAiHttpShellCommand(materializedRun)) {
+        runDataflowUnknownEvents[index] = stepReachability.events;
         output.diagnostics.push({
           code: "agentci/analysis-run-dataflow-unknown",
           kind: "analysis",
           severity: "warning",
           file,
           job: jobName,
+          step_index: index,
           line: stepLine,
           message: "A possible AI call inside command substitution, a shell-evaluated string, or a shell function could not be attributed to a direct executable command."
         });
@@ -9544,6 +9674,93 @@ function analyzeWorkflow(workflow, repository, context) {
           httpDispatches.map((dispatch) => dispatch.expandableCommand).join("\n")
         )
       }) : "";
+      const stepActorGate = jobActorGate || hasTrustedActorGate(rawStep.if);
+      const stepPrGate = jobPrGate || hasTrustedPrProvenanceGate(rawStep.if);
+      if (stepUsesAi) {
+        const shellMayReadEarlierOutput = stepUsesAiCli && (/\$(?:\{[A-Za-z_]\w*\}|[A-Za-z_]\w*)/.test(
+          cliExpandableCommands
+        ) || cliInvocations.some((invocation) => invocation.pipedInput)) || httpDispatches.some(
+          (dispatch) => /\$(?:\{[A-Za-z_]\w*\}|[A-Za-z_]\w*)/.test(
+            dispatch.expandablePayload
+          ) || dispatch.opaquePayload
+        );
+        const outputAliasMaterial = stepUsesAiCli ? `${sinkMaterial}
+${JSON.stringify(effectiveEnvironment)}` : sinkMaterial;
+        const possibleOutputMaterial = shellMayReadEarlierOutput ? `${outputAliasMaterial}
+${materializedRun}` : outputAliasMaterial;
+        const input2 = inputProvenance(possibleOutputMaterial);
+        const readsMatrix = outputContextReferences(possibleOutputMaterial, "matrix").length > 0;
+        const outputEvents = unionEvents([
+          ...unresolvedOutputEvents(
+            `${possibleOutputMaterial}
+${input2.material}`,
+            stepReachability.events
+          ),
+          ...readsMatrix ? unresolvedMatrixEvents.filter(
+            (event) => stepReachability.events.includes(event)
+          ) : []
+        ]);
+        if (outputEvents.length > 0) {
+          runDataflowUnknownEvents[index] = unionEvents([
+            ...runDataflowUnknownEvents[index] ?? [],
+            ...outputEvents
+          ]);
+          output.diagnostics.push({
+            code: "agentci/analysis-output-provenance-unknown",
+            kind: "analysis",
+            severity: "warning",
+            file,
+            job: jobName,
+            step_index: index,
+            line: stepLine,
+            message: "An AI input consumes a prior step or job output whose source provenance is not modeled."
+          });
+        }
+        const matrixSourceEvents = readsMatrix ? activeMatrixSourceEvents(
+          stepReachability.events,
+          stepActorGate,
+          stepPrGate
+        ) : [];
+        if (matrixSourceEvents.length > 0) {
+          runDataflowUnknownEvents[index] = unionEvents([
+            ...runDataflowUnknownEvents[index] ?? [],
+            ...matrixSourceEvents
+          ]);
+          output.diagnostics.push({
+            code: "agentci/analysis-matrix-provenance-unknown",
+            kind: "analysis",
+            severity: "warning",
+            file,
+            job: jobName,
+            step_index: index,
+            line: stepLine,
+            message: "An AI input reads a matrix derived from untrusted event text; matrix value flow is not modeled."
+          });
+        }
+        if ((input2.opaque || readsMatrix && matrixInput.opaque || unknownCallerInputEvents(
+          JSON.stringify({
+            run: rawStep.run,
+            with: rawStep.with,
+            env: effectiveEnvironment
+          }),
+          stepReachability.events
+        ).length > 0) && outputEvents.length === 0 && matrixSourceEvents.length === 0) {
+          runDataflowUnknownEvents[index] = unionEvents([
+            ...runDataflowUnknownEvents[index] ?? [],
+            ...stepReachability.events
+          ]);
+          output.diagnostics.push({
+            code: "agentci/analysis-reusable-input-provenance-unknown",
+            kind: "analysis",
+            severity: "warning",
+            file,
+            job: jobName,
+            step_index: index,
+            line: stepLine,
+            message: "An AI input depends on a dynamic reusable-workflow input whose source cannot be resolved."
+          });
+        }
+      }
       if (stepUsesAi && stepReachability.events.some(
         (event) => secretEnvTransferEvents.has(event)
       )) {
@@ -9553,17 +9770,105 @@ function analyzeWorkflow(workflow, repository, context) {
           severity: "warning",
           file,
           job: jobName,
+          step_index: index,
           line: stepLine,
           message: "An earlier step may write a secret to GITHUB_ENV; exposure to this AI step is not modeled."
         });
       }
-      if (/\bGITHUB_ENV\b/.test(materializedRun) && (containsSecretReference(materializedRun) || containsSecretReference(JSON.stringify(effectiveEnvironment)))) {
+      if (stepUsesAi) {
+        const inheritedEvents = stepReachability.events.filter(
+          (event) => untrustedEnvTransferEvents.has(event)
+        );
+        if (inheritedEvents.length > 0) {
+          runDataflowUnknownEvents[index] = unionEvents([
+            ...runDataflowUnknownEvents[index] ?? [],
+            ...inheritedEvents
+          ]);
+          output.diagnostics.push({
+            code: "agentci/analysis-run-dataflow-unknown",
+            kind: "analysis",
+            severity: "warning",
+            file,
+            job: jobName,
+            step_index: index,
+            line: stepLine,
+            message: "An earlier step may write untrusted event text to GITHUB_ENV; input to this AI step is unresolved."
+          });
+        }
+        const inheritedOutputEvents = stepReachability.events.filter(
+          (event) => outputEnvTransferEvents.has(event)
+        );
+        if (inheritedOutputEvents.length > 0) {
+          runDataflowUnknownEvents[index] = unionEvents([
+            ...runDataflowUnknownEvents[index] ?? [],
+            ...inheritedOutputEvents
+          ]);
+          output.diagnostics.push({
+            code: "agentci/analysis-output-provenance-unknown",
+            kind: "analysis",
+            severity: "warning",
+            file,
+            job: jobName,
+            step_index: index,
+            line: stepLine,
+            message: "An earlier step may pass an unresolved step or job output through GITHUB_ENV to this AI step."
+          });
+        }
+        const inheritedMatrixEvents = stepReachability.events.filter(
+          (event) => matrixEnvTransferEvents.has(event)
+        );
+        if (inheritedMatrixEvents.length > 0) {
+          runDataflowUnknownEvents[index] = unionEvents([
+            ...runDataflowUnknownEvents[index] ?? [],
+            ...inheritedMatrixEvents
+          ]);
+          output.diagnostics.push({
+            code: "agentci/analysis-matrix-provenance-unknown",
+            kind: "analysis",
+            severity: "warning",
+            file,
+            job: jobName,
+            step_index: index,
+            line: stepLine,
+            message: "An earlier step may pass an event-derived matrix value through GITHUB_ENV to this AI step."
+          });
+        }
+        const inheritedInputEvents = stepReachability.events.filter(
+          (event) => reusableInputEnvTransferEvents.has(event)
+        );
+        if (inheritedInputEvents.length > 0) {
+          runDataflowUnknownEvents[index] = unionEvents([
+            ...runDataflowUnknownEvents[index] ?? [],
+            ...inheritedInputEvents
+          ]);
+          output.diagnostics.push({
+            code: "agentci/analysis-reusable-input-provenance-unknown",
+            kind: "analysis",
+            severity: "warning",
+            file,
+            job: jobName,
+            step_index: index,
+            line: stepLine,
+            message: "An earlier step may pass a dynamic reusable-workflow input through GITHUB_ENV to this AI step."
+          });
+        }
+      }
+      const defaultUbuntuShell = index === 0 && typeof rawJob["runs-on"] === "string" && /^ubuntu-(?:latest|\d{2}\.\d{2})$/.test(rawJob["runs-on"]) && rawJob.container === void 0 && rawStep.shell === void 0 && doc.defaults === void 0 && rawJob.defaults === void 0;
+      const literalEchoSafeShell = defaultUbuntuShell && !Object.keys(effectiveEnvironment).some(
+        (name) => ["BASH_ENV", "ENV", "BASHOPTS", "SHELLOPTS"].includes(name) || name.startsWith("BASH_FUNC_")
+      );
+      const literalGithubEnvWrite = literalEchoSafeShell && /^[ \t]*echo[ \t]+(?:"[A-Za-z_]\w*=[A-Za-z0-9._/-]*"|'[A-Za-z_]\w*=[A-Za-z0-9._/-]*')[ \t]*>>[ \t]*(?:"\$GITHUB_ENV"|\$GITHUB_ENV)[ \t]*$/.test(
+        materializedRun
+      );
+      const literalGithubOutputWrite = literalEchoSafeShell && /^[ \t]*echo[ \t]+(?:"[A-Za-z_]\w*=[A-Za-z0-9._/-]*"|'[A-Za-z_]\w*=[A-Za-z0-9._/-]*')[ \t]*>>[ \t]*(?:"\$GITHUB_OUTPUT"|\$GITHUB_OUTPUT)[ \t]*$/.test(
+        materializedRun
+      );
+      const mayTransferToGithubEnv = /\bGITHUB_ENV\b/.test(materializedRun) && !literalGithubEnvWrite;
+      if (mayTransferToGithubEnv && (containsSecretReference(materializedRun) || containsSecretReference(JSON.stringify(effectiveEnvironment)))) {
         for (const event of stepReachability.events) {
           secretEnvTransferEvents.add(event);
         }
       }
-      const stepActorGate = jobActorGate || hasTrustedActorGate(rawStep.if);
-      const stepPrGate = jobPrGate || hasTrustedPrProvenanceGate(rawStep.if);
       const activeMatches = (value) => untrustedGitHubContextMatches(value).filter(
         (match) => contextCanReach(stepReachability.events, [match.event]) && !sourceTrustedByGate(
           match.source,
@@ -9573,25 +9878,102 @@ function analyzeWorkflow(workflow, repository, context) {
           creationOnlyEvents
         )
       );
+      if (mayTransferToGithubEnv) {
+        const writerMaterial = JSON.stringify({
+          run: materializedRun,
+          env: effectiveEnvironment
+        });
+        const writerInput = inputProvenance(writerMaterial);
+        const writerReadsMatrix = outputContextReferences(writerMaterial, "matrix").length > 0;
+        const writerOutputEvents = unionEvents([
+          ...unresolvedOutputEvents(
+            `${writerMaterial}
+${writerInput.material}`,
+            stepReachability.events
+          ),
+          ...writerReadsMatrix ? unresolvedMatrixEvents.filter(
+            (event) => stepReachability.events.includes(event)
+          ) : []
+        ]);
+        for (const event of writerOutputEvents) {
+          outputEnvTransferEvents.add(event);
+        }
+        const writerMatrixEvents = writerReadsMatrix ? activeMatrixSourceEvents(
+          stepReachability.events,
+          stepActorGate,
+          stepPrGate
+        ) : [];
+        for (const event of writerMatrixEvents) {
+          matrixEnvTransferEvents.add(event);
+        }
+        if ((writerInput.opaque || writerReadsMatrix && matrixInput.opaque) && writerOutputEvents.length === 0 && writerMatrixEvents.length === 0) {
+          for (const event of stepReachability.events) {
+            reusableInputEnvTransferEvents.add(event);
+          }
+        }
+        for (const event of unknownCallerInputEvents(
+          JSON.stringify({ run: rawStep.run, env: effectiveEnvironment }),
+          stepReachability.events
+        )) {
+          reusableInputEnvTransferEvents.add(event);
+        }
+        for (const match of activeMatches(writerMaterial)) {
+          for (const event of match.event === "*" ? stepReachability.events : [match.event]) {
+            untrustedEnvTransferEvents.add(event);
+          }
+        }
+      }
+      if (typeof rawStep.id === "string") {
+        priorStepOutputEvents.set(
+          rawStep.id,
+          literalGithubOutputWrite ? [] : stepReachability.events
+        );
+      }
       const sinkMatches = activeMatches(sinkMaterial);
-      if (stepUsesAiCli && (cliInvocations.some(
-        (invocation) => invocation.opaqueInput || activeMatches(invocation.pipedInput).length > 0
-      ) || activeMatches(materializedRun).length > 0 && [
-        ...cliExpandableCommands.matchAll(
-          /\$(?:\{([A-Za-z_]\w*)\}|([A-Za-z_]\w*))/g
+      const pipedInputMatches = cliInvocations.flatMap(
+        (invocation) => activeMatches(invocation.pipedInput)
+      );
+      const runContextMatches = activeMatches(materializedRun);
+      const inheritedUnknownEvents = unionEvents(
+        activeMatches(
+          JSON.stringify(
+            Object.fromEntries(
+              Object.entries(effectiveEnvironment).filter(
+                ([name]) => !Object.prototype.hasOwnProperty.call(cliEnvironment, name)
+              )
+            )
+          )
+        ).flatMap(
+          (match) => match.event === "*" ? stepReachability.events : [match.event]
         )
-      ].some(
-        (match) => !Object.prototype.hasOwnProperty.call(
-          effectiveEnvironment,
-          match[1] ?? match[2]
+      );
+      const opaqueCliInput = cliInvocations.some(
+        (invocation) => invocation.opaqueInput
+      );
+      const shellInputUnknownEvents = /\$(?:\{[A-Za-z_]\w*\}|[A-Za-z_]\w*)/.test(cliExpandableCommands) || cliInvocations.some((invocation) => invocation.pipedInput.length > 0) ? unionEvents(
+        runContextMatches.flatMap(
+          (match) => match.event === "*" ? stepReachability.events : [match.event]
         )
-      ) || activeMatches(JSON.stringify(effectiveEnvironment)).length > 0 && activeMatches(JSON.stringify(cliEnvironment)).length === 0)) {
+      ) : [];
+      if (stepUsesAiCli && (opaqueCliInput || pipedInputMatches.length > 0 || shellInputUnknownEvents.length > 0 || inheritedUnknownEvents.length > 0)) {
+        const matchedEvents = unionEvents([
+          ...pipedInputMatches.flatMap(
+            (match) => match.event === "*" ? stepReachability.events : [match.event]
+          ),
+          ...shellInputUnknownEvents,
+          ...inheritedUnknownEvents
+        ]);
+        runDataflowUnknownEvents[index] = unionEvents([
+          ...runDataflowUnknownEvents[index] ?? [],
+          ...opaqueCliInput || matchedEvents.length === 0 ? stepReachability.events : matchedEvents
+        ]);
         output.diagnostics.push({
           code: "agentci/analysis-run-dataflow-unknown",
           kind: "analysis",
           severity: "warning",
           file,
           job: jobName,
+          step_index: index,
           line: stepLine,
           message: "The local AI CLI's stdin, shell variables, or inherited environment may carry input that command-level analysis cannot prove."
         });
@@ -9608,19 +9990,20 @@ function analyzeWorkflow(workflow, repository, context) {
           )
         )
       ) || httpDispatches.some((dispatch) => dispatch.opaquePayload))) {
+        runDataflowUnknownEvents[index] = stepReachability.events;
         output.diagnostics.push({
           code: "agentci/analysis-run-dataflow-unknown",
           kind: "analysis",
           severity: "warning",
           file,
           job: jobName,
+          step_index: index,
           line: stepLine,
           message: "The HTTP request body or another command has unresolved input/secret flow; only direct payload references are findings."
         });
       }
       const hasUntrustedSink = sinkMatches.length > 0;
-      const fetchedMatches = stepUsesAiAction ? selfFetchedSources(
-        materializeInputs(stepUses, context.inputValues),
+      const fetchedMatches = stepUsesAiAction && pinnedAnthropicRef === ANTHROPIC_ACTION_WITHOUT_DISCUSSION ? selfFetchedSources(
         effectiveWith,
         stepReachability.events,
         creationOnlyEvents
@@ -9633,8 +10016,16 @@ function analyzeWorkflow(workflow, repository, context) {
           creationOnlyEvents
         )
       ) : [];
-      if (stepRun.trim().length > 0 && activeMatches(materializeInputs(stepRun, context.inputValues)).length > 0) {
-        untrustedInRun = true;
+      const runMatches = stepRun.trim().length > 0 ? activeMatches(materializeInputs(stepRun, context.inputValues)) : [];
+      if (runMatches.length > 0) {
+        untrustedRunPaths.push({
+          events: unionEvents(
+            runMatches.flatMap(
+              (match) => match.event === "*" ? stepReachability.events : [match.event]
+            )
+          ),
+          uncertainEvents: stepUncertainEvents
+        });
       }
       const hasUntrustedIngestion = hasUntrustedSink || fetchedMatches.length > 0;
       if (httpOnly && hasUntrustedIngestion) {
@@ -9644,6 +10035,7 @@ function analyzeWorkflow(workflow, repository, context) {
           severity: "warning",
           file,
           job: jobName,
+          step_index: index,
           line: stepLine,
           message: "The HTTP request reaches a hosted agent, but this job's GITHUB_TOKEN permissions do not establish the remote agent's repository write capability."
         });
@@ -9651,19 +10043,35 @@ function analyzeWorkflow(workflow, repository, context) {
       const potentialAppWrite = isSelfGatingAgentAction(actionReference) && permissionLevel(jobPermissions, "id-token") === "write" && (!isRecord2(effectiveWith) || String(effectiveWith.github_token ?? "").trim().length === 0);
       const selfGated = isSelfGatingAgentAction(actionReference) && !hasAgentGateBypass(rawStep.with);
       const verifiedSelfGate = selfGated && VERIFIED_ANTHROPIC_WRITE_GATES.has(pinnedAnthropicRef ?? "");
+      const ungatedIngestionEvents = unionEvents(
+        [...sinkMatches, ...fetchedMatches].flatMap((match) => {
+          const events = match.event === "*" ? stepReachability.events : [match.event];
+          return events.filter(
+            (event) => !verifiedSelfGate || !SELF_GATED_EVENTS.has(event) || sourceMayDifferFromTriggerActor(
+              match.source,
+              event,
+              creationOnlyEvents
+            )
+          );
+        })
+      );
+      const knownAgentModeWithoutImplicitFetch = pinnedAnthropicRef === ANTHROPIC_ACTION_AGENT_PROMPT_VERIFIED && isRecord2(effectiveWith) && String(effectiveWith.prompt ?? "").length > 0 && !/^\$\{\{[\s\S]*\}\}$/.test(String(effectiveWith.prompt)) && String(effectiveWith.track_progress ?? "") !== "true" && !String(effectiveWith.track_progress ?? "").includes("${{");
+      const implicitIngestionUnknown = stepUsesAiAction && pinnedAnthropicRef !== ANTHROPIC_ACTION_WITHOUT_DISCUSSION && !knownAgentModeWithoutImplicitFetch && stepReachability.events.some((event) => UNTRUSTED_EVENTS.has(event)) && (hasSensitiveWrite(jobPermissions) || potentialAppWrite);
+      if (implicitIngestionUnknown) {
+        output.diagnostics.push({
+          code: "agentci/analysis-agent-implicit-ingestion-unknown",
+          kind: "analysis",
+          severity: "warning",
+          file,
+          job: jobName,
+          step_index: index,
+          line: stepLine,
+          message: "This AI Action ref/event has no verified contract for implicit Issue, PR, or comment ingestion; explicit input flow is analyzed separately."
+        });
+      }
       const ingestionEvents = unionEvents(
         [...sinkMatches, ...fetchedMatches].flatMap(
           (match) => match.event === "*" ? stepReachability.events : [match.event]
-        )
-      );
-      const sourceMayDifferFromTrigger = [
-        ...sinkMatches,
-        ...fetchedMatches
-      ].some(
-        (match) => sourceMayDifferFromTriggerActor(
-          match.source,
-          match.event,
-          creationOnlyEvents
         )
       );
       const hasSecret = httpOnly ? containsSecretReference(secretMaterial) : containsSecretReference(JSON.stringify(effectiveEnvironment)) || containsSecretReference(
@@ -9677,7 +10085,12 @@ function analyzeWorkflow(workflow, repository, context) {
         )
       );
       if (stepUsesAi) {
-        if (!hasUntrustedIngestion && ["issues", "issue_comment"].some(
+        const mayFetchIssue = Boolean(
+          (hasSensitiveWrite(jobPermissions) || potentialAppWrite) && (potentialAppWrite || ["GH_TOKEN", "GITHUB_TOKEN"].some(
+            (name) => String(effectiveEnvironment[name] ?? "").trim()
+          ) || isRecord2(effectiveWith) && String(effectiveWith.github_token ?? "").trim()) && mayFetchIssueViaTool(actionReference, effectiveWith)
+        );
+        const toolFetchUnknownEvents = mayFetchIssue ? ["issues", "issue_comment"].filter(
           (event) => stepReachability.events.includes(event) && !sourceTrustedByGate(
             "issue",
             event,
@@ -9685,15 +10098,15 @@ function analyzeWorkflow(workflow, repository, context) {
             stepPrGate,
             creationOnlyEvents
           )
-        ) && (hasSensitiveWrite(jobPermissions) || potentialAppWrite) && (potentialAppWrite || ["GH_TOKEN", "GITHUB_TOKEN"].some(
-          (name) => String(effectiveEnvironment[name] ?? "").trim()
-        ) || isRecord2(effectiveWith) && String(effectiveWith.github_token ?? "").trim()) && mayFetchIssueViaTool(actionReference, effectiveWith)) {
+        ) : [];
+        if (toolFetchUnknownEvents.length > 0) {
           output.diagnostics.push({
             code: "agentci/analysis-agent-tool-fetch-unknown",
             kind: "analysis",
             severity: "warning",
             file,
             job: jobName,
+            step_index: index,
             line: stepLine,
             message: "The agent may read an untrusted Issue body with its permitted gh issue tool and a token, but static analysis cannot prove the tool was called."
           });
@@ -9710,19 +10123,21 @@ function analyzeWorkflow(workflow, repository, context) {
           ),
           line: stepLine,
           reachable_events: stepReachability.events,
+          uncertain_reachable_events: stepUncertainEvents.length ? stepUncertainEvents : void 0,
           call_chain: context.callChain.length > 0 ? context.callChain : void 0
         });
         aiSteps.push({
           hasSecret,
-          hasUntrustedSink,
           hasUntrustedIngestion,
           remoteHttp: httpOnly,
-          sourceMayDifferFromTrigger,
+          ungatedIngestionEvents,
           ingestionEvents,
           potentialAppWrite,
-          selfGated,
+          implicitIngestionUnknown,
+          toolFetchUnknownEvents,
           actorGated: stepActorGate,
-          events: stepReachability.events
+          events: stepReachability.events,
+          uncertainEvents: stepUncertainEvents
         });
         if (hasUntrustedSink) {
           output.findings.push(
@@ -9738,6 +10153,7 @@ function analyzeWorkflow(workflow, repository, context) {
                   (match) => match.event === "*" ? stepReachability.events : [match.event]
                 )
               ),
+              uncertainEvents: stepUncertainEvents,
               callChain: context.callChain
             })
           );
@@ -9752,6 +10168,7 @@ function analyzeWorkflow(workflow, repository, context) {
               evidence: stepUsesAiCli ? `AI CLI executes through run: ${shrink(stepRun)}` : shrink(JSON.stringify(effectiveWith)),
               line: stepLine,
               events: stepReachability.events,
+              uncertainEvents: stepUncertainEvents,
               callChain: context.callChain
             })
           );
@@ -9766,6 +10183,7 @@ function analyzeWorkflow(workflow, repository, context) {
               evidence: `uses: ${stepUses}`,
               line: stepLine,
               events: stepReachability.events,
+              uncertainEvents: stepUncertainEvents,
               callChain: context.callChain
             })
           );
@@ -9782,7 +10200,8 @@ function analyzeWorkflow(workflow, repository, context) {
               stepIndex: index,
               evidence: shrink(JSON.stringify(rawStep)),
               line: stepLine,
-              events: stepReachability.events,
+              events: ["pull_request_target"],
+              uncertainEvents: stepUncertainEvents,
               callChain: context.callChain
             })
           );
@@ -9793,6 +10212,7 @@ function analyzeWorkflow(workflow, repository, context) {
             severity: "warning",
             file,
             job: jobName,
+            step_index: index,
             line: stepLine,
             message: "The checkout step requests pull-request code, but its ref does not identify whether GitHub's built-in unsafe-PR protection is present."
           });
@@ -9801,16 +10221,13 @@ function analyzeWorkflow(workflow, repository, context) {
     }
     if (aiSteps.length === 0) continue;
     const jobHasWrite = hasSensitiveWrite(jobPermissions);
-    const aiOnPullRequestTarget = aiSteps.some(
+    const prTargetSteps = aiSteps.filter(
       (step) => !step.actorGated && step.events.includes("pull_request_target")
     );
     const ingesting = aiSteps.filter(
       (step) => step.hasUntrustedIngestion && !step.remoteHttp && step.ingestionEvents.some((event) => UNTRUSTED_EVENTS.has(event)) && (jobHasWrite || step.potentialAppWrite)
     );
-    const untrustedViaInterpolation = ingesting.some(
-      (step) => step.hasUntrustedSink
-    );
-    if (aiOnPullRequestTarget) {
+    if (prTargetSteps.length > 0) {
       output.findings.push(
         makeFinding("agentci/pull-request-target-ai", {
           file,
@@ -9818,6 +10235,10 @@ function analyzeWorkflow(workflow, repository, context) {
           evidence: "AI usage is reachable on pull_request_target",
           line: jobLine,
           events: ["pull_request_target"],
+          uncertainEvents: uncertainWitnessEvents(
+            ["pull_request_target"],
+            prTargetSteps
+          ),
           callChain: context.callChain
         })
       );
@@ -9826,41 +10247,77 @@ function analyzeWorkflow(workflow, repository, context) {
       const reachableUntrusted = unionEvents(
         ingesting.flatMap((step) => step.ingestionEvents)
       ).filter((event) => UNTRUSTED_EVENTS.has(event));
-      const gated = ingesting.every((step) => step.selfGated) && reachableUntrusted.every((event) => SELF_GATED_EVENTS.has(event)) && !ingesting.some((step) => step.sourceMayDifferFromTrigger) && !untrustedInRun;
-      output.findings.push(
-        makeFinding(
-          gated ? "agentci/gated-ai-write-token" : "agentci/untrusted-ai-write-token",
-          {
+      const criticalEvents = reachableUntrusted.filter(
+        (event) => ingesting.some(
+          (step) => step.ungatedIngestionEvents.includes(event)
+        ) || untrustedRunPaths.some((run) => run.events.includes(event))
+      );
+      const unknownEvents = reachableUntrusted.filter(
+        (event) => aiSteps.some(
+          (step) => step.implicitIngestionUnknown && step.events.includes(event) || step.toolFetchUnknownEvents.includes(event) || step.remoteHttp && step.ingestionEvents.includes(event)
+        ) || runDataflowUnknownEvents.some((events) => events.includes(event))
+      );
+      const gatedEvents = reachableUntrusted.filter(
+        (event) => !criticalEvents.includes(event) && !unknownEvents.includes(event)
+      );
+      for (const [rule, events] of [
+        ["agentci/untrusted-ai-write-token", criticalEvents],
+        ["agentci/gated-ai-write-token", gatedEvents]
+      ]) {
+        if (events.length === 0) continue;
+        const gated = rule === "agentci/gated-ai-write-token";
+        output.findings.push(
+          makeFinding(rule, {
             file,
             job: jobName,
-            evidence: gated ? "actor-authored event content + AI usage + effective write permission; anthropics/claude-code-action normally checks the triggering actor for repository write access, with no configured allowlist bypass or untrusted run: expansion" : untrustedViaInterpolation ? "reachable untrusted event content + AI usage + workflow or potential Action App write capability" : "AI agent action may ingest reachable event content through its runtime context + workflow or potential Action App write capability",
+            evidence: gated ? "actor-authored event content + AI usage + effective write permission; anthropics/claude-code-action normally checks the triggering actor for repository write access, with no configured allowlist bypass or untrusted run: expansion" : "reachable untrusted event content + AI usage + workflow or potential Action App write capability",
             line: jobLine,
-            events: reachableUntrusted,
+            events,
+            uncertainEvents: gated ? uncertainWitnessEvents(
+              events,
+              ingesting.map((step) => ({
+                events: step.ingestionEvents,
+                uncertainEvents: step.uncertainEvents
+              }))
+            ) : events.filter(
+              (event) => !ingesting.some(
+                (step) => step.ungatedIngestionEvents.includes(event) && !step.uncertainEvents.includes(event)
+              ) && !(untrustedRunPaths.some(
+                (run) => run.events.includes(event) && !run.uncertainEvents.includes(event)
+              ) && ingesting.some(
+                (step) => step.ingestionEvents.includes(event) && !step.uncertainEvents.includes(event)
+              ))
+            ),
             callChain: context.callChain
-          }
-        )
-      );
+          })
+        );
+      }
     }
-    if (aiSteps.some((step) => step.hasSecret)) {
+    const secretSteps = aiSteps.filter((step) => step.hasSecret);
+    if (secretSteps.length > 0) {
+      const events = unionEvents(secretSteps.flatMap((step) => step.events));
       output.findings.push(
         makeFinding("agentci/ai-with-secrets", {
           file,
           job: jobName,
           evidence: "AI step's effective environment or inputs reference a secret/token",
           line: jobLine,
-          events: unionEvents(aiSteps.flatMap((step) => step.events)),
+          events,
+          uncertainEvents: uncertainWitnessEvents(events, secretSteps),
           callChain: context.callChain
         })
       );
     }
     if (jobHasWrite) {
+      const events = unionEvents(aiSteps.flatMap((step) => step.events));
       output.findings.push(
         makeFinding("agentci/broad-write-permissions", {
           file,
           job: jobName,
           evidence: `effective permissions: ${describePermissions(jobPermissions)}`,
           line: jobLine,
-          events: unionEvents(aiSteps.flatMap((step) => step.events)),
+          events,
+          uncertainEvents: uncertainWitnessEvents(events, aiSteps),
           callChain: context.callChain
         })
       );
@@ -9880,7 +10337,7 @@ function analyzeWorkflow(workflow, repository, context) {
   output.findings = ignores.all ? [] : output.findings.filter((finding) => !ignores.rules.has(finding.rule_id));
   return output;
 }
-function analyzeReusableCall(caller, jobName, rawJob, jobLine, events, creationOnlyEvents, permissions, repository, context) {
+function analyzeReusableCall(caller, jobName, rawJob, jobLine, events, uncertainEvents, creationOnlyEvents, permissions, repository, context) {
   const uses = String(rawJob.uses);
   const callerFile = relativeFile(repository.root, caller.path);
   if (!uses.startsWith("./")) {
@@ -9937,14 +10394,36 @@ function analyzeReusableCall(caller, jobName, rawJob, jobLine, events, creationO
       ]
     };
   }
+  const matrixMaterial = isRecord2(rawJob.strategy) ? JSON.stringify(rawJob.strategy.matrix ?? "") : "";
+  const matrixEvents = matrixMaterial.includes("${{") ? events : [];
+  const inputUnknownEvents = Object.fromEntries(
+    Object.entries(isRecord2(rawJob.with) ? rawJob.with : {}).map(([name, value]) => {
+      const material = String(value ?? "");
+      const parentEvents = outputContextReferences(
+        material,
+        "inputs"
+      ).flatMap(
+        ({ id }) => id === null ? Object.values(context.inputUnknownEvents ?? {}).flat() : context.inputUnknownEvents?.[id] ?? []
+      );
+      return [
+        name,
+        unionEvents([
+          ...outputContextReferences(material, "matrix").length ? matrixEvents : [],
+          ...parentEvents
+        ]).filter((event) => events.includes(event))
+      ];
+    }).filter(([, uncertain]) => uncertain.length > 0)
+  );
   return analyzeWorkflow(target, repository, {
     events,
+    uncertainEvents,
     triggerSource: context.triggerSource,
     creationOnlyEvents,
     actorGate: Boolean(context.actorGate) || hasTrustedActorGate(rawJob.if),
     prGate: Boolean(context.prGate) || hasTrustedPrProvenanceGate(rawJob.if),
     permissionCeiling: permissions,
     inputValues: toStringMap(rawJob.with, context.inputValues),
+    inputUnknownEvents,
     stack: [...context.stack, path2.resolve(caller.path), targetPath],
     callChain: [...context.callChain, `${callerFile}#${jobName}`]
   });
@@ -9954,6 +10433,9 @@ function makeFinding(ruleId, context) {
   if (!rule) throw new Error(`Unknown rule: ${ruleId}`);
   const chain = context.callChain?.join(">") ?? "";
   const id = `${ruleId}:${context.file}:${context.job ?? ""}:${context.stepIndex ?? ""}:${chain}`;
+  const uncertainEvents = context.events?.filter(
+    (event) => context.uncertainEvents?.includes(event)
+  );
   return {
     id,
     rule_id: rule.id,
@@ -9969,6 +10451,7 @@ function makeFinding(ruleId, context) {
     evidence: context.evidence,
     line: context.line,
     reachable_events: context.events,
+    uncertain_reachable_events: uncertainEvents?.length ? uncertainEvents : void 0,
     call_chain: context.callChain && context.callChain.length > 0 ? context.callChain : void 0
   };
 }
@@ -9978,6 +10461,54 @@ function workflowTriggers(workflow) {
 }
 function contextCanReach(reachableEvents, contextEvents) {
   return contextEvents.includes("*") || contextEvents.some((event) => reachableEvents.includes(event));
+}
+function outputContextReferences(material, context) {
+  const expressions = [];
+  let cursor = 0;
+  while (true) {
+    const start = material.indexOf("${{", cursor);
+    if (start < 0) break;
+    const end = githubExpressionEnd(material, start);
+    if (end < 0) break;
+    expressions.push(material.slice(start + 3, end - 2));
+    cursor = end;
+  }
+  return expressions.flatMap((rawExpression) => {
+    const expression = rawExpression.replace(/\\"/g, '"').replace(/\[\s*['"]([A-Za-z_][\w-]*)['"]\s*\]/g, ".$1").replace(/'(?:[^']|'')*'/g, (literal) => " ".repeat(literal.length));
+    const direct = [
+      ...expression.matchAll(
+        new RegExp(
+          `\\b${context}\\.([A-Za-z_][\\w-]*)\\.outputs(?:\\.([A-Za-z_][\\w-]*))?\\b`,
+          "g"
+        )
+      )
+    ].map((reference) => ({
+      id: reference[1],
+      output: reference[2] ?? null
+    }));
+    for (const reference of expression.matchAll(
+      new RegExp(
+        `(?:^|[^\\w.])${context}\\.([A-Za-z_][\\w-]*)\\b${context === "matrix" ? "" : "(?!\\s*(?:\\.|\\[))"}`,
+        "g"
+      )
+    )) {
+      direct.push({ id: reference[1], output: null });
+    }
+    if (new RegExp(`(?:^|[^\\w.])${context}\\b(?!\\s*(?:\\.|\\[))`).test(
+      expression
+    )) {
+      direct.push({ id: null, output: null });
+    }
+    if (new RegExp(`(?:^|[^\\w.])${context}\\.\\*`).test(expression)) {
+      direct.push({ id: null, output: null });
+    }
+    if (new RegExp(`\\b${context}(?:\\.[\\w-]+)?\\s*\\[\\s*[^'"]`).test(
+      expression
+    )) {
+      direct.push({ id: null, output: null });
+    }
+    return direct;
+  });
 }
 function creationOnlyTriggers(raw) {
   if (!isRecord2(raw)) return [];
@@ -10006,11 +10537,7 @@ function sourceTrustedByGate(source, event, actorGate, prGate, creationOnlyEvent
 function sourceMayDifferFromTriggerActor(source, event, creationOnlyEvents) {
   return source === "history" || source === "commit" || source === "pr_head_ref" || source === "pr_head_content" || (source === "issue" || source === "pull_request" || source === "discussion") && !creationOnlyEvents.has(event);
 }
-function selfFetchedSources(uses, withBlock, events, creationOnlyEvents) {
-  if (/^anthropics\/claude-code-base-action(?:@|$)/i.test(uses)) return [];
-  if (!isSelfGatingAgentAction(uses)) {
-    return events.filter((event) => UNTRUSTED_EVENTS.has(event)).map((event) => ({ event, source: "other" }));
-  }
+function selfFetchedSources(withBlock, events, creationOnlyEvents) {
   const inputs = isRecord2(withBlock) ? withBlock : {};
   const prompt = String(inputs.prompt ?? "");
   const hasPrompt = prompt.length > 0 && !/^\$\{\{[\s\S]*\}\}$/.test(prompt);
@@ -10188,6 +10715,13 @@ function shrink(value) {
 function unionEvents(events) {
   return [...new Set(events)].sort();
 }
+function uncertainWitnessEvents(events, witnesses) {
+  return events.filter(
+    (event) => !witnesses.some(
+      (witness) => witness.events.includes(event) && !witness.uncertainEvents.includes(event)
+    )
+  );
+}
 function mergeOutput(target, source) {
   target.agentUsages.push(...source.agentUsages);
   target.findings.push(...source.findings);
@@ -10212,7 +10746,7 @@ function dedupe(findings) {
 function dedupeDiagnostics(diagnostics) {
   const seen = /* @__PURE__ */ new Set();
   return diagnostics.filter((diagnostic) => {
-    const key = `${diagnostic.code}:${diagnostic.file}:${diagnostic.job ?? ""}:${diagnostic.line ?? ""}:${diagnostic.message}`;
+    const key = `${diagnostic.code}:${diagnostic.file}:${diagnostic.job ?? ""}:${diagnostic.step_index ?? ""}:${diagnostic.line ?? ""}:${diagnostic.message}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -10256,8 +10790,11 @@ function renderTextReport(result) {
   for (const finding of result.findings) {
     lines.push(`${label(finding.severity)} ${finding.rule_id}`);
     lines.push(
-      `File: ${finding.file}${finding.job ? ` / job: ${finding.job}` : ""}${finding.step ? ` / step: ${finding.step}` : ""}`
+      `File: ${finding.file}${finding.line ? `:${finding.line}` : ""}${finding.job ? ` / job: ${finding.job}` : ""}${finding.step ? ` / step: ${finding.step}` : ""}${finding.step_index === void 0 ? "" : ` / step_index: ${finding.step_index}`}`
     );
+    for (const [name, events] of eventPathDetails(finding)) {
+      lines.push(`${name}: ${events}`);
+    }
     lines.push(`Evidence: ${finding.evidence}`);
     lines.push(`Why: ${finding.why}`);
     lines.push("Fix:");
@@ -10268,11 +10805,26 @@ function renderTextReport(result) {
     lines.push("Diagnostics:");
     for (const diagnostic of result.diagnostics) {
       lines.push(
-        `- [${diagnostic.kind.toUpperCase()}] ${diagnostic.code} ${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ""}: ${diagnostic.message}`
+        `- [${diagnostic.kind.toUpperCase()}] ${diagnostic.code} ${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ""}${diagnostic.step_index === void 0 ? "" : ` [step_index=${diagnostic.step_index}]`}: ${diagnostic.message}`
       );
     }
   }
   return lines.join("\n");
+}
+function eventPathDetails(finding) {
+  const possible = finding.uncertain_reachable_events ?? [];
+  if (possible.length === 0) return [];
+  const resolved = (finding.reachable_events ?? []).filter(
+    (event) => !possible.includes(event)
+  );
+  const details = [];
+  if (resolved.length)
+    details.push(["Resolved event paths", resolved.join(", ")]);
+  details.push([
+    "Possible event paths (unresolved reachability)",
+    possible.join(", ")
+  ]);
+  return details;
 }
 function label(severity) {
   if (severity === "critical") return import_picocolors.default.red("[CRITICAL]");
@@ -10317,6 +10869,9 @@ function toSarif(input2) {
           properties: {
             "agentci/severity": finding.severity,
             "agentci/reachableEvents": finding.reachable_events ?? [],
+            ...finding.uncertain_reachable_events?.length ? {
+              "agentci/uncertainReachableEvents": finding.uncertain_reachable_events
+            } : {},
             ...finding.job ? { "agentci/job": finding.job } : {},
             ...finding.step ? { "agentci/step": finding.step } : {},
             ...finding.step_index === void 0 ? {} : { "agentci/stepIndex": finding.step_index }
@@ -10361,7 +10916,8 @@ function toNotification(diagnostic) {
     ],
     properties: {
       "agentci/kind": diagnostic.kind,
-      ...diagnostic.job ? { "agentci/job": diagnostic.job } : {}
+      ...diagnostic.job ? { "agentci/job": diagnostic.job } : {},
+      ...diagnostic.step_index === void 0 ? {} : { "agentci/stepIndex": diagnostic.step_index }
     }
   };
 }

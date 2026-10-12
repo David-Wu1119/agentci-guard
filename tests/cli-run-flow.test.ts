@@ -585,6 +585,19 @@ describe("local CLI run-step input flow", () => {
     );
   });
 
+  it.each([
+    'declare REQUEST="\${{ github.event.issue.body }}"\nclaude -p "$REQUEST"',
+    'printf -v REQUEST "%s" "\${{ github.event.issue.body }}"\nclaude -p "$REQUEST"',
+    'REQUEST="\${{ github.event.issue.body }}"\necho "$REQUEST" | claude -p fixed',
+    'printf "%s" "\${{ github.event.issue.body }}" > /tmp/request\ncat /tmp/request | claude -p fixed',
+  ])("does not clear unresolved shell-variable flow: %s", (run) => {
+    const result = scan(run, "env:\n  REQUEST: safe\n");
+    expect(result.diagnostics.map((item) => item.code)).toContain(
+      "agentci/analysis-run-dataflow-unknown",
+    );
+    expect(result.analysis_complete).toBe(false);
+  });
+
   it("marks piped input as unresolved instead of inventing a prompt finding", () => {
     for (const run of [
       'printf "%s" "\${{ github.event.issue.body }}" | claude -p -',

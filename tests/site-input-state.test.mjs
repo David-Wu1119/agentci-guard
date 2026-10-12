@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 
-function browserPage() {
+function browserPage(hasScanner = true, scanResult = {}) {
   const makeElement = () => ({
     value: "",
     textContent: "",
@@ -35,6 +35,14 @@ function browserPage() {
     "load-example",
   ];
   const elements = new Map(ids.map((id) => [id, makeElement()]));
+  for (const id of [
+    "workflow-yaml",
+    "workflow-file",
+    "scan-button",
+    "load-example",
+  ]) {
+    elements.get(id).disabled = true;
+  }
   const file = elements.get("workflow-file");
   let fileValue = "";
   Object.defineProperty(file, "value", {
@@ -61,13 +69,14 @@ function browserPage() {
     ],
     diagnostics: [],
     analysis_complete: true,
+    ...scanResult,
   });
   scan.version = "test";
   runInNewContext(
     readFileSync(new URL("../site/src/app.js", import.meta.url), "utf8"),
     {
       window: {
-        agentciScanWorkflow: scan,
+        agentciScanWorkflow: hasScanner ? scan : undefined,
         confirm() {
           confirmations++;
           return allowReplace;
@@ -97,6 +106,173 @@ function browserPage() {
 }
 
 describe("browser workflow input", () => {
+  it("enables scan controls only when the scanner and renderer load", () => {
+    const ready = browserPage();
+    for (const id of [
+      "workflow-yaml",
+      "workflow-file",
+      "scan-button",
+      "load-example",
+    ]) {
+      expect(ready.elements.get(id).disabled).toBe(false);
+    }
+    expect(ready.elements.get("scan-results-heading").textContent).toBe(
+      "Ready to scan",
+    );
+    expect(ready.elements.get("scan-status").textContent).toMatch(
+      /Load the sample or paste a workflow/,
+    );
+
+    const missingScanner = browserPage(false);
+    for (const id of [
+      "workflow-yaml",
+      "workflow-file",
+      "scan-button",
+      "load-example",
+    ]) {
+      expect(missingScanner.elements.get(id).disabled).toBe(true);
+    }
+    expect(
+      missingScanner.elements.get("scan-results-heading").textContent,
+    ).toBe("Scan not completed");
+    expect(missingScanner.elements.get("scan-error").textContent).toMatch(
+      /scanner did not load.*Refresh the page/i,
+    );
+  });
+
+  it("separates possible event paths from paths with resolved conditions", () => {
+    const file = ".github/workflows/input.yml";
+    const page = browserPage(true, {
+      agent_usages: [
+        {
+          job: "agent",
+          step: "Run agent",
+          file,
+          line: 5,
+          step_index: 0,
+          evidence: "claude -p",
+          reachable_events: ["issues", "discussion_comment"],
+          uncertain_reachable_events: ["discussion_comment"],
+        },
+      ],
+      findings: [
+        {
+          severity: "high",
+          title: "Test finding",
+          rule_id: "agentci/test",
+          file,
+          message: "Test",
+          reachable_events: ["issues", "discussion_comment"],
+          uncertain_reachable_events: ["discussion_comment"],
+        },
+      ],
+    });
+    const get = (id) => page.elements.get(id);
+    get("workflow-yaml").value = "on: [issues, discussion_comment]\n";
+    get("scan-button").listeners.click();
+    for (const id of ["scan-agent-usages", "scan-findings"]) {
+      const detail = get(id)
+        .children[0].children.flatMap((line) => line.children)
+        .map((node) => node.textContent)
+        .join(" ");
+      expect(detail).toMatch(/Resolved event paths:\s+issues/);
+      expect(detail).toMatch(
+        /Possible event paths \(unresolved reachability\):\s+discussion_comment/,
+      );
+    }
+  });
+
+  it("shows the zero-based step index for a step-level diagnostic", () => {
+    const page = browserPage(true, {
+      diagnostics: [
+        {
+          code: "agentci/analysis-agent-event-unknown",
+          severity: "warning",
+          file: ".github/workflows/input.yml",
+          line: 5,
+          step_index: 0,
+          message: "Unknown Action event path",
+        },
+      ],
+    });
+    const get = (id) => page.elements.get(id);
+    get("workflow-yaml").value = "on: discussion_comment\n";
+    get("scan-button").listeners.click();
+    const details = get("scan-diagnostics")
+      .children[0].children.flatMap((line) => line.children)
+      .map((node) => node.textContent)
+      .join(" ");
+    expect(details).toMatch(/Step index:\s+0/);
+  });
+
+  it("identifies same-line findings, usages, and diagnostics by step", () => {
+    const file = ".github/workflows/input.yml";
+    const page = browserPage(true, {
+      agent_usages: [0, 1].map((step_index) => ({
+        job: "agent",
+        step: "Duplicate",
+        file,
+        line: 5,
+        step_index,
+        evidence: "same action",
+        reachable_events: ["push"],
+      })),
+      findings: [0, 1].map((step_index) => ({
+        severity: "high",
+        title: "Test finding",
+        rule_id: "agentci/test",
+        file,
+        job: "agent",
+        line: 5,
+        step_index,
+        message: "same finding",
+      })),
+      diagnostics: [0, 1].map((step_index) => ({
+        code: "agentci/test",
+        severity: "warning",
+        file,
+        job: "agent",
+        line: 5,
+        step_index,
+        message: "same diagnostic",
+      })),
+    });
+    const get = (id) => page.elements.get(id);
+    get("workflow-yaml").value = "on: push\n";
+    get("scan-button").listeners.click();
+    const cardText = (item) =>
+      item.children
+        .flatMap((line) => line.children)
+        .map((node) => node.textContent)
+        .join(" ");
+    for (const id of [
+      "scan-agent-usages",
+      "scan-findings",
+      "scan-diagnostics",
+    ]) {
+      const cards = get(id).children.map(cardText);
+      expect(cards).toHaveLength(2);
+      expect(cards[0]).toMatch(/Step index:\s+0/);
+      expect(cards[1]).toMatch(/Step index:\s+1/);
+      if (id !== "scan-agent-usages") {
+        expect(cards[0]).toMatch(/Job:\s+agent/);
+      }
+    }
+  });
+
+  it("fails closed with a refresh instruction when the scanner script is unavailable", () => {
+    const page = browserPage(false);
+    const get = (id) => page.elements.get(id);
+    expect(get("scan-error").textContent).toMatch(
+      /scanner did not load.*Refresh the page/i,
+    );
+    expect(get("scan-error").hidden).toBe(false);
+    expect(get("scan-output").hidden).toBe(true);
+    get("workflow-yaml").value = "on: push\n";
+    get("scan-button").listeners.click();
+    expect(get("scan-output").hidden).toBe(true);
+  });
+
   it("keeps an existing draft until replacement is confirmed and clears stale file selection on edit", async () => {
     const page = browserPage();
     const get = (id) => page.elements.get(id);

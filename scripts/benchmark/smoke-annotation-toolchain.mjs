@@ -603,7 +603,7 @@ try {
       "ai-027|job|check-duplicates|-|agentci%2Funtrusted-ai-write-token",
       "abstained-positive",
       "unknown",
-      "agentci/analysis-agent-tool-fetch-unknown",
+      "agentci/analysis-agent-implicit-ingestion-unknown;agentci/analysis-agent-tool-fetch-unknown",
     ],
     [
       "ai-027|job|check-duplicates|-|agentci%2Fpull-request-target-ai",

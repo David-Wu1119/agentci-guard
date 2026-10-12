@@ -66,7 +66,7 @@ exploitability issue should use private disclosure rather than a public
 benchmark discussion.
 
 The entire v3 corpus is development data after evaluation leakage. Formal
-accuracy work requires a fresh sealed v4 sample and a registry covering all
+accuracy work requires a qualified sealed v4 sample and a registry covering all
 current rules. If evaluation errors influence a rule change, those cases must
 be retired from held-out evaluation.
 

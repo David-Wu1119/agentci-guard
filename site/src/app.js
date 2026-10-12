@@ -13,6 +13,7 @@ const agentUsages = document.getElementById('scan-agent-usages');
 const findings = document.getElementById('scan-findings');
 const diagnostics = document.getElementById('scan-diagnostics');
 const scanButton = document.getElementById('scan-button');
+const loadExampleButton = document.getElementById('load-example');
 let inputRevision = 0;
 let sourceLabel = 'pasted YAML';
 
@@ -47,6 +48,17 @@ function addDetail(item, label, value) {
   item.append(line);
 }
 
+function addEventPaths(item, entry) {
+  const possible = entry.uncertain_reachable_events ?? [];
+  if (!possible.length) {
+    addDetail(item, 'Reachable events', entry.reachable_events?.join(', '));
+    return;
+  }
+  const resolved = (entry.reachable_events ?? []).filter((event) => !possible.includes(event));
+  addDetail(item, 'Resolved event paths', resolved.join(', '));
+  addDetail(item, 'Possible event paths (unresolved reachability)', possible.join(', '));
+}
+
 function renderResult(result) {
   if (!Array.isArray(result?.agent_usages) || !Array.isArray(result.findings) || !Array.isArray(result.diagnostics) || typeof result.analysis_complete !== 'boolean') {
     throw new Error('The scanner returned an invalid result.');
@@ -61,8 +73,9 @@ function renderResult(result) {
     title.textContent = `${usage.job} / ${usage.step}`;
     item.append(title);
     addDetail(item, 'Virtual location', `${usage.file}:${usage.line}`);
+    addDetail(item, 'Step index', usage.step_index);
     addDetail(item, 'Evidence', usage.evidence);
-    addDetail(item, 'Reachable events', usage.reachable_events.join(', '));
+    addEventPaths(item, usage);
     agentUsages.append(item);
   }
   if (!result.agent_usages.length) {
@@ -73,16 +86,22 @@ function renderResult(result) {
     agentUsages.append(item);
   }
 
-  for (const finding of result.findings) {
+  const severityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+  for (const finding of [...result.findings].sort((a, b) =>
+    (severityOrder[a.severity] ?? 4) - (severityOrder[b.severity] ?? 4)
+  )) {
     const item = document.createElement('li');
     const title = document.createElement('h5');
     title.textContent = `${finding.severity.toUpperCase()} · ${finding.title}`;
     item.append(title);
     addDetail(item, 'Rule', finding.rule_id);
     addDetail(item, 'Virtual location', `${finding.file}${finding.line ? `:${finding.line}` : ''}`);
+    addDetail(item, 'Job', finding.job);
+    addDetail(item, 'Step index', finding.step_index);
     addDetail(item, 'Finding', finding.message);
     addDetail(item, 'Why', finding.why);
     addDetail(item, 'Evidence', finding.evidence);
+    addEventPaths(item, finding);
     addDetail(item, 'Suggested fix', finding.fix?.join(' '));
     findings.append(item);
   }
@@ -98,6 +117,8 @@ function renderResult(result) {
     const item = document.createElement('li');
     addDetail(item, 'Diagnostic', `${diagnostic.severity.toUpperCase()} · ${diagnostic.code}`);
     addDetail(item, 'Virtual location', `${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ''}`);
+    addDetail(item, 'Job', diagnostic.job);
+    addDetail(item, 'Step index', diagnostic.step_index);
     addDetail(item, 'Message', diagnostic.message);
     diagnostics.append(item);
   }
@@ -114,7 +135,7 @@ function renderResult(result) {
     : `Analysis incomplete${count ? ` — ${findingLabel}` : ''} for ${sourceLabel}`;
   const findingStatus = count ? `${findingLabel}; ` : '';
   const pageSource = document.querySelector('#scanner-source a')?.textContent ?? document.getElementById('scanner-source').textContent.trim();
-  status.textContent = `${result.agent_usages.length} recognized agent-use step${result.agent_usages.length === 1 ? '' : 's'}; ${findingStatus}${result.analysis_complete ? 'analysis complete' : 'analysis incomplete'} for ${sourceLabel}. Browser scanner trial (page build source: ${pageSource}; cached HTML can load a different script; compare separately with the published Action/CLI). Locations below are virtual scanner paths.`;
+  status.textContent = `${result.agent_usages.length} recognized agent-use step${result.agent_usages.length === 1 ? '' : 's'}; ${findingStatus}${result.analysis_complete ? 'analysis complete' : 'analysis incomplete'} for ${sourceLabel}. Browser scanner trial (page build source: ${pageSource}; scanner and renderer scripts checked by the browser; compare separately with the published Action/CLI). Locations below are virtual scanner paths.`;
   completeness.textContent = result.analysis_complete
     ? 'analysis_complete: true. This covers only supported static checks for the supplied file; it does not validate the full GitHub Actions schema or guarantee security.'
     : 'analysis_complete: false. The diagnostics below identify unsupported or failed analysis; do not treat this as a clean scan.';
@@ -131,7 +152,7 @@ yaml.addEventListener('input', () => {
   resetResults('Input changed. Scan again to see current results.');
 });
 
-document.getElementById('load-example').addEventListener('click', () => {
+loadExampleButton.addEventListener('click', () => {
   const sample = document.querySelector('#research pre code').textContent;
   const hasDifferentInput = (yaml.value.trim() && yaml.value !== sample) || fileInput.files?.length;
   if (hasDifferentInput && !window.confirm('Replace the current workflow or selected file with the published sample?')) return;
@@ -184,7 +205,7 @@ scanButton.addEventListener('click', () => {
   const raw = yaml.value;
   if (!raw.trim()) return showError('Paste workflow YAML or choose a file before scanning.');
   if (raw.length > maxChars) return showError(`Workflow is too large. The limit is ${maxChars.toLocaleString()} characters.`);
-  if (typeof scanWorkflow !== 'function') return showError('The scanner did not load. Use the CLI or GitHub Action instead.');
+  if (typeof scanWorkflow !== 'function') return showError('The scanner did not load. Refresh the page, or use the CLI or GitHub Action instead.');
   try {
     renderResult(scanWorkflow(raw));
   } catch (cause) {
@@ -192,7 +213,7 @@ scanButton.addEventListener('click', () => {
   }
 });
 
-if (typeof scanWorkflow !== 'function') showError('The scanner did not load. Use the CLI or GitHub Action instead.', false);
+if (typeof scanWorkflow !== 'function') showError('The scanner did not load. Refresh the page, or use the CLI or GitHub Action instead.', false);
 
 const examples = {
   unknown: ['UNREVIEWED VERSION', 'Verify the gate before reducing risk.', 'A mutable tag or an unreviewed commit does not establish the Action’s authorization behavior. The scanner reports action pinning separately; inspect the deployed version before relying on its gate.'],
@@ -207,4 +228,13 @@ for (const button of document.querySelectorAll('[data-case]')) {
     document.getElementById('case-title').textContent = example[1];
     document.getElementById('case-copy').textContent = example[2];
   });
+  button.disabled = false;
+}
+if (typeof scanWorkflow === 'function') {
+  heading.textContent = 'Ready to scan';
+  yaml.disabled = false;
+  fileInput.disabled = false;
+  loadExampleButton.disabled = false;
+  scanButton.disabled = false;
+  status.textContent = 'Load the sample or paste a workflow, then run the scanner.';
 }

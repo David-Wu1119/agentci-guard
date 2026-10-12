@@ -3,6 +3,8 @@ import YAML from "yaml";
 import { scanWorkflow, type WorkflowFile } from "../src/index.js";
 import { hasTrustedActorGate } from "../src/workflow-model.js";
 
+const VERIFIED_REF = "1d6de8cb0c237e7c15e9e1bdf973826ebae490cc";
+
 function ruleIds(raw: string): Set<string> {
   return new Set(
     scanWorkflow(
@@ -115,7 +117,7 @@ jobs:
       pull-requests: write
       issues: write
     steps:
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@${VERIFIED_REF}
 `);
     expect(rules).toContain("agentci/untrusted-ai-write-token");
     expect(rules).not.toContain("agentci/untrusted-input-in-prompt");
@@ -134,7 +136,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@${VERIFIED_REF}
 `);
     // The action fetches the parent Issue, whose author can differ from the
     // commenter; the action's actor gate cannot sanitize that content.

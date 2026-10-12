@@ -36,8 +36,11 @@ export function renderTextReport(result: ScanResult): string {
   for (const finding of result.findings) {
     lines.push(`${label(finding.severity)} ${finding.rule_id}`);
     lines.push(
-      `File: ${finding.file}${finding.job ? ` / job: ${finding.job}` : ""}${finding.step ? ` / step: ${finding.step}` : ""}`,
+      `File: ${finding.file}${finding.line ? `:${finding.line}` : ""}${finding.job ? ` / job: ${finding.job}` : ""}${finding.step ? ` / step: ${finding.step}` : ""}${finding.step_index === undefined ? "" : ` / step_index: ${finding.step_index}`}`,
     );
+    for (const [name, events] of eventPathDetails(finding)) {
+      lines.push(`${name}: ${events}`);
+    }
     lines.push(`Evidence: ${finding.evidence}`);
     lines.push(`Why: ${finding.why}`);
     lines.push("Fix:");
@@ -49,7 +52,7 @@ export function renderTextReport(result: ScanResult): string {
     lines.push("Diagnostics:");
     for (const diagnostic of result.diagnostics) {
       lines.push(
-        `- [${diagnostic.kind.toUpperCase()}] ${diagnostic.code} ${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ""}: ${diagnostic.message}`,
+        `- [${diagnostic.kind.toUpperCase()}] ${diagnostic.code} ${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ""}${diagnostic.step_index === undefined ? "" : ` [step_index=${diagnostic.step_index}]`}: ${diagnostic.message}`,
       );
     }
   }
@@ -77,7 +80,7 @@ export function renderMarkdownReport(result: ScanResult): string {
           "",
           ...result.diagnostics.map(
             (diagnostic) =>
-              `- **${diagnostic.code}** — ${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ""}: ${diagnostic.message}`,
+              `- **${diagnostic.code}** — ${diagnostic.file}${diagnostic.line ? `:${diagnostic.line}` : ""}${diagnostic.step_index === undefined ? "" : ` [step_index=${diagnostic.step_index}]`}: ${diagnostic.message}`,
           ),
           "",
         ]
@@ -94,6 +97,12 @@ function renderFindingMarkdown(finding: Finding): string[] {
     finding.line ? `**Line:** ${finding.line}` : "",
     finding.job ? `**Job:** ${finding.job}` : "",
     finding.step ? `**Step:** ${finding.step}` : "",
+    finding.step_index === undefined
+      ? ""
+      : `**Step index:** ${finding.step_index}`,
+    ...eventPathDetails(finding).map(
+      ([name, events]) => `**${name}:** ${events}`,
+    ),
     `**Evidence:** \`${finding.evidence.replace(/`/g, "'")}\``,
     "",
     finding.why,
@@ -103,6 +112,22 @@ function renderFindingMarkdown(finding: Finding): string[] {
     ...finding.fix.map((fix) => `- ${fix}`),
     "",
   ].filter(Boolean);
+}
+
+function eventPathDetails(finding: Finding): Array<[string, string]> {
+  const possible = finding.uncertain_reachable_events ?? [];
+  if (possible.length === 0) return [];
+  const resolved = (finding.reachable_events ?? []).filter(
+    (event) => !possible.includes(event),
+  );
+  const details: Array<[string, string]> = [];
+  if (resolved.length)
+    details.push(["Resolved event paths", resolved.join(", ")]);
+  details.push([
+    "Possible event paths (unresolved reachability)",
+    possible.join(", "),
+  ]);
+  return details;
 }
 
 function label(severity: string): string {
