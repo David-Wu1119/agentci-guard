@@ -206,7 +206,7 @@ jobs:
   agent:
     runs-on: ubuntu-latest
     steps:
-      - run: codex exec "\${{ github.event['comment']['body'] }}"
+      - run: codex exec "\${{ github['event']['comment']['body'] }}"
 `);
 assert.equal(indexedComment.analysis_complete, true);
 assert.ok(
