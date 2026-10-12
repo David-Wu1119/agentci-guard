@@ -55,6 +55,10 @@ describe("JavaScript Action entrypoint", () => {
     };
     const steps = ci.jobs.verify.steps;
     const actionIndex = steps.findIndex((step) => step.id === "reusable");
+    expect(steps[actionIndex - 1].run).toContain(
+      "['show', `${actionCommit}:${file}`]",
+    );
+    expect(steps[actionIndex - 1].run).toContain("'dist/action.js'");
     expect(steps[actionIndex]).toMatchObject({
       uses: "./",
       with: {
@@ -72,19 +76,24 @@ describe("JavaScript Action entrypoint", () => {
     expect(steps[actionIndex + 1].run).toContain(
       "artifacts/e4-synthetic-receipt.json",
     );
-    const verifier = steps[actionIndex + 1].run
-      ?.split("node --input-type=module <<'NODE'\n")[1]
-      ?.split("\nNODE")[0];
-    expect(verifier).toBeTruthy();
-    const syntax = spawnSync(
-      process.execPath,
-      ["--input-type=module", "--check"],
-      {
-        input: verifier,
-        encoding: "utf8",
-      },
+    expect(steps[actionIndex + 1].run).toContain(
+      "['show', `${process.env.E4_WORKFLOW_SHA}:.github/workflows/ci.yml`]",
     );
-    expect(syntax.status, syntax.stderr).toBe(0);
+    for (const run of [
+      steps[actionIndex - 1].run,
+      steps[actionIndex + 1].run,
+    ]) {
+      const script = run
+        ?.split("node --input-type=module <<'NODE'\n")[1]
+        ?.split("\nNODE")[0];
+      expect(script).toBeTruthy();
+      const syntax = spawnSync(
+        process.execPath,
+        ["--input-type=module", "--check"],
+        { input: script, encoding: "utf8" },
+      );
+      expect(syntax.status, syntax.stderr).toBe(0);
+    }
     expect(steps[actionIndex + 2]).toMatchObject({
       if: "success()",
       uses: "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",

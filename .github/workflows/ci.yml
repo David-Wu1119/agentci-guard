@@ -169,10 +169,18 @@ jobs:
             '.github/workflows/reusable.yml',
           ]);
           assert.equal(configs.length, 0);
+          const actionCommit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          for (const file of [
+            ...input_files.map((entry) => path.join(root, entry.path)),
+            'action.yml', 'dist/action.js', 'pnpm-lock.yaml',
+          ]) {
+            const committed = execFileSync('git', ['show', `${actionCommit}:${file}`]);
+            assert.equal(hash(file), createHash('sha256').update(committed).digest('hex'), `${file} differs from HEAD`);
+          }
           mkdirSync('artifacts', { recursive: true });
           writeFileSync('artifacts/e3-reusable-preflight.json', JSON.stringify({
             case_id: 'synthetic-reusable', source_path: source, input_files,
-            action_commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+            action_commit: actionCommit,
             action_manifest_sha256: hash('action.yml'),
             action_bundle_sha256: hash('dist/action.js'),
             lockfile_sha256: hash('pnpm-lock.yaml'),
@@ -224,7 +232,10 @@ jobs:
               'fail-on': 'none',
             },
           };
-          const workflow = YAML.parse(readFileSync('.github/workflows/ci.yml', 'utf8'));
+          assert.match(process.env.E4_WORKFLOW_SHA ?? '', /^[0-9a-f]{40}$/);
+          assert.match(process.env.E4_WORKFLOW_REF ?? '', /\/\.github\/workflows\/ci\.yml@/);
+          const workflowBytes = execFileSync('git', ['show', `${process.env.E4_WORKFLOW_SHA}:.github/workflows/ci.yml`]);
+          const workflow = YAML.parse(workflowBytes.toString('utf8'));
           const actionStep = workflow.jobs.verify.steps.find((step) => step.id === 'reusable');
           assert.deepEqual({ uses: actionStep?.uses, with: actionStep?.with }, invocation);
           assert.equal(process.env.E4_ACTION_JSON_PATH, jsonPath);
@@ -290,8 +301,6 @@ jobs:
           assert.match(process.env.GITHUB_RUN_ATTEMPT ?? '', /^[0-9]+$/);
           assert.match(process.env.GITHUB_REPOSITORY ?? '', /^[^/]+\/[^/]+$/);
           assert.equal(process.env.GITHUB_JOB, 'verify');
-          assert.match(process.env.E4_WORKFLOW_SHA ?? '', /^[0-9a-f]{40}$/);
-          assert.match(process.env.E4_WORKFLOW_REF ?? '', /\/\.github\/workflows\/ci\.yml@/);
           const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
           writeFileSync('artifacts/e4-synthetic-receipt.json', JSON.stringify({
             schema_version: 1,
