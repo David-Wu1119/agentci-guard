@@ -23,8 +23,9 @@ does not establish remote write capability; that path emits
 Untrusted content reaches a write-capable, inspected immutable Claude Code
 Action revision whose default actor write-access gate is modeled as intact.
 Every relevant text source must be attributable to the checked actor, with no
-unresolved implicit ingestion, tool fetch, or CLI input flow in another
-reachable AI path.
+unresolved implicit ingestion, tool fetch, or CLI input flow in another AI path
+reachable on the reported event. The same job may have a critical finding on a
+different event.
 
 ## `agentci/pull-request-target-ai`
 

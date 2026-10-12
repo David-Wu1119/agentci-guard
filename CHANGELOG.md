@@ -40,6 +40,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Write-token findings now partition disjoint trigger events: a critical path on
+  one event no longer makes a separately gated event critical, and uncertainty
+  on one event no longer erases a proven finding on another. CLI shell-variable,
+  pipe, inherited-environment, and earlier `GITHUB_ENV` input paths that cannot
+  be proven are marked analysis-incomplete instead of clean. Synthetic
+  regressions cover these boundaries. A schema-v4 comparison against `ba3fa61`
+  changed 0 of 152 fixed public development workflows (4 critical, 36 high,
+  180 medium; 48 complete in both); this is behavior, not accuracy evidence.
 - Unverified Anthropic Action discussion-event support now marks matching agent
   uses and findings as possible paths, not confirmed execution. The development
   scorer also keeps that diagnostic from making unrelated step rules unknown.

@@ -107,9 +107,11 @@ describe("text report", () => {
       renderTextReport(result),
       renderMarkdownReport(result),
     ]) {
-      expect(report).toContain("Event paths with resolved if");
+      expect(report).toContain("Resolved event paths");
       expect(report).toContain("issues");
-      expect(report).toContain("Possible event paths (unresolved if)");
+      expect(report).toContain(
+        "Possible event paths (unresolved reachability)",
+      );
       expect(report).toContain("discussion_comment");
       expect(report).toContain("HIGH");
     }

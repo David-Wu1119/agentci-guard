@@ -122,8 +122,11 @@ function eventPathDetails(finding: Finding): Array<[string, string]> {
   );
   const details: Array<[string, string]> = [];
   if (resolved.length)
-    details.push(["Event paths with resolved if", resolved.join(", ")]);
-  details.push(["Possible event paths (unresolved if)", possible.join(", ")]);
+    details.push(["Resolved event paths", resolved.join(", ")]);
+  details.push([
+    "Possible event paths (unresolved reachability)",
+    possible.join(", "),
+  ]);
   return details;
 }
 

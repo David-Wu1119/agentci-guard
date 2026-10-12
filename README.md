@@ -74,17 +74,20 @@ documented in [`RULES.md`](RULES.md), with the reasoning in
 [`THREAT_MODEL.md`](THREAT_MODEL.md). A current nine-rule human annotation
 contract has not been frozen.
 
-| Rule                        | Severity | Fires when                                                                                                                                                                   |
-| --------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `untrusted-ai-write-token`  | critical | Untrusted event content reaches an agent with a modeled sensitive write capability, including a narrow Anthropic App-token path in this candidate                            |
-| `gated-ai-write-token`      | high     | The same pattern, but only when an inspected immutable Anthropic Action revision verifies its gate for every relevant text source and path, with no untrusted text in `run:` |
-| `pull-request-target-ai`    | critical | An agent is reachable on `pull_request_target` without a recognized actor gate; that event runs in base-repo context with secrets                                            |
-| `untrusted-input-in-prompt` | high     | Attacker-controlled context is interpolated into an agent's prompt or inputs                                                                                                 |
-| `ai-shell-access`           | high     | A local AI CLI runs through the runner shell, or an AI Action explicitly enables a command tool                                                                              |
-| `unsafe-checkout`           | high     | Untrusted PR head code is checked out without GitHub's built-in protection                                                                                                   |
-| `ai-with-secrets`           | medium   | An AI step's inputs or environment reference a secret — baseline exposure, not a vulnerability alone                                                                         |
-| `broad-write-permissions`   | medium   | An AI job has an effective sensitive write scope in its workflow token                                                                                                       |
-| `unpinned-ai-action`        | medium   | The agent action is referenced by tag rather than commit SHA                                                                                                                 |
+| Rule                        | Severity | Fires when                                                                                                                                               |
+| --------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `untrusted-ai-write-token`  | critical | Untrusted event content reaches an agent with a modeled sensitive write capability, including a narrow Anthropic App-token path in this candidate        |
+| `gated-ai-write-token`      | high     | The same pattern, but only when an inspected immutable Anthropic Action revision verifies its gate for every relevant text source and path on that event |
+| `pull-request-target-ai`    | critical | An agent is reachable on `pull_request_target` without a recognized actor gate; that event runs in base-repo context with secrets                        |
+| `untrusted-input-in-prompt` | high     | Attacker-controlled context is interpolated into an agent's prompt or inputs                                                                             |
+| `ai-shell-access`           | high     | A local AI CLI runs through the runner shell, or an AI Action explicitly enables a command tool                                                          |
+| `unsafe-checkout`           | high     | Untrusted PR head code is checked out without GitHub's built-in protection                                                                               |
+| `ai-with-secrets`           | medium   | An AI step's inputs or environment reference a secret — baseline exposure, not a vulnerability alone                                                     |
+| `broad-write-permissions`   | medium   | An AI job has an effective sensitive write scope in its workflow token                                                                                   |
+| `unpinned-ai-action`        | medium   | The agent action is referenced by tag rather than commit SHA                                                                                             |
+
+A job can have both write-token severities on different trigger events; each
+finding reports only the event paths that justify its severity.
 
 Two things the source-aware model checks beyond the event name:
 whether a guard authenticates the author of the **specific text** being read,
@@ -297,7 +300,7 @@ Concretely:
   shell flow is reported as incomplete. Runner `GITHUB_TOKEN` permissions do
   not establish the hosted agent's write capability.
 - The source-aware candidate only lowers an inspected immutable Anthropic Action
-  Action to `gated-ai-write-token` at **high** when its modeled input sources
+  to `gated-ai-write-token` at **high** when its modeled input sources
   belong to the checked triggering actor. A maintainer comment or label can
   activate tag mode on an attacker-authored parent Issue or PR; with a modeled
   write capability, that remains **critical**. A nonempty static prompt does

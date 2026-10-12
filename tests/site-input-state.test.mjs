@@ -133,9 +133,9 @@ describe("browser workflow input", () => {
         .children[0].children.flatMap((line) => line.children)
         .map((node) => node.textContent)
         .join(" ");
-      expect(detail).toMatch(/Event paths with resolved if:\s+issues/);
+      expect(detail).toMatch(/Resolved event paths:\s+issues/);
       expect(detail).toMatch(
-        /Possible event paths \(unresolved if\):\s+discussion_comment/,
+        /Possible event paths \(unresolved reachability\):\s+discussion_comment/,
       );
     }
   });

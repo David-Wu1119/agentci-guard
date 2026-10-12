@@ -54,8 +54,8 @@ function addEventPaths(item, entry) {
     return;
   }
   const resolved = (entry.reachable_events ?? []).filter((event) => !possible.includes(event));
-  addDetail(item, 'Event paths with resolved if', resolved.join(', '));
-  addDetail(item, 'Possible event paths (unresolved if)', possible.join(', '));
+  addDetail(item, 'Resolved event paths', resolved.join(', '));
+  addDetail(item, 'Possible event paths (unresolved reachability)', possible.join(', '));
 }
 
 function renderResult(result) {

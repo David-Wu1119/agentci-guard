@@ -94,7 +94,8 @@ dataflow analysis.
 A direct AI CLI may be preceded by literal shell `NAME=VALUE` assignments or
 launched through `env`. Assignment values are not prompt arguments: dynamic
 values produce `analysis-run-dataflow-unknown` unless the CLI command itself
-proves the source reaches its prompt. A nested `sh -c`/`bash -c` agent command
+proves the source reaches its prompt. A shell assignment can override a safe
+workflow `env` value; that path remains unresolved. A nested `sh -c`/`bash -c` agent command
 is unresolved, not a proven direct sink.
 
 The candidate recognizes documented hosted-agent creation/follow-up routes
@@ -162,14 +163,15 @@ PR can point to a fork branch they did not author, so an actor gate alone
 cannot dismiss that source. An `issue_comment` may target a PR and is
 conservatively treated as capable of bringing in those paths too.
 
-The candidate emits `gated-ai-write-token` at high only when all reachable
-ingested source text is attributable to the actor checked by an inspected
-Action's intact write-access gate, every relevant event is modeled as checked,
-no other agent path has unresolved input flow, and no untrusted text enters a
-`run:` step. If a trusted actor activates an agent on someone
-else's parent Issue/PR, the gate does not justify that downgrade and the
-modeled write-token rule stays critical. This is a static severity heuristic,
-not proof that the Action accepted or rejected a runtime trigger.
+The candidate classifies each reachable event path separately. It emits
+`gated-ai-write-token` at high only when that event's ingested source text is
+attributable to the actor checked by an inspected Action's intact write-access
+gate, the event is modeled as checked, no same-event agent path has unresolved
+input flow, and no same-event `run:` step expands untrusted text. A job can
+therefore have a high finding on one event and a critical finding on another.
+If a trusted actor activates an agent on someone else's parent Issue/PR, the
+gate does not justify that path's downgrade. This is a static severity
+heuristic, not proof that the Action accepted or rejected a runtime trigger.
 
 Unlike the pre-candidate `pull-request-target-ai` predicate above, this candidate
 does not treat same-repository PR-head provenance as an actor gate. It can
@@ -209,7 +211,8 @@ referenced secret is nonempty at runtime.
 The candidate recognizes bracket secret references and `toJSON(secrets)`.
 A prior step that may export a secret through `GITHUB_ENV` produces an
 analysis-incomplete diagnostic at a later AI step; that cross-step flow is not
-yet modeled as a positive finding.
+yet modeled as a positive finding. The same holds for untrusted event text
+written to `GITHUB_ENV`.
 
 ## Severity rationale
 

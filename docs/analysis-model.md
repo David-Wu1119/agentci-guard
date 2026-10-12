@@ -124,27 +124,29 @@ an explicit `github_token` input; the candidate checks for that input before
 modeling a bypass, but cannot resolve whether a dynamic token expression is
 empty. `allowed_bots` entries are not permission-checked.
 
-When the untrusted-trigger, agent, write-token pattern is present and **all** of
-the following hold, the finding is `agentci/gated-ai-write-token` at high rather
-than `agentci/untrusted-ai-write-token` at critical:
+The candidate classifies each reachable event path independently. When the
+untrusted-trigger, agent, write-token pattern is present and **all** of the
+following hold on that event, the finding is `agentci/gated-ai-write-token` at
+high rather than `agentci/untrusted-ai-write-token` at critical:
 
-- every AI step that ingests untrusted content is an inspected immutable
+- every AI step that ingests untrusted content on that event is an inspected immutable
   `anthropics/claude-code-action` revision (not `-base-action`) with neither
   `allowed_non_write_users` nor `allowed_bots` set to a non-empty value;
-- every reachable untrusted event is one the docs list as checked — `issues`,
+- the event is one the docs list as checked — `issues`,
   `issue_comment`, `pull_request`, `pull_request_review`,
   `pull_request_review_comment`; `pull_request_target` and the discussion events
   are not listed and keep potential critical findings when Action event support
   is unverified;
 - every relevant text source belongs to the actor checked by that gate, and
-  no other reachable AI path has unresolved implicit, tool-fetch, or CLI input
-  flow. Parent Issue,
+  no other AI path reachable on that event has unresolved implicit, tool-fetch,
+  or CLI input flow. Parent Issue,
   PR, or discussion content may have a different author on comment, review, or
   label activity and therefore prevents the downgrade;
-- no `run:` step in the job expands untrusted event text, because that path
+- no `run:` step reachable on that event expands untrusted event text, because that path
   bypasses the agent's gate entirely. If another agent's inherited input is
   unresolved, neither the high nor the critical write-token finding is
-  asserted from that unknown path.
+  asserted from that unknown path. A job can have high and critical findings
+  on different events without attributing either severity to the other event.
 
 The Action's gate answers "who activated this run?", not "who authored every
 piece of text the agent reads?" A trusted maintainer can label an attacker
@@ -172,7 +174,8 @@ environment variables expanded in it. A source used solely by a sibling
 command is not a proven CLI input. The local CLI nevertheless inherits its
 environment: an unreferenced untrusted environment value leaves analysis
 incomplete instead of proving ingestion or safety. Shell assignments, pipes,
-stdin redirection, and other unresolved flow likewise emit
+stdin redirection, earlier untrusted `GITHUB_ENV` writes, and other unresolved
+flow likewise emit
 `agentci/analysis-run-dataflow-unknown`. For a direct hosted-agent HTTP POST,
 the candidate traces the request body and only environment variables
 referenced by that body. These bounded parsers are not general shell dataflow
@@ -392,6 +395,8 @@ effective environment or inputs. The built-in `GITHUB_TOKEN` is handled by
 the permissions model.
 An earlier step that may write a secret to `GITHUB_ENV` marks a later AI step's
 analysis incomplete; cross-step secret flow is not a positive finding yet.
+The same incomplete result applies to an earlier untrusted event-text write to
+`GITHUB_ENV`; the scanner does not claim that the later agent consumed it.
 `workflow_call` entrypoints with no reachable local caller are also marked
 incomplete because their caller-supplied context is unavailable; any separate
 direct trigger is still analyzed on its own event set.

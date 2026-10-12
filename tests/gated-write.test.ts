@@ -100,6 +100,35 @@ jobs:
     ).toEqual(["issue_comment"]);
   });
 
+  it("separates a gated comment path from a critical parent-Issue path", () => {
+    const raw = `
+on: [issue_comment, issues]
+permissions:
+  contents: write
+jobs:
+  claude:
+    runs-on: ubuntu-latest
+    steps:
+      - if: github.event_name == 'issue_comment'
+        uses: anthropics/claude-code-action@${VERIFIED_TAG_REF}
+        with:
+          prompt: "Reply to \${{ github.event.comment.body }}"
+      - if: github.event_name == 'issues'
+        uses: anthropics/claude-code-action@${VERIFIED_TAG_REF}
+`;
+    const result = findings(raw);
+    expect(
+      result.find((finding) => finding.rule_id === GATED)?.reachable_events,
+    ).toEqual(["issue_comment"]);
+    expect(
+      result.find((finding) => finding.rule_id === CRITICAL)?.reachable_events,
+    ).toEqual(["issues"]);
+    expect(
+      result.find((finding) => finding.rule_id === CRITICAL)
+        ?.uncertain_reachable_events ?? [],
+    ).toEqual([]);
+  });
+
   it("keeps the bare tag-mode template critical for attacker-authored parent issues", () => {
     const rules = rulesOf(BARE());
     expect(rules).toContain(CRITICAL);
