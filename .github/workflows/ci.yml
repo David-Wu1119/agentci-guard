@@ -189,6 +189,7 @@ jobs:
       - name: Verify reusable caller chain in Action JSON
         env:
           E3_ACTION_OUTCOME: ${{ steps.reusable.outcome }}
+          E3_ACTION_JSON_SHA256: ${{ steps.reusable.outputs.json-sha256 }}
         run: |
           node -e 'const assert = require("node:assert/strict"); const r = JSON.parse(require("node:fs").readFileSync("artifacts/reusable.json", "utf8")); assert.deepEqual(r.agent_usages[0]?.call_chain, [".github/workflows/caller.yml#agent", ".github/workflows/bridge.yml#agent"]); assert(r.findings.some((f) => f.call_chain?.[0] === ".github/workflows/caller.yml#agent"))'
           node --input-type=module <<'NODE'
@@ -204,12 +205,15 @@ jobs:
             sha256: preflight.input_files.find((file) => file.path === source).sha256,
           };
           const jsonPath = 'artifacts/reusable.json';
+          const outputSha256 = process.env.E3_ACTION_JSON_SHA256;
+          assert.match(outputSha256, /^[0-9a-f]{64}$/, 'Action must emit its JSON SHA-256');
+          assert.equal(createHash('sha256').update(readFileSync(jsonPath)).digest('hex'), outputSha256);
           const runReceipt = {
             case_id: preflight.case_id,
             source_path: source,
             action_commit: preflight.action_commit,
             input_files: preflight.input_files,
-            output_sha256: createHash('sha256').update(readFileSync(jsonPath)).digest('hex'),
+            output_sha256: outputSha256,
             outcome: process.env.E3_ACTION_OUTCOME,
             fail_on: 'none',
           };

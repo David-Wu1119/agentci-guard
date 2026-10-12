@@ -35,6 +35,8 @@ outputs:
     description: Path to the written SARIF file.
   json-path:
     description: Path to the written complete scan result JSON file, when requested.
+  json-sha256:
+    description: SHA-256 of the exact JSON file bytes written by this Action, when requested.
   diagnostics:
     description: Number of parse or incomplete-analysis diagnostics.
   analysis-complete:

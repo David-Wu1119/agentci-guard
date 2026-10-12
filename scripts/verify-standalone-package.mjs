@@ -107,11 +107,17 @@ try {
     throw new Error("Packed Action did not emit the 9-fixture SARIF baseline.");
   }
   const actionOutputs = fs.readFileSync(outputPath, "utf8");
-  const actionResult = JSON.parse(fs.readFileSync(jsonPath, "utf8"));
+  const jsonBytes = fs.readFileSync(jsonPath);
+  const actionResult = JSON.parse(jsonBytes.toString("utf8"));
+  const jsonSha256 = crypto
+    .createHash("sha256")
+    .update(jsonBytes)
+    .digest("hex");
   if (
     !actionOutputs.includes("analysis-complete=false") ||
     !actionOutputs.includes("diagnostics=1") ||
     !actionOutputs.includes(`json-path=${jsonPath}`) ||
+    !actionOutputs.includes(`json-sha256=${jsonSha256}`) ||
     actionResult.findings.length !== 9 ||
     actionResult.agent_usages.length === 0 ||
     actionResult.diagnostics.length !== 1
@@ -134,10 +140,12 @@ try {
       GITHUB_OUTPUT: noJsonOutput,
     },
   });
+  const noJsonOutputs = fs.readFileSync(noJsonOutput, "utf8");
   if (
     noJsonAction.status !== 0 ||
     fs.existsSync(path.join(packageRoot, "agentci-results.json")) ||
-    fs.readFileSync(noJsonOutput, "utf8").includes("json-path=")
+    noJsonOutputs.includes("json-path=") ||
+    noJsonOutputs.includes("json-sha256=")
   ) {
     throw new Error(
       "Packed Action wrote JSON when the optional input was omitted.",

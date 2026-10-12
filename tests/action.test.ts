@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -143,6 +144,77 @@ describe("JavaScript Action entrypoint", () => {
     expect(result.analysis_complete).toBe(false);
     expect(await fs.readFile(temporary.output, "utf8")).toContain(
       `json-path=${temporary.json}`,
+    );
+  });
+
+  it("declares the optional JSON digest output in the Action manifest", async () => {
+    const manifest = YAML.parse(await fs.readFile("action.yml", "utf8")) as {
+      outputs: Record<string, unknown>;
+    };
+
+    expect(manifest.outputs["json-sha256"]).toBeDefined();
+  });
+
+  it("reports the SHA-256 of exact JSON file bytes before threshold failure", async () => {
+    const temporary = await temporaryOutput();
+    const code = await runAction(
+      {
+        INPUT_PATH: "examples/vulnerable",
+        INPUT_SARIF: temporary.sarif,
+        INPUT_JSON: temporary.json,
+        "INPUT_FAIL-ON": "high",
+        GITHUB_OUTPUT: temporary.output,
+      },
+      captureIo(),
+    );
+
+    expect(code).toBe(2);
+    const writtenBytes = await fs.readFile(temporary.json);
+    const digest = createHash("sha256").update(writtenBytes).digest("hex");
+    const outputs = await fs.readFile(temporary.output, "utf8");
+    expect(outputs).toContain(`json-sha256=${digest}\n`);
+    expect(outputs.match(/^json-sha256=/gm)).toHaveLength(1);
+  });
+
+  it("does not report a JSON digest when optional JSON is omitted", async () => {
+    for (const jsonInput of [undefined, ""]) {
+      const temporary = await temporaryOutput();
+      const code = await runAction(
+        {
+          INPUT_PATH: "examples/hardened",
+          INPUT_SARIF: temporary.sarif,
+          INPUT_JSON: jsonInput,
+          "INPUT_FAIL-ON": "none",
+          GITHUB_OUTPUT: temporary.output,
+        },
+        captureIo(),
+      );
+
+      expect(code).toBe(0);
+      expect(await fs.readFile(temporary.output, "utf8")).not.toContain(
+        "json-sha256=",
+      );
+    }
+  });
+
+  it("does not report a JSON digest when the create-only JSON write fails", async () => {
+    const temporary = await temporaryOutput();
+    await fs.writeFile(temporary.json, "existing result\n", "utf8");
+    const code = await runAction(
+      {
+        INPUT_PATH: "examples/hardened",
+        INPUT_SARIF: temporary.sarif,
+        INPUT_JSON: temporary.json,
+        "INPUT_FAIL-ON": "none",
+        GITHUB_OUTPUT: temporary.output,
+      },
+      captureIo(),
+    );
+
+    expect(code).toBe(1);
+    expect(await fs.readFile(temporary.json, "utf8")).toBe("existing result\n");
+    expect(await fs.readFile(temporary.output, "utf8")).not.toContain(
+      "json-sha256=",
     );
   });
 
@@ -300,6 +372,10 @@ jobs:
     expect(await fs.readFile(temporary.output, "utf8")).toContain("findings=0");
     expect(await fs.readFile(temporary.output, "utf8")).toContain(
       "analysis-complete=false",
+    );
+    const jsonBytes = await fs.readFile(temporary.json);
+    expect(await fs.readFile(temporary.output, "utf8")).toContain(
+      `json-sha256=${createHash("sha256").update(jsonBytes).digest("hex")}\n`,
     );
     expect(JSON.parse(await fs.readFile(temporary.json, "utf8"))).toMatchObject(
       {
