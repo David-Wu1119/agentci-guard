@@ -37,6 +37,12 @@ Any nonconstant job or step condition outside this subset does not silently
 choose a reachability state. It retains the conservative event set and emits
 `agentci/analysis-event-condition`.
 
+When such a condition leaves an event path unresolved, the result keeps that
+event in `reachable_events` and also lists it in the optional
+`uncertain_reachable_events` subset. Text, Markdown, SARIF, and browser output
+expose the distinction. An event absent from the uncertainty subset has its
+modeled event predicates resolved; that does **not** prove the job or step ran.
+
 ## Coverage floor: agents invoked outside the workflow
 
 A workflow can name no agent at all and still run one. Several patterns in the

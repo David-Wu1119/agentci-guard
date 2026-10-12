@@ -128,6 +128,99 @@ jobs:
     expect(classify("agentci/gated-ai-write-token", scan)).toBe("negative");
   });
 
+  it("abstains when a matching finding has only possibly reachable events", () => {
+    const scan = result([
+      {
+        rule_id: "agentci/broad-write-permissions",
+        file,
+        job: "agent",
+        reachable_events: ["issues"],
+        uncertain_reachable_events: ["issues"],
+      },
+    ]);
+    expect(classify("agentci/broad-write-permissions", scan)).toBe("unknown");
+  });
+
+  it("keeps a confirmed event positive beside a possibly reachable event", () => {
+    const scan = result([
+      {
+        rule_id: "agentci/broad-write-permissions",
+        file,
+        job: "agent",
+        reachable_events: ["issues", "discussion_comment"],
+        uncertain_reachable_events: ["discussion_comment"],
+      },
+    ]);
+    expect(classify("agentci/broad-write-permissions", scan)).toBe("positive");
+  });
+
+  it("keeps a confirmed sibling positive despite a possible-only sibling", () => {
+    const scan = result([
+      {
+        rule_id: "agentci/broad-write-permissions",
+        file,
+        job: "agent",
+        reachable_events: ["issues"],
+        uncertain_reachable_events: ["issues"],
+      },
+      {
+        rule_id: "agentci/broad-write-permissions",
+        file,
+        job: "agent",
+        reachable_events: ["push"],
+      },
+    ]);
+    expect(classify("agentci/broad-write-permissions", scan)).toBe("positive");
+  });
+
+  it("keeps legacy matching findings positive without certainty metadata", () => {
+    const scan = result([
+      { rule_id: "agentci/broad-write-permissions", file, job: "agent" },
+    ]);
+    expect(classify("agentci/broad-write-permissions", scan)).toBe("positive");
+  });
+
+  it("abstains on possible-only agent use without affecting another step", () => {
+    const scan = {
+      ...result(),
+      agent_usages: [
+        {
+          file,
+          job: "agent",
+          step_index: 0,
+          reachable_events: ["issue_comment"],
+          uncertain_reachable_events: ["issue_comment"],
+        },
+        {
+          file,
+          job: "agent",
+          step_index: 1,
+          reachable_events: ["issue_comment"],
+        },
+      ],
+    };
+    expect(predict(stepAnnotation(0), scan, "agentci/agent-usage")).toBe(
+      "unknown",
+    );
+    expect(predict(stepAnnotation(1), scan, "agentci/agent-usage")).toBe(
+      "positive",
+    );
+  });
+
+  it("does not use a possible-only ungated path to make the gated rule negative", () => {
+    const scan = result([
+      {
+        rule_id: "agentci/untrusted-ai-write-token",
+        file,
+        job: "agent",
+        reachable_events: ["issues"],
+        uncertain_reachable_events: ["issues"],
+      },
+    ]);
+    expect(classify("agentci/untrusted-ai-write-token", scan)).toBe("unknown");
+    expect(classify("agentci/gated-ai-write-token", scan)).toBe("unknown");
+  });
+
   it("does not rule out a critical path when gated evidence coexists with unknown ingestion", () => {
     const scan = result(
       [{ rule_id: "agentci/gated-ai-write-token", file, job: "agent" }],

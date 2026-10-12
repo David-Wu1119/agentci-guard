@@ -8760,38 +8760,46 @@ function mergeEnvironment(...layers) {
   return merged;
 }
 function narrowEvents(events, rawCondition) {
+  const { events: reachable, complete } = narrowEventsDetailed(
+    events,
+    rawCondition
+  );
+  return { events: reachable, complete };
+}
+function narrowEventsDetailed(events, rawCondition) {
   if (rawCondition === void 0 || rawCondition === null) {
-    return { events: [...events], complete: true };
+    return { events: [...events], unknownEvents: [], complete: true };
   }
   if (rawCondition === true) {
-    return { events: [...events], complete: true };
+    return { events: [...events], unknownEvents: [], complete: true };
   }
   if (rawCondition === false) {
-    return { events: [], complete: true };
+    return { events: [], unknownEvents: [], complete: true };
   }
   if (typeof rawCondition !== "string") {
-    return { events: [...events], complete: false };
+    return { events: [...events], unknownEvents: [...events], complete: false };
   }
   const condition = unwrapExpression(rawCondition);
   if (condition === "true") {
-    return { events: [...events], complete: true };
+    return { events: [...events], unknownEvents: [], complete: true };
   }
   if (condition === "false") {
-    return { events: [], complete: true };
+    return { events: [], unknownEvents: [], complete: true };
   }
-  if (STATUS_ONLY_CONDITION.test(condition)) {
-    return { events: [...events], complete: true };
+  if (STATUS_ONLY_CONDITION.test(condition) && isWellFormedStatusCondition(condition)) {
+    return { events: [...events], unknownEvents: [], complete: true };
   }
-  let complete = true;
   const reachable = [];
+  const unknownEvents = [];
   for (const event of events) {
     const result = evaluateEventCondition(condition, event);
-    if (result === "unknown") complete = false;
+    if (result === "unknown") unknownEvents.push(event);
     if (result !== false) reachable.push(event);
   }
   return {
     events: reachable,
-    complete
+    unknownEvents,
+    complete: unknownEvents.length === 0
   };
 }
 function evaluateEventCondition(condition, event) {
@@ -8898,6 +8906,36 @@ function tokenizeExpression(value) {
     index += identifier.length;
   }
   return tokens;
+}
+function isWellFormedStatusCondition(condition) {
+  const tokens = tokenizeExpression(condition);
+  if (!tokens) return false;
+  let needsOperand = true;
+  let depth = 0;
+  for (let index = 0; index < tokens.length; index++) {
+    const token = tokens[index];
+    if (needsOperand) {
+      if (token.kind === "operator" && token.value === "!") continue;
+      if (token.kind === "left-paren") {
+        depth++;
+        continue;
+      }
+      if (token.kind === "identifier" && /^(?:always|success|failure|cancelled)$/i.test(token.value) && tokens[index + 1]?.kind === "left-paren" && tokens[index + 2]?.kind === "right-paren") {
+        index += 2;
+        needsOperand = false;
+        continue;
+      }
+      return false;
+    }
+    if (token.kind === "right-paren" && depth > 0) {
+      depth--;
+    } else if (token.kind === "operator" && (token.value === "&&" || token.value === "||")) {
+      needsOperand = true;
+    } else {
+      return false;
+    }
+  }
+  return !needsOperand && depth === 0;
 }
 var EventExpressionParser = class {
   constructor(tokens, event) {
@@ -9350,7 +9388,10 @@ function analyzeWorkflow(workflow, repository, context) {
   for (const [jobName, rawJob] of Object.entries(jobs)) {
     if (!isRecord2(rawJob)) continue;
     const jobLine = locateJobLine(workflow.raw, jobName);
-    const jobReachability = narrowEvents(workflowEvents, rawJob.if);
+    const jobReachability = narrowEventsDetailed(workflowEvents, rawJob.if);
+    const jobUncertainEvents = jobReachability.events.filter(
+      (event) => context.uncertainEvents?.includes(event) || jobReachability.unknownEvents.includes(event)
+    );
     const jobActorGate = Boolean(context.actorGate) || hasTrustedActorGate(rawJob.if);
     const jobPrGate = Boolean(context.prGate) || hasTrustedPrProvenanceGate(rawJob.if);
     if (!jobReachability.complete) {
@@ -9380,6 +9421,7 @@ function analyzeWorkflow(workflow, repository, context) {
           rawJob,
           jobLine,
           jobReachability.events,
+          jobUncertainEvents,
           [...creationOnlyEvents],
           jobPermissions,
           repository,
@@ -9392,12 +9434,16 @@ function analyzeWorkflow(workflow, repository, context) {
     const jobEnvironment = mergeEnvironment(workflowEnvironment, rawJob.env);
     const aiSteps = [];
     let untrustedInRun = false;
+    const untrustedRunPaths = [];
     const secretEnvTransferEvents = /* @__PURE__ */ new Set();
     for (const [index, rawStep] of steps.entries()) {
       if (!isRecord2(rawStep)) continue;
       const stepName = typeof rawStep.name === "string" ? rawStep.name : `step ${index + 1}`;
       const stepLine = locateStepLine(workflow.raw, jobName, index);
-      let stepReachability = narrowEvents(jobReachability.events, rawStep.if);
+      let stepReachability = narrowEventsDetailed(
+        jobReachability.events,
+        rawStep.if
+      );
       if (!stepReachability.complete) {
         output.diagnostics.push({
           code: "agentci/analysis-event-condition",
@@ -9497,6 +9543,9 @@ function analyzeWorkflow(workflow, repository, context) {
           if (stepReachability.events.length === 0) continue;
         }
       }
+      const stepUncertainEvents = stepReachability.events.filter(
+        (event) => jobUncertainEvents.includes(event) || stepReachability.unknownEvents.includes(event)
+      );
       const effectiveEnvironment = mergeEnvironment(
         jobEnvironment,
         rawStep.env
@@ -9670,8 +9719,17 @@ function analyzeWorkflow(workflow, repository, context) {
           creationOnlyEvents
         )
       ) : [];
-      if (stepRun.trim().length > 0 && activeMatches(materializeInputs(stepRun, context.inputValues)).length > 0) {
+      const runMatches = stepRun.trim().length > 0 ? activeMatches(materializeInputs(stepRun, context.inputValues)) : [];
+      if (runMatches.length > 0) {
         untrustedInRun = true;
+        untrustedRunPaths.push({
+          events: unionEvents(
+            runMatches.flatMap(
+              (match) => match.event === "*" ? stepReachability.events : [match.event]
+            )
+          ),
+          uncertainEvents: stepUncertainEvents
+        });
       }
       const hasUntrustedIngestion = hasUntrustedSink || fetchedMatches.length > 0;
       if (httpOnly && hasUntrustedIngestion) {
@@ -9689,6 +9747,18 @@ function analyzeWorkflow(workflow, repository, context) {
       const potentialAppWrite = isSelfGatingAgentAction(actionReference) && permissionLevel(jobPermissions, "id-token") === "write" && (!isRecord2(effectiveWith) || String(effectiveWith.github_token ?? "").trim().length === 0);
       const selfGated = isSelfGatingAgentAction(actionReference) && !hasAgentGateBypass(rawStep.with);
       const verifiedSelfGate = selfGated && VERIFIED_ANTHROPIC_WRITE_GATES.has(pinnedAnthropicRef ?? "");
+      const ungatedIngestionEvents = unionEvents(
+        [...sinkMatches, ...fetchedMatches].flatMap((match) => {
+          const events = match.event === "*" ? stepReachability.events : [match.event];
+          return events.filter(
+            (event) => !verifiedSelfGate || !SELF_GATED_EVENTS.has(event) || sourceMayDifferFromTriggerActor(
+              match.source,
+              event,
+              creationOnlyEvents
+            )
+          );
+        })
+      );
       const knownAgentModeWithoutImplicitFetch = pinnedAnthropicRef === ANTHROPIC_ACTION_AGENT_PROMPT_VERIFIED && isRecord2(effectiveWith) && String(effectiveWith.prompt ?? "").length > 0 && !/^\$\{\{[\s\S]*\}\}$/.test(String(effectiveWith.prompt)) && String(effectiveWith.track_progress ?? "") !== "true" && !String(effectiveWith.track_progress ?? "").includes("${{");
       const implicitIngestionUnknown = stepUsesAiAction && pinnedAnthropicRef !== ANTHROPIC_ACTION_WITHOUT_DISCUSSION && !knownAgentModeWithoutImplicitFetch && stepReachability.events.some((event) => UNTRUSTED_EVENTS.has(event)) && (hasSensitiveWrite(jobPermissions) || potentialAppWrite);
       if (implicitIngestionUnknown) {
@@ -9766,6 +9836,7 @@ function analyzeWorkflow(workflow, repository, context) {
           ),
           line: stepLine,
           reachable_events: stepReachability.events,
+          uncertain_reachable_events: stepUncertainEvents.length ? stepUncertainEvents : void 0,
           call_chain: context.callChain.length > 0 ? context.callChain : void 0
         });
         aiSteps.push({
@@ -9774,13 +9845,15 @@ function analyzeWorkflow(workflow, repository, context) {
           hasUntrustedIngestion,
           remoteHttp: httpOnly,
           sourceMayDifferFromTrigger,
+          ungatedIngestionEvents,
           ingestionEvents,
           potentialAppWrite,
           implicitIngestionUnknown,
           toolFetchUnknown,
           verifiedSelfGate,
           actorGated: stepActorGate,
-          events: stepReachability.events
+          events: stepReachability.events,
+          uncertainEvents: stepUncertainEvents
         });
         if (hasUntrustedSink) {
           output.findings.push(
@@ -9796,6 +9869,7 @@ function analyzeWorkflow(workflow, repository, context) {
                   (match) => match.event === "*" ? stepReachability.events : [match.event]
                 )
               ),
+              uncertainEvents: stepUncertainEvents,
               callChain: context.callChain
             })
           );
@@ -9810,6 +9884,7 @@ function analyzeWorkflow(workflow, repository, context) {
               evidence: stepUsesAiCli ? `AI CLI executes through run: ${shrink(stepRun)}` : shrink(JSON.stringify(effectiveWith)),
               line: stepLine,
               events: stepReachability.events,
+              uncertainEvents: stepUncertainEvents,
               callChain: context.callChain
             })
           );
@@ -9824,6 +9899,7 @@ function analyzeWorkflow(workflow, repository, context) {
               evidence: `uses: ${stepUses}`,
               line: stepLine,
               events: stepReachability.events,
+              uncertainEvents: stepUncertainEvents,
               callChain: context.callChain
             })
           );
@@ -9840,7 +9916,8 @@ function analyzeWorkflow(workflow, repository, context) {
               stepIndex: index,
               evidence: shrink(JSON.stringify(rawStep)),
               line: stepLine,
-              events: stepReachability.events,
+              events: ["pull_request_target"],
+              uncertainEvents: stepUncertainEvents,
               callChain: context.callChain
             })
           );
@@ -9860,7 +9937,7 @@ function analyzeWorkflow(workflow, repository, context) {
     }
     if (aiSteps.length === 0) continue;
     const jobHasWrite = hasSensitiveWrite(jobPermissions);
-    const aiOnPullRequestTarget = aiSteps.some(
+    const prTargetSteps = aiSteps.filter(
       (step) => !step.actorGated && step.events.includes("pull_request_target")
     );
     const ingesting = aiSteps.filter(
@@ -9869,7 +9946,7 @@ function analyzeWorkflow(workflow, repository, context) {
     const untrustedViaInterpolation = ingesting.some(
       (step) => step.hasUntrustedSink
     );
-    if (aiOnPullRequestTarget) {
+    if (prTargetSteps.length > 0) {
       output.findings.push(
         makeFinding("agentci/pull-request-target-ai", {
           file,
@@ -9877,6 +9954,10 @@ function analyzeWorkflow(workflow, repository, context) {
           evidence: "AI usage is reachable on pull_request_target",
           line: jobLine,
           events: ["pull_request_target"],
+          uncertainEvents: uncertainWitnessEvents(
+            ["pull_request_target"],
+            prTargetSteps
+          ),
           callChain: context.callChain
         })
       );
@@ -9900,31 +9981,51 @@ function analyzeWorkflow(workflow, repository, context) {
               evidence: gated ? "actor-authored event content + AI usage + effective write permission; anthropics/claude-code-action normally checks the triggering actor for repository write access, with no configured allowlist bypass or untrusted run: expansion" : untrustedViaInterpolation ? "reachable untrusted event content + AI usage + workflow or potential Action App write capability" : "AI agent action may ingest reachable event content through its runtime context + workflow or potential Action App write capability",
               line: jobLine,
               events: reachableUntrusted,
+              uncertainEvents: gated ? uncertainWitnessEvents(
+                reachableUntrusted,
+                ingesting.map((step) => ({
+                  events: step.ingestionEvents,
+                  uncertainEvents: step.uncertainEvents
+                }))
+              ) : reachableUntrusted.filter(
+                (event) => !ingesting.some(
+                  (step) => step.ungatedIngestionEvents.includes(event) && !step.uncertainEvents.includes(event)
+                ) && !(untrustedRunPaths.some(
+                  (run) => run.events.includes(event) && !run.uncertainEvents.includes(event)
+                ) && ingesting.some(
+                  (step) => step.ingestionEvents.includes(event) && !step.uncertainEvents.includes(event)
+                ))
+              ),
               callChain: context.callChain
             }
           )
         );
     }
-    if (aiSteps.some((step) => step.hasSecret)) {
+    const secretSteps = aiSteps.filter((step) => step.hasSecret);
+    if (secretSteps.length > 0) {
+      const events = unionEvents(secretSteps.flatMap((step) => step.events));
       output.findings.push(
         makeFinding("agentci/ai-with-secrets", {
           file,
           job: jobName,
           evidence: "AI step's effective environment or inputs reference a secret/token",
           line: jobLine,
-          events: unionEvents(aiSteps.flatMap((step) => step.events)),
+          events,
+          uncertainEvents: uncertainWitnessEvents(events, secretSteps),
           callChain: context.callChain
         })
       );
     }
     if (jobHasWrite) {
+      const events = unionEvents(aiSteps.flatMap((step) => step.events));
       output.findings.push(
         makeFinding("agentci/broad-write-permissions", {
           file,
           job: jobName,
           evidence: `effective permissions: ${describePermissions(jobPermissions)}`,
           line: jobLine,
-          events: unionEvents(aiSteps.flatMap((step) => step.events)),
+          events,
+          uncertainEvents: uncertainWitnessEvents(events, aiSteps),
           callChain: context.callChain
         })
       );
@@ -9944,7 +10045,7 @@ function analyzeWorkflow(workflow, repository, context) {
   output.findings = ignores.all ? [] : output.findings.filter((finding) => !ignores.rules.has(finding.rule_id));
   return output;
 }
-function analyzeReusableCall(caller, jobName, rawJob, jobLine, events, creationOnlyEvents, permissions, repository, context) {
+function analyzeReusableCall(caller, jobName, rawJob, jobLine, events, uncertainEvents, creationOnlyEvents, permissions, repository, context) {
   const uses = String(rawJob.uses);
   const callerFile = relativeFile(repository.root, caller.path);
   if (!uses.startsWith("./")) {
@@ -10003,6 +10104,7 @@ function analyzeReusableCall(caller, jobName, rawJob, jobLine, events, creationO
   }
   return analyzeWorkflow(target, repository, {
     events,
+    uncertainEvents,
     triggerSource: context.triggerSource,
     creationOnlyEvents,
     actorGate: Boolean(context.actorGate) || hasTrustedActorGate(rawJob.if),
@@ -10018,6 +10120,9 @@ function makeFinding(ruleId, context) {
   if (!rule) throw new Error(`Unknown rule: ${ruleId}`);
   const chain = context.callChain?.join(">") ?? "";
   const id = `${ruleId}:${context.file}:${context.job ?? ""}:${context.stepIndex ?? ""}:${chain}`;
+  const uncertainEvents = context.events?.filter(
+    (event) => context.uncertainEvents?.includes(event)
+  );
   return {
     id,
     rule_id: rule.id,
@@ -10033,6 +10138,7 @@ function makeFinding(ruleId, context) {
     evidence: context.evidence,
     line: context.line,
     reachable_events: context.events,
+    uncertain_reachable_events: uncertainEvents?.length ? uncertainEvents : void 0,
     call_chain: context.callChain && context.callChain.length > 0 ? context.callChain : void 0
   };
 }
@@ -10247,6 +10353,13 @@ function shrink(value) {
 }
 function unionEvents(events) {
   return [...new Set(events)].sort();
+}
+function uncertainWitnessEvents(events, witnesses) {
+  return events.filter(
+    (event) => !witnesses.some(
+      (witness) => witness.events.includes(event) && !witness.uncertainEvents.includes(event)
+    )
+  );
 }
 function mergeOutput(target, source) {
   target.agentUsages.push(...source.agentUsages);
@@ -10599,6 +10712,9 @@ function renderTextReport(result) {
     lines.push(
       `File: ${finding.file}${finding.line ? `:${finding.line}` : ""}${finding.job ? ` / job: ${finding.job}` : ""}${finding.step ? ` / step: ${finding.step}` : ""}${finding.step_index === void 0 ? "" : ` / step_index: ${finding.step_index}`}`
     );
+    for (const [name, events] of eventPathDetails(finding)) {
+      lines.push(`${name}: ${events}`);
+    }
     lines.push(`Evidence: ${finding.evidence}`);
     lines.push(`Why: ${finding.why}`);
     lines.push("Fix:");
@@ -10649,6 +10765,9 @@ function renderFindingMarkdown(finding) {
     finding.job ? `**Job:** ${finding.job}` : "",
     finding.step ? `**Step:** ${finding.step}` : "",
     finding.step_index === void 0 ? "" : `**Step index:** ${finding.step_index}`,
+    ...eventPathDetails(finding).map(
+      ([name, events]) => `**${name}:** ${events}`
+    ),
     `**Evidence:** \`${finding.evidence.replace(/`/g, "'")}\``,
     "",
     finding.why,
@@ -10658,6 +10777,18 @@ function renderFindingMarkdown(finding) {
     ...finding.fix.map((fix) => `- ${fix}`),
     ""
   ].filter(Boolean);
+}
+function eventPathDetails(finding) {
+  const possible = finding.uncertain_reachable_events ?? [];
+  if (possible.length === 0) return [];
+  const resolved = (finding.reachable_events ?? []).filter(
+    (event) => !possible.includes(event)
+  );
+  const details = [];
+  if (resolved.length)
+    details.push(["Event paths with resolved if", resolved.join(", ")]);
+  details.push(["Possible event paths (unresolved if)", possible.join(", ")]);
+  return details;
 }
 function label(severity) {
   if (severity === "critical") return import_picocolors.default.red("[CRITICAL]");
@@ -10702,6 +10833,9 @@ function toSarif(input) {
           properties: {
             "agentci/severity": finding.severity,
             "agentci/reachableEvents": finding.reachable_events ?? [],
+            ...finding.uncertain_reachable_events?.length ? {
+              "agentci/uncertainReachableEvents": finding.uncertain_reachable_events
+            } : {},
             ...finding.job ? { "agentci/job": finding.job } : {},
             ...finding.step ? { "agentci/step": finding.step } : {},
             ...finding.step_index === void 0 ? {} : { "agentci/stepIndex": finding.step_index }
@@ -10796,6 +10930,7 @@ export {
   matchesPath,
   mergeEnvironment,
   narrowEvents,
+  narrowEventsDetailed,
   normalizeTriggers,
   parseFailOn,
   parseInlineIgnores,

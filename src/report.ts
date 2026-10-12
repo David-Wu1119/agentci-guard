@@ -38,6 +38,9 @@ export function renderTextReport(result: ScanResult): string {
     lines.push(
       `File: ${finding.file}${finding.line ? `:${finding.line}` : ""}${finding.job ? ` / job: ${finding.job}` : ""}${finding.step ? ` / step: ${finding.step}` : ""}${finding.step_index === undefined ? "" : ` / step_index: ${finding.step_index}`}`,
     );
+    for (const [name, events] of eventPathDetails(finding)) {
+      lines.push(`${name}: ${events}`);
+    }
     lines.push(`Evidence: ${finding.evidence}`);
     lines.push(`Why: ${finding.why}`);
     lines.push("Fix:");
@@ -97,6 +100,9 @@ function renderFindingMarkdown(finding: Finding): string[] {
     finding.step_index === undefined
       ? ""
       : `**Step index:** ${finding.step_index}`,
+    ...eventPathDetails(finding).map(
+      ([name, events]) => `**${name}:** ${events}`,
+    ),
     `**Evidence:** \`${finding.evidence.replace(/`/g, "'")}\``,
     "",
     finding.why,
@@ -106,6 +112,19 @@ function renderFindingMarkdown(finding: Finding): string[] {
     ...finding.fix.map((fix) => `- ${fix}`),
     "",
   ].filter(Boolean);
+}
+
+function eventPathDetails(finding: Finding): Array<[string, string]> {
+  const possible = finding.uncertain_reachable_events ?? [];
+  if (possible.length === 0) return [];
+  const resolved = (finding.reachable_events ?? []).filter(
+    (event) => !possible.includes(event),
+  );
+  const details: Array<[string, string]> = [];
+  if (resolved.length)
+    details.push(["Event paths with resolved if", resolved.join(", ")]);
+  details.push(["Possible event paths (unresolved if)", possible.join(", ")]);
+  return details;
 }
 
 function label(severity: string): string {

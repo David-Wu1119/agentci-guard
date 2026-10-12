@@ -52,6 +52,12 @@ export function toSarif(input: Finding[] | SarifScanInput): SarifLog {
           properties: {
             "agentci/severity": finding.severity,
             "agentci/reachableEvents": finding.reachable_events ?? [],
+            ...(finding.uncertain_reachable_events?.length
+              ? {
+                  "agentci/uncertainReachableEvents":
+                    finding.uncertain_reachable_events,
+                }
+              : {}),
             ...(finding.job ? { "agentci/job": finding.job } : {}),
             ...(finding.step ? { "agentci/step": finding.step } : {}),
             ...(finding.step_index === undefined

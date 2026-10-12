@@ -140,25 +140,36 @@ export function narrowEvents(
   events: string[],
   rawCondition: unknown,
 ): Reachability {
+  const { events: reachable, complete } = narrowEventsDetailed(
+    events,
+    rawCondition,
+  );
+  return { events: reachable, complete };
+}
+
+export function narrowEventsDetailed(
+  events: string[],
+  rawCondition: unknown,
+): Reachability & { unknownEvents: string[] } {
   if (rawCondition === undefined || rawCondition === null) {
-    return { events: [...events], complete: true };
+    return { events: [...events], unknownEvents: [], complete: true };
   }
   if (rawCondition === true) {
-    return { events: [...events], complete: true };
+    return { events: [...events], unknownEvents: [], complete: true };
   }
   if (rawCondition === false) {
-    return { events: [], complete: true };
+    return { events: [], unknownEvents: [], complete: true };
   }
   if (typeof rawCondition !== "string") {
-    return { events: [...events], complete: false };
+    return { events: [...events], unknownEvents: [...events], complete: false };
   }
 
   const condition = unwrapExpression(rawCondition);
   if (condition === "true") {
-    return { events: [...events], complete: true };
+    return { events: [...events], unknownEvents: [], complete: true };
   }
   if (condition === "false") {
-    return { events: [], complete: true };
+    return { events: [], unknownEvents: [], complete: true };
   }
   // Status functions are event-independent: none of them can exclude an
   // event, so a condition built only from them and boolean operators leaves
@@ -166,19 +177,23 @@ export function narrowEvents(
   // not substituted with `true` — that would turn `!cancelled()` into `false`
   // and silently empty the event set. Mixed conditions fall through and stay
   // conservative.
-  if (STATUS_ONLY_CONDITION.test(condition)) {
-    return { events: [...events], complete: true };
+  if (
+    STATUS_ONLY_CONDITION.test(condition) &&
+    isWellFormedStatusCondition(condition)
+  ) {
+    return { events: [...events], unknownEvents: [], complete: true };
   }
-  let complete = true;
   const reachable: string[] = [];
+  const unknownEvents: string[] = [];
   for (const event of events) {
     const result = evaluateEventCondition(condition, event);
-    if (result === "unknown") complete = false;
+    if (result === "unknown") unknownEvents.push(event);
     if (result !== false) reachable.push(event);
   }
   return {
     events: reachable,
-    complete,
+    unknownEvents,
+    complete: unknownEvents.length === 0,
   };
 }
 
@@ -296,6 +311,45 @@ function tokenizeExpression(value: string): ExpressionToken[] | null {
     index += identifier.length;
   }
   return tokens;
+}
+
+function isWellFormedStatusCondition(condition: string): boolean {
+  const tokens = tokenizeExpression(condition);
+  if (!tokens) return false;
+  let needsOperand = true;
+  let depth = 0;
+  for (let index = 0; index < tokens.length; index++) {
+    const token = tokens[index];
+    if (needsOperand) {
+      if (token.kind === "operator" && token.value === "!") continue;
+      if (token.kind === "left-paren") {
+        depth++;
+        continue;
+      }
+      if (
+        token.kind === "identifier" &&
+        /^(?:always|success|failure|cancelled)$/i.test(token.value) &&
+        tokens[index + 1]?.kind === "left-paren" &&
+        tokens[index + 2]?.kind === "right-paren"
+      ) {
+        index += 2;
+        needsOperand = false;
+        continue;
+      }
+      return false;
+    }
+    if (token.kind === "right-paren" && depth > 0) {
+      depth--;
+    } else if (
+      token.kind === "operator" &&
+      (token.value === "&&" || token.value === "||")
+    ) {
+      needsOperand = true;
+    } else {
+      return false;
+    }
+  }
+  return !needsOperand && depth === 0;
 }
 
 class EventExpressionParser {

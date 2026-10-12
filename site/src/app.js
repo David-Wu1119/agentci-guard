@@ -47,6 +47,17 @@ function addDetail(item, label, value) {
   item.append(line);
 }
 
+function addEventPaths(item, entry) {
+  const possible = entry.uncertain_reachable_events ?? [];
+  if (!possible.length) {
+    addDetail(item, 'Reachable events', entry.reachable_events?.join(', '));
+    return;
+  }
+  const resolved = (entry.reachable_events ?? []).filter((event) => !possible.includes(event));
+  addDetail(item, 'Event paths with resolved if', resolved.join(', '));
+  addDetail(item, 'Possible event paths (unresolved if)', possible.join(', '));
+}
+
 function renderResult(result) {
   if (!Array.isArray(result?.agent_usages) || !Array.isArray(result.findings) || !Array.isArray(result.diagnostics) || typeof result.analysis_complete !== 'boolean') {
     throw new Error('The scanner returned an invalid result.');
@@ -63,7 +74,7 @@ function renderResult(result) {
     addDetail(item, 'Virtual location', `${usage.file}:${usage.line}`);
     addDetail(item, 'Step index', usage.step_index);
     addDetail(item, 'Evidence', usage.evidence);
-    addDetail(item, 'Reachable events', usage.reachable_events.join(', '));
+    addEventPaths(item, usage);
     agentUsages.append(item);
   }
   if (!result.agent_usages.length) {
@@ -86,6 +97,7 @@ function renderResult(result) {
     addDetail(item, 'Finding', finding.message);
     addDetail(item, 'Why', finding.why);
     addDetail(item, 'Evidence', finding.evidence);
+    addEventPaths(item, finding);
     addDetail(item, 'Suggested fix', finding.fix?.join(' '));
     findings.append(item);
   }

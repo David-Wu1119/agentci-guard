@@ -78,6 +78,47 @@ describe("Markdown report", () => {
 });
 
 describe("text report", () => {
+  it("separates resolved and possible event paths without changing finding severity", () => {
+    const result = {
+      scanned_at: "2026-01-01T00:00:00.000Z",
+      root: ".",
+      workflow_count: 1,
+      agent_usages: [],
+      findings: [
+        {
+          id: "uncertain",
+          rule_id: "agentci/ai-shell-access",
+          title: "Shell access",
+          severity: "high" as const,
+          file: "wf.yml",
+          message: "m",
+          why: "w",
+          fix: [],
+          evidence: "e",
+          reachable_events: ["issues", "discussion_comment"],
+          uncertain_reachable_events: ["discussion_comment"],
+        },
+      ],
+      summary: { critical: 0, high: 1, medium: 0, low: 0 },
+      diagnostics: [],
+      analysis_complete: false,
+    };
+    for (const report of [
+      renderTextReport(result),
+      renderMarkdownReport(result),
+    ]) {
+      expect(report).toContain("Event paths with resolved if");
+      expect(report).toContain("issues");
+      expect(report).toContain("Possible event paths (unresolved if)");
+      expect(report).toContain("discussion_comment");
+      expect(report).toContain("HIGH");
+    }
+    const legacy = { ...result, findings: [{ ...result.findings[0] }] };
+    delete (legacy.findings[0] as { uncertain_reachable_events?: string[] })
+      .uncertain_reachable_events;
+    expect(renderTextReport(legacy)).not.toContain("Possible event paths");
+  });
+
   it("distinguishes same-line findings with duplicate step names", () => {
     const result = {
       scanned_at: "2026-01-01T00:00:00.000Z",

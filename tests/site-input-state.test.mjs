@@ -98,6 +98,48 @@ function browserPage(hasScanner = true, scanResult = {}) {
 }
 
 describe("browser workflow input", () => {
+  it("separates possible event paths from paths with resolved conditions", () => {
+    const file = ".github/workflows/input.yml";
+    const page = browserPage(true, {
+      agent_usages: [
+        {
+          job: "agent",
+          step: "Run agent",
+          file,
+          line: 5,
+          step_index: 0,
+          evidence: "claude -p",
+          reachable_events: ["issues", "discussion_comment"],
+          uncertain_reachable_events: ["discussion_comment"],
+        },
+      ],
+      findings: [
+        {
+          severity: "high",
+          title: "Test finding",
+          rule_id: "agentci/test",
+          file,
+          message: "Test",
+          reachable_events: ["issues", "discussion_comment"],
+          uncertain_reachable_events: ["discussion_comment"],
+        },
+      ],
+    });
+    const get = (id) => page.elements.get(id);
+    get("workflow-yaml").value = "on: [issues, discussion_comment]\n";
+    get("scan-button").listeners.click();
+    for (const id of ["scan-agent-usages", "scan-findings"]) {
+      const detail = get(id)
+        .children[0].children.flatMap((line) => line.children)
+        .map((node) => node.textContent)
+        .join(" ");
+      expect(detail).toMatch(/Event paths with resolved if:\s+issues/);
+      expect(detail).toMatch(
+        /Possible event paths \(unresolved if\):\s+discussion_comment/,
+      );
+    }
+  });
+
   it("shows the zero-based step index for a step-level diagnostic", () => {
     const page = browserPage(true, {
       diagnostics: [

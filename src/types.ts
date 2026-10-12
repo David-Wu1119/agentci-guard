@@ -23,6 +23,8 @@ export type Finding = {
   evidence: string;
   line?: number;
   reachable_events?: string[];
+  /** Subset retained only because an event predicate could not be resolved. */
+  uncertain_reachable_events?: string[];
   call_chain?: string[];
 };
 
@@ -37,6 +39,8 @@ export type AgentUsage = {
   evidence: string;
   line: number;
   reachable_events: string[];
+  /** Subset retained only because an event predicate could not be resolved. */
+  uncertain_reachable_events?: string[];
   call_chain?: string[];
 };
 
@@ -127,6 +131,7 @@ export type SarifLog = {
       properties: {
         "agentci/severity": Severity;
         "agentci/reachableEvents": string[];
+        "agentci/uncertainReachableEvents"?: string[];
         "agentci/job"?: string;
         "agentci/step"?: string;
         "agentci/stepIndex"?: number;

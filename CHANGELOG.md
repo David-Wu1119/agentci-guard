@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Findings and agent uses now distinguish event paths resolved by modeled
+  `if` predicates from paths retained only because a predicate is unknown.
+  Text, Markdown, SARIF, and the browser show that distinction; the development
+  scorer abstains on possible-only paths. A schema-v4 before/after report on
+  the fixed 152-workflow development corpus changed 55 case signatures solely
+  in certainty metadata (166 findings and 59 agent uses carry possible paths);
+  finding identity/counts, agent-use identity/counts, diagnostics, and
+  completeness were unchanged. This is not an accuracy measurement or a
+  formal-v4 scoring result.
 - Implicit Issue/PR/comment ingestion now requires evidence for the exact AI
   Action revision and event path. Unverified Action refs with write capability
   produce `analysis-agent-implicit-ingestion-unknown` instead of a definite

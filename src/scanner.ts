@@ -38,7 +38,7 @@ import {
   mergeEnvironment,
   hasTrustedActorGate,
   hasTrustedPrProvenanceGate,
-  narrowEvents,
+  narrowEventsDetailed,
   normalizeTriggers,
   permissionLevel,
   resolvePermissions,
@@ -55,6 +55,7 @@ type FindingContext = {
   evidence: string;
   line?: number;
   events?: string[];
+  uncertainEvents?: string[];
   callChain?: string[];
 };
 type AnalysisOutput = {
@@ -64,6 +65,7 @@ type AnalysisOutput = {
 };
 type ReusableContext = {
   events?: string[];
+  uncertainEvents?: string[];
   triggerSource?: unknown;
   creationOnlyEvents?: string[];
   actorGate?: boolean;
@@ -329,7 +331,12 @@ function analyzeWorkflow(
   for (const [jobName, rawJob] of Object.entries(jobs)) {
     if (!isRecord(rawJob)) continue;
     const jobLine = locateJobLine(workflow.raw, jobName);
-    const jobReachability = narrowEvents(workflowEvents, rawJob.if);
+    const jobReachability = narrowEventsDetailed(workflowEvents, rawJob.if);
+    const jobUncertainEvents = jobReachability.events.filter(
+      (event) =>
+        context.uncertainEvents?.includes(event) ||
+        jobReachability.unknownEvents.includes(event),
+    );
     const jobActorGate =
       Boolean(context.actorGate) || hasTrustedActorGate(rawJob.if);
     const jobPrGate =
@@ -367,6 +374,7 @@ function analyzeWorkflow(
           rawJob,
           jobLine,
           jobReachability.events,
+          jobUncertainEvents,
           [...creationOnlyEvents],
           jobPermissions,
           repository,
@@ -384,6 +392,7 @@ function analyzeWorkflow(
       hasUntrustedIngestion: boolean;
       remoteHttp: boolean;
       sourceMayDifferFromTrigger: boolean;
+      ungatedIngestionEvents: string[];
       potentialAppWrite: boolean;
       ingestionEvents: string[];
       implicitIngestionUnknown: boolean;
@@ -393,9 +402,14 @@ function analyzeWorkflow(
       /** The job or this step carries a recognized actor/provenance gate. */
       actorGated: boolean;
       events: string[];
+      uncertainEvents: string[];
     }> = [];
     /** Untrusted event text expanded into a `run:` step anywhere in the job. */
     let untrustedInRun = false;
+    const untrustedRunPaths: Array<{
+      events: string[];
+      uncertainEvents: string[];
+    }> = [];
     const secretEnvTransferEvents = new Set<string>();
 
     for (const [index, rawStep] of steps.entries()) {
@@ -403,7 +417,10 @@ function analyzeWorkflow(
       const stepName =
         typeof rawStep.name === "string" ? rawStep.name : `step ${index + 1}`;
       const stepLine = locateStepLine(workflow.raw, jobName, index);
-      let stepReachability = narrowEvents(jobReachability.events, rawStep.if);
+      let stepReachability = narrowEventsDetailed(
+        jobReachability.events,
+        rawStep.if,
+      );
       if (!stepReachability.complete) {
         output.diagnostics.push({
           code: "agentci/analysis-event-condition",
@@ -531,6 +548,12 @@ function analyzeWorkflow(
           if (stepReachability.events.length === 0) continue;
         }
       }
+
+      const stepUncertainEvents = stepReachability.events.filter(
+        (event) =>
+          jobUncertainEvents.includes(event) ||
+          stepReachability.unknownEvents.includes(event),
+      );
 
       const effectiveEnvironment = mergeEnvironment(
         jobEnvironment,
@@ -780,12 +803,20 @@ function analyzeWorkflow(
                 ),
             )
           : [];
-      if (
-        stepRun.trim().length > 0 &&
-        activeMatches(materializeInputs(stepRun, context.inputValues)).length >
-          0
-      ) {
+      const runMatches =
+        stepRun.trim().length > 0
+          ? activeMatches(materializeInputs(stepRun, context.inputValues))
+          : [];
+      if (runMatches.length > 0) {
         untrustedInRun = true;
+        untrustedRunPaths.push({
+          events: unionEvents(
+            runMatches.flatMap((match) =>
+              match.event === "*" ? stepReachability.events : [match.event],
+            ),
+          ),
+          uncertainEvents: stepUncertainEvents,
+        });
       }
       const hasUntrustedIngestion =
         hasUntrustedSink || fetchedMatches.length > 0;
@@ -813,6 +844,22 @@ function analyzeWorkflow(
       const verifiedSelfGate =
         selfGated &&
         VERIFIED_ANTHROPIC_WRITE_GATES.has(pinnedAnthropicRef ?? "");
+      const ungatedIngestionEvents = unionEvents(
+        [...sinkMatches, ...fetchedMatches].flatMap((match) => {
+          const events =
+            match.event === "*" ? stepReachability.events : [match.event];
+          return events.filter(
+            (event) =>
+              !verifiedSelfGate ||
+              !SELF_GATED_EVENTS.has(event) ||
+              sourceMayDifferFromTriggerActor(
+                match.source,
+                event,
+                creationOnlyEvents,
+              ),
+          );
+        }),
+      );
       const knownAgentModeWithoutImplicitFetch =
         pinnedAnthropicRef === ANTHROPIC_ACTION_AGENT_PROMPT_VERIFIED &&
         isRecord(effectiveWith) &&
@@ -921,6 +968,9 @@ function analyzeWorkflow(
           ),
           line: stepLine,
           reachable_events: stepReachability.events,
+          uncertain_reachable_events: stepUncertainEvents.length
+            ? stepUncertainEvents
+            : undefined,
           call_chain:
             context.callChain.length > 0 ? context.callChain : undefined,
         });
@@ -930,6 +980,7 @@ function analyzeWorkflow(
           hasUntrustedIngestion,
           remoteHttp: httpOnly,
           sourceMayDifferFromTrigger,
+          ungatedIngestionEvents,
           ingestionEvents,
           potentialAppWrite,
           implicitIngestionUnknown,
@@ -937,6 +988,7 @@ function analyzeWorkflow(
           verifiedSelfGate,
           actorGated: stepActorGate,
           events: stepReachability.events,
+          uncertainEvents: stepUncertainEvents,
         });
         if (hasUntrustedSink) {
           output.findings.push(
@@ -952,6 +1004,7 @@ function analyzeWorkflow(
                   match.event === "*" ? stepReachability.events : [match.event],
                 ),
               ),
+              uncertainEvents: stepUncertainEvents,
               callChain: context.callChain,
             }),
           );
@@ -968,6 +1021,7 @@ function analyzeWorkflow(
                 : shrink(JSON.stringify(effectiveWith)),
               line: stepLine,
               events: stepReachability.events,
+              uncertainEvents: stepUncertainEvents,
               callChain: context.callChain,
             }),
           );
@@ -982,6 +1036,7 @@ function analyzeWorkflow(
               evidence: `uses: ${stepUses}`,
               line: stepLine,
               events: stepReachability.events,
+              uncertainEvents: stepUncertainEvents,
               callChain: context.callChain,
             }),
           );
@@ -999,7 +1054,8 @@ function analyzeWorkflow(
               stepIndex: index,
               evidence: shrink(JSON.stringify(rawStep)),
               line: stepLine,
-              events: stepReachability.events,
+              events: ["pull_request_target"],
+              uncertainEvents: stepUncertainEvents,
               callChain: context.callChain,
             }),
           );
@@ -1025,7 +1081,7 @@ function analyzeWorkflow(
     // gate on the job or on the agent step itself means no untrusted actor can
     // reach that agent, even on pull_request_target. Unguarded steps in the
     // same job (an unsafe checkout, another agent) are judged on their own.
-    const aiOnPullRequestTarget = aiSteps.some(
+    const prTargetSteps = aiSteps.filter(
       (step) => !step.actorGated && step.events.includes("pull_request_target"),
     );
     const ingesting = aiSteps.filter(
@@ -1039,7 +1095,7 @@ function analyzeWorkflow(
       (step) => step.hasUntrustedSink,
     );
 
-    if (aiOnPullRequestTarget) {
+    if (prTargetSteps.length > 0) {
       output.findings.push(
         makeFinding("agentci/pull-request-target-ai", {
           file,
@@ -1047,6 +1103,10 @@ function analyzeWorkflow(
           evidence: "AI usage is reachable on pull_request_target",
           line: jobLine,
           events: ["pull_request_target"],
+          uncertainEvents: uncertainWitnessEvents(
+            ["pull_request_target"],
+            prTargetSteps,
+          ),
           callChain: context.callChain,
         }),
       );
@@ -1092,12 +1152,42 @@ function analyzeWorkflow(
                   : "AI agent action may ingest reachable event content through its runtime context + workflow or potential Action App write capability",
               line: jobLine,
               events: reachableUntrusted,
+              uncertainEvents: gated
+                ? uncertainWitnessEvents(
+                    reachableUntrusted,
+                    ingesting.map((step) => ({
+                      events: step.ingestionEvents,
+                      uncertainEvents: step.uncertainEvents,
+                    })),
+                  )
+                : reachableUntrusted.filter(
+                    (event) =>
+                      !ingesting.some(
+                        (step) =>
+                          step.ungatedIngestionEvents.includes(event) &&
+                          !step.uncertainEvents.includes(event),
+                      ) &&
+                      !(
+                        untrustedRunPaths.some(
+                          (run) =>
+                            run.events.includes(event) &&
+                            !run.uncertainEvents.includes(event),
+                        ) &&
+                        ingesting.some(
+                          (step) =>
+                            step.ingestionEvents.includes(event) &&
+                            !step.uncertainEvents.includes(event),
+                        )
+                      ),
+                  ),
               callChain: context.callChain,
             },
           ),
         );
     }
-    if (aiSteps.some((step) => step.hasSecret)) {
+    const secretSteps = aiSteps.filter((step) => step.hasSecret);
+    if (secretSteps.length > 0) {
+      const events = unionEvents(secretSteps.flatMap((step) => step.events));
       output.findings.push(
         makeFinding("agentci/ai-with-secrets", {
           file,
@@ -1105,19 +1195,22 @@ function analyzeWorkflow(
           evidence:
             "AI step's effective environment or inputs reference a secret/token",
           line: jobLine,
-          events: unionEvents(aiSteps.flatMap((step) => step.events)),
+          events,
+          uncertainEvents: uncertainWitnessEvents(events, secretSteps),
           callChain: context.callChain,
         }),
       );
     }
     if (jobHasWrite) {
+      const events = unionEvents(aiSteps.flatMap((step) => step.events));
       output.findings.push(
         makeFinding("agentci/broad-write-permissions", {
           file,
           job: jobName,
           evidence: `effective permissions: ${describePermissions(jobPermissions)}`,
           line: jobLine,
-          events: unionEvents(aiSteps.flatMap((step) => step.events)),
+          events,
+          uncertainEvents: uncertainWitnessEvents(events, aiSteps),
           callChain: context.callChain,
         }),
       );
@@ -1148,6 +1241,7 @@ function analyzeReusableCall(
   rawJob: WorkflowMap,
   jobLine: number,
   events: string[],
+  uncertainEvents: string[],
   creationOnlyEvents: string[],
   permissions: EffectivePermissions,
   repository: RepositoryAnalysis,
@@ -1213,6 +1307,7 @@ function analyzeReusableCall(
 
   return analyzeWorkflow(target, repository, {
     events,
+    uncertainEvents,
     triggerSource: context.triggerSource,
     creationOnlyEvents,
     actorGate: Boolean(context.actorGate) || hasTrustedActorGate(rawJob.if),
@@ -1229,6 +1324,9 @@ function makeFinding(ruleId: string, context: FindingContext): Finding {
   if (!rule) throw new Error(`Unknown rule: ${ruleId}`);
   const chain = context.callChain?.join(">") ?? "";
   const id = `${ruleId}:${context.file}:${context.job ?? ""}:${context.stepIndex ?? ""}:${chain}`;
+  const uncertainEvents = context.events?.filter((event) =>
+    context.uncertainEvents?.includes(event),
+  );
   return {
     id,
     rule_id: rule.id,
@@ -1244,6 +1342,9 @@ function makeFinding(ruleId: string, context: FindingContext): Finding {
     evidence: context.evidence,
     line: context.line,
     reachable_events: context.events,
+    uncertain_reachable_events: uncertainEvents?.length
+      ? uncertainEvents
+      : undefined,
     call_chain:
       context.callChain && context.callChain.length > 0
         ? context.callChain
@@ -1564,6 +1665,20 @@ function shrink(value: string): string {
 
 function unionEvents(events: string[]): string[] {
   return [...new Set(events)].sort();
+}
+
+function uncertainWitnessEvents(
+  events: string[],
+  witnesses: Array<{ events: string[]; uncertainEvents: string[] }>,
+): string[] {
+  return events.filter(
+    (event) =>
+      !witnesses.some(
+        (witness) =>
+          witness.events.includes(event) &&
+          !witness.uncertainEvents.includes(event),
+      ),
+  );
 }
 
 function mergeOutput(target: AnalysisOutput, source: AnalysisOutput): void {

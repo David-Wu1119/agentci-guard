@@ -21,6 +21,9 @@ it("reports attribution-only changes in the behavioral diff", () => {
     step: "same name",
     step_index: 0,
     line: 5,
+    reachable_events: ["push"],
+    uncertain_reachable_events: [],
+    call_chain: [],
   };
   const diagnostic = {
     code: "agentci/analysis-agent-event-unknown",
@@ -38,6 +41,7 @@ it("reports attribution-only changes in the behavioral diff", () => {
     kind: "action",
     line: 5,
     reachable_events: ["push"],
+    uncertain_reachable_events: [],
     call_chain: [],
   };
   const cases = [
@@ -55,6 +59,30 @@ it("reports attribution-only changes in the behavioral diff", () => {
       "finding-line",
       { findings: [finding] },
       { findings: [{ ...finding, line: 6 }] },
+    ],
+    [
+      "finding-event",
+      { findings: [finding] },
+      { findings: [{ ...finding, reachable_events: ["issues"] }] },
+    ],
+    [
+      "finding-uncertainty",
+      { findings: [finding] },
+      { findings: [{ ...finding, uncertain_reachable_events: ["push"] }] },
+    ],
+    [
+      "finding-caller",
+      { findings: [finding] },
+      { findings: [{ ...finding, call_chain: ["wf.yml#caller"] }] },
+    ],
+    [
+      "agent-usage-uncertainty",
+      { agent_usage_records: [agentUsage] },
+      {
+        agent_usage_records: [
+          { ...agentUsage, uncertain_reachable_events: ["push"] },
+        ],
+      },
     ],
     [
       "diagnostic-step",
@@ -97,7 +125,7 @@ it("reports attribution-only changes in the behavioral diff", () => {
     commit: "abcdef123456",
     scanner_version: "test",
     dist_cli_sha256: "test",
-    report_schema_version: 3,
+    report_schema_version: 4,
     manifest_sha256: "same-manifest",
   };
   try {
@@ -122,7 +150,7 @@ it("reports attribution-only changes in the behavioral diff", () => {
     );
     for (const [id] of cases)
       expect(output).toContain(`## ${id} (example/repo)`);
-    expect(output).toContain("7 of 7 cases changed.");
+    expect(output).toContain("11 of 11 cases changed.");
     expect(output).toMatch(
       /## agent-usage-step \(example\/repo\)\n- agent usage removed:/,
     );
@@ -141,10 +169,11 @@ it("rejects comparisons with an old or unknown report schema", () => {
   const meta = { commit: "abcdef123456", scanner_version: "test" };
   try {
     for (const [beforeVersion, afterVersion] of [
-      [undefined, 3],
-      [1, 3],
-      [2, 3],
-      [2, 2],
+      [undefined, 4],
+      [1, 4],
+      [2, 4],
+      [3, 4],
+      [3, 3],
     ]) {
       writeFileSync(
         beforePath,
@@ -185,7 +214,7 @@ it("rejects comparisons across different manifest bytes", () => {
   const meta = {
     commit: "abcdef123456",
     scanner_version: "test",
-    report_schema_version: 3,
+    report_schema_version: 4,
   };
   try {
     writeFileSync(

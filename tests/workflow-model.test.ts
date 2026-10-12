@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { narrowEvents } from "../src/index.js";
+import { narrowEventsDetailed } from "../src/workflow-model.js";
 
 const EVENTS = ["push", "pull_request", "pull_request_target"];
 
@@ -109,5 +110,23 @@ describe("event-specific reachability", () => {
       events: [],
       complete: true,
     });
+  });
+
+  it("distinguishes known-true, unknown, and known-false events", () => {
+    const events = ["issues", "discussion_comment", "push"];
+    const condition =
+      "github.event_name == 'issues' || (github.event_name == 'discussion_comment' && steps.gate.outputs.ok)";
+    expect(narrowEventsDetailed(events, condition)).toEqual({
+      events: ["issues", "discussion_comment"],
+      unknownEvents: ["discussion_comment"],
+      complete: false,
+    });
+    expect(narrowEvents(events, condition)).toEqual({
+      events: ["issues", "discussion_comment"],
+      complete: false,
+    });
+    expect(
+      narrowEventsDetailed(events, "false && steps.gate.outputs.ok"),
+    ).toEqual({ events: [], unknownEvents: [], complete: true });
   });
 });

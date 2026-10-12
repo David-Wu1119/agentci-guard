@@ -1,3 +1,4 @@
+// Development scoring only; formal v4 requires locked per-rule witnesses and unit projection.
 export function sameUnit(annotation, candidate) {
   if (
     candidate.file !== annotation.workflow_file ||
@@ -60,26 +61,36 @@ export function relevantDiagnostics(annotation, result) {
 }
 
 export function predict(annotation, result, agentDetectionTask) {
-  const positive =
+  const candidates =
     annotation.rule_id === agentDetectionTask
-      ? result.agent_usages.some((usage) => sameUnit(annotation, usage))
-      : result.findings.some(
+      ? result.agent_usages.filter((usage) => sameUnit(annotation, usage))
+      : result.findings.filter(
           (finding) =>
             finding.rule_id === annotation.rule_id &&
             sameUnit(annotation, finding),
         );
-  if (positive) return "positive";
-  if (
-    annotation.rule_id === "agentci/gated-ai-write-token" &&
-    result.findings.some(
-      (finding) =>
-        finding.rule_id === "agentci/untrusted-ai-write-token" &&
-        sameUnit(annotation, finding),
-    )
-  ) {
-    return "negative";
-  }
+  if (candidates.some(confirmedEvent)) return "positive";
+  const ungated =
+    annotation.rule_id === "agentci/gated-ai-write-token"
+      ? result.findings.filter(
+          (finding) =>
+            finding.rule_id === "agentci/untrusted-ai-write-token" &&
+            sameUnit(annotation, finding),
+        )
+      : [];
+  if (ungated.some(confirmedEvent)) return "negative";
+  if (candidates.length > 0 || ungated.length > 0) return "unknown";
   return relevantDiagnostics(annotation, result).length > 0
     ? "unknown"
     : "negative";
+}
+
+function confirmedEvent(candidate) {
+  const uncertain = candidate.uncertain_reachable_events;
+  return (
+    !uncertain?.length ||
+    (candidate.reachable_events ?? []).some(
+      (event) => !uncertain.includes(event),
+    )
+  );
 }

@@ -19,7 +19,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-const REPORT_SCHEMA_VERSION = 3;
+const REPORT_SCHEMA_VERSION = 4;
 const args = process.argv.slice(2);
 const flag = (name) => {
   const index = args.indexOf(name);
@@ -94,6 +94,9 @@ function report(outDir) {
           kind: usage.kind,
           line: usage.line ?? null,
           reachable_events: [...usage.reachable_events].sort(),
+          uncertain_reachable_events: [
+            ...(usage.uncertain_reachable_events ?? []),
+          ].sort(),
           call_chain: usage.call_chain ?? [],
         }))
         .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
@@ -106,6 +109,11 @@ function report(outDir) {
           step: finding.step ?? null,
           step_index: finding.step_index ?? null,
           line: finding.line ?? null,
+          reachable_events: [...(finding.reachable_events ?? [])].sort(),
+          uncertain_reachable_events: [
+            ...(finding.uncertain_reachable_events ?? []),
+          ].sort(),
+          call_chain: finding.call_chain ?? [],
         }))
         .sort(sortFinding),
       by_severity: bySeverity,
@@ -278,6 +286,7 @@ function compare(beforePath, afterPath) {
                 usage.kind,
                 usage.line ?? null,
                 usage.reachable_events,
+                usage.uncertain_reachable_events,
                 usage.call_chain ?? [],
               ]),
             )
@@ -292,6 +301,9 @@ function compare(beforePath, afterPath) {
                 f.step ?? null,
                 f.step_index ?? null,
                 f.line ?? null,
+                f.reachable_events,
+                f.uncertain_reachable_events,
+                f.call_chain ?? [],
               ]),
             )
             .sort(),
