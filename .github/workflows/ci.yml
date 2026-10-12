@@ -142,7 +142,43 @@ jobs:
           node -e 'const r = JSON.parse(require("node:fs").readFileSync(process.env.OUTPUT_JSON_PATH, "utf8")); if (r.findings.length !== 0 || r.agent_usages.length !== 0 || r.analysis_complete !== true) process.exit(1)'
           test "$ANALYSIS_COMPLETE" = "true"
 
+      - name: Capture synthetic E3 Action inputs
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { createHash } from 'node:crypto';
+          import { execFileSync } from 'node:child_process';
+          import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+          import path from 'node:path';
+
+          const root = 'corpus/adversarial/cases/local-reusable';
+          const source = '.github/workflows/caller.yml';
+          const output = 'artifacts/reusable.json';
+          assert(!existsSync(output), 'Action JSON must be absent before the Action runs');
+          const hash = (file) => createHash('sha256').update(readFileSync(file)).digest('hex');
+          const workflows = readdirSync(path.join(root, '.github/workflows'), { withFileTypes: true })
+            .filter((entry) => entry.isFile() && /\.ya?ml$/.test(entry.name))
+            .map((entry) => `.github/workflows/${entry.name}`);
+          const configs = ['agentci.config.json', '.agentcirc.json']
+            .filter((file) => existsSync(path.join(root, file)));
+          const input_files = [...workflows, ...configs].sort()
+            .map((file) => ({ path: file, sha256: hash(path.join(root, file)) }));
+          assert.deepEqual(workflows.sort(), [
+            '.github/workflows/bridge.yml',
+            '.github/workflows/caller.yml',
+            '.github/workflows/reusable.yml',
+          ]);
+          assert.equal(configs.length, 0);
+          mkdirSync('artifacts', { recursive: true });
+          writeFileSync('artifacts/e3-reusable-preflight.json', JSON.stringify({
+            case_id: 'synthetic-reusable', source_path: source, input_files,
+            action_commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+            action_bundle_sha256: hash('dist/action.js'),
+          }));
+          NODE
+
       - name: Action smoke - reusable caller chain
+        id: reusable
         uses: ./
         with:
           path: corpus/adversarial/cases/local-reusable
@@ -151,8 +187,66 @@ jobs:
           fail-on: none
 
       - name: Verify reusable caller chain in Action JSON
+        env:
+          E3_ACTION_OUTCOME: ${{ steps.reusable.outcome }}
         run: |
           node -e 'const assert = require("node:assert/strict"); const r = JSON.parse(require("node:fs").readFileSync("artifacts/reusable.json", "utf8")); assert.deepEqual(r.agent_usages[0]?.call_chain, [".github/workflows/caller.yml#agent", ".github/workflows/bridge.yml#agent"]); assert(r.findings.some((f) => f.call_chain?.[0] === ".github/workflows/caller.yml#agent"))'
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { createHash } from 'node:crypto';
+          import { readFileSync } from 'node:fs';
+          import { loadActionRun, projectPrimary } from './scripts/benchmark/v4-primary-projection.mjs';
+
+          const preflight = JSON.parse(readFileSync('artifacts/e3-reusable-preflight.json', 'utf8'));
+          const source = preflight.source_path;
+          const caseRecord = {
+            case_id: preflight.case_id, source_path: source,
+            sha256: preflight.input_files.find((file) => file.path === source).sha256,
+          };
+          const jsonPath = 'artifacts/reusable.json';
+          const runReceipt = {
+            case_id: preflight.case_id,
+            source_path: source,
+            action_commit: preflight.action_commit,
+            input_files: preflight.input_files,
+            output_sha256: createHash('sha256').update(readFileSync(jsonPath)).digest('hex'),
+            outcome: process.env.E3_ACTION_OUTCOME,
+            fail_on: 'none',
+          };
+          const { result, run_incomplete } = await loadActionRun({
+            caseRecord,
+            inputRoot: 'corpus/adversarial/cases/local-reusable',
+            actionBundlePath: 'dist/action.js',
+            expectedBundleSha256: preflight.action_bundle_sha256,
+            expectedActionCommit: preflight.action_commit,
+            jsonPath,
+            outputRoot: 'artifacts',
+            runReceipt,
+          });
+          assert.equal(run_incomplete, false);
+          const row = (unit_id, scope, rule_id) => ({
+            unit_id, case_id: caseRecord.case_id, source_path: source,
+            scope, job_id: 'agent', step_index: null, rule_id,
+          });
+          const registryRows = [
+            row('agent-usage', 'reusable-call', 'agentci/agent-usage'),
+            row('prompt', 'reusable-call', 'agentci/untrusted-input-in-prompt'),
+            row('shell', 'reusable-call', 'agentci/ai-shell-access'),
+            row('gated-write', 'job', 'agentci/gated-ai-write-token'),
+            row('broad-write', 'job', 'agentci/broad-write-permissions'),
+          ];
+          const expectedUnitIds = ['agent-usage', 'prompt', 'shell', 'gated-write', 'broad-write'];
+          const projected = projectPrimary({ caseRecord, registryRows, expectedUnitIds, result });
+          assert.deepEqual(projected.parse_gap_unit_ids, []);
+          assert.deepEqual(projected.out_of_scope_records, []);
+          assert.deepEqual(projected.units.map((unit) => [unit.unit_id, unit.alert, unit.matched_records]), [
+            ['agent-usage', true, [{ kind: 'agent_usage', index: 0, id: '.github/workflows/reusable.yml:agent:0:.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],
+            ['prompt', true, [{ kind: 'finding', index: 0, id: 'agentci/untrusted-input-in-prompt:.github/workflows/reusable.yml:agent:0:.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],
+            ['shell', true, [{ kind: 'finding', index: 1, id: 'agentci/ai-shell-access:.github/workflows/reusable.yml:agent:0:.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],
+            ['gated-write', true, [{ kind: 'finding', index: 2, id: 'agentci/gated-ai-write-token:.github/workflows/reusable.yml:agent::.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],
+            ['broad-write', true, [{ kind: 'finding', index: 3, id: 'agentci/broad-write-permissions:.github/workflows/reusable.yml:agent::.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],
+          ]);
+          NODE
 
       - name: Action smoke - JSON omitted
         id: no-json
