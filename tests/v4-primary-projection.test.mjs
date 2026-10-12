@@ -116,17 +116,24 @@ function actionRun(result = scan()) {
   const inputRoot = path.join(temporary, "input");
   const outputRoot = path.join(temporary, "output");
   const snapshotPath = path.join(inputRoot, source);
-  const actionBundlePath = path.join(temporary, "action.js");
+  const actionManifestPath = path.join(temporary, "action", "action.yml");
+  const actionBundlePath = path.join(temporary, "action", "dist", "action.js");
+  const lockfilePath = path.join(temporary, "action", "pnpm-lock.yaml");
   const jsonPath = path.join(outputRoot, "scan.json");
   const snapshot =
     "on: issue_comment\njobs:\n  agent:\n    runs-on: ubuntu-latest\n";
   const bundle = "// synthetic Action bundle\n";
+  const manifest = "runs:\n  using: node24\n  main: dist/action.js\n";
+  const lockfile = "lockfileVersion: '9.0'\n";
   const boundResult = { ...result, root: inputRoot };
   const json = JSON.stringify(boundResult);
   mkdirSync(path.dirname(snapshotPath), { recursive: true });
+  mkdirSync(path.dirname(actionBundlePath), { recursive: true });
   mkdirSync(outputRoot);
   writeFileSync(snapshotPath, snapshot);
   writeFileSync(actionBundlePath, bundle);
+  writeFileSync(actionManifestPath, manifest);
+  writeFileSync(lockfilePath, lockfile);
   writeFileSync(jsonPath, json);
   const selectedCase = { ...caseRecord, sha256: sha256(snapshot) };
   const actionCommit = "a".repeat(40);
@@ -134,6 +141,8 @@ function actionRun(result = scan()) {
     case_id: selectedCase.case_id,
     source_path: selectedCase.source_path,
     action_commit: actionCommit,
+    action_manifest_sha256: sha256(manifest),
+    lockfile_sha256: sha256(lockfile),
     output_sha256: sha256(json),
     input_files: [{ path: source, sha256: selectedCase.sha256 }],
     outcome: "success",
@@ -143,13 +152,19 @@ function actionRun(result = scan()) {
     temporary,
     result: boundResult,
     snapshotPath,
+    actionManifestPath,
     actionBundlePath,
+    lockfilePath,
     jsonPath,
     options: {
       caseRecord: selectedCase,
       inputRoot,
+      actionManifestPath,
       actionBundlePath,
+      lockfilePath,
+      expectedManifestSha256: sha256(manifest),
       expectedBundleSha256: sha256(bundle),
+      expectedLockfileSha256: sha256(lockfile),
       expectedActionCommit: actionCommit,
       jsonPath,
       outputRoot,
@@ -241,6 +256,32 @@ describe("synthetic E3 Action run binding", () => {
           },
         }),
       ).rejects.toThrow();
+    } finally {
+      rmSync(fixture.temporary, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects an altered Action manifest or lockfile even when the bundle is unchanged", async () => {
+    const fixture = actionRun();
+    try {
+      const redirected = "runs:\n  using: node24\n  main: other.js\n";
+      writeFileSync(fixture.actionManifestPath, redirected);
+      await expect(
+        load({
+          ...fixture.options,
+          expectedManifestSha256: sha256(redirected),
+          runReceipt: {
+            ...fixture.options.runReceipt,
+            action_manifest_sha256: sha256(redirected),
+          },
+        }),
+      ).rejects.toThrow();
+      writeFileSync(
+        fixture.actionManifestPath,
+        "runs:\n  using: node24\n  main: dist/action.js\n",
+      );
+      writeFileSync(fixture.lockfilePath, "lockfileVersion: '10.0'\n");
+      await expect(load(fixture.options)).rejects.toThrow();
     } finally {
       rmSync(fixture.temporary, { recursive: true, force: true });
     }

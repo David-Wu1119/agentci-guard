@@ -233,8 +233,12 @@ export async function loadActionRun(options) {
   const {
     caseRecord,
     inputRoot,
+    actionManifestPath,
     actionBundlePath,
+    lockfilePath,
+    expectedManifestSha256,
     expectedBundleSha256,
+    expectedLockfileSha256,
     expectedActionCommit,
     jsonPath,
     outputRoot,
@@ -255,7 +259,9 @@ export async function loadActionRun(options) {
     "invalid source path",
   );
   requireValue(validHash(caseRecord.sha256), "invalid source digest");
+  requireValue(validHash(expectedManifestSha256), "invalid manifest digest");
   requireValue(validHash(expectedBundleSha256), "invalid bundle digest");
+  requireValue(validHash(expectedLockfileSha256), "invalid lockfile digest");
   requireValue(
     /^[0-9a-f]{40}$/.test(expectedActionCommit),
     "invalid Action commit",
@@ -271,6 +277,14 @@ export async function loadActionRun(options) {
   requireValue(
     runReceipt.action_commit === expectedActionCommit,
     "receipt Action commit mismatch",
+  );
+  requireValue(
+    runReceipt.action_manifest_sha256 === expectedManifestSha256,
+    "receipt manifest digest mismatch",
+  );
+  requireValue(
+    runReceipt.lockfile_sha256 === expectedLockfileSha256,
+    "receipt lockfile digest mismatch",
   );
   requireValue(runReceipt.fail_on === "none", "Action must use fail-on none");
   requireValue(
@@ -306,6 +320,25 @@ export async function loadActionRun(options) {
   requireValue(
     digest(await regularBytes(actionBundlePath)) === expectedBundleSha256,
     "Action bundle hash mismatch",
+  );
+  const manifestBytes = await regularBytes(actionManifestPath);
+  requireValue(
+    digest(manifestBytes) === expectedManifestSha256,
+    "Action manifest hash mismatch",
+  );
+  requireValue(
+    digest(await regularBytes(lockfilePath)) === expectedLockfileSha256,
+    "dependency lockfile hash mismatch",
+  );
+  const manifest = YAML.parse(manifestBytes.toString("utf8"));
+  requireValue(
+    isRecord(manifest) &&
+      isRecord(manifest.runs) &&
+      manifest.runs.using === "node24" &&
+      manifest.runs.main === "dist/action.js" &&
+      path.resolve(path.dirname(actionManifestPath), manifest.runs.main) ===
+        path.resolve(actionBundlePath),
+    "Action manifest runtime or entrypoint mismatch",
   );
 
   const root = path.resolve(outputRoot);

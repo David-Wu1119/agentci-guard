@@ -173,7 +173,9 @@ jobs:
           writeFileSync('artifacts/e3-reusable-preflight.json', JSON.stringify({
             case_id: 'synthetic-reusable', source_path: source, input_files,
             action_commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+            action_manifest_sha256: hash('action.yml'),
             action_bundle_sha256: hash('dist/action.js'),
+            lockfile_sha256: hash('pnpm-lock.yaml'),
           }));
           NODE
 
@@ -213,6 +215,8 @@ jobs:
             case_id: preflight.case_id,
             source_path: source,
             action_commit: preflight.action_commit,
+            action_manifest_sha256: preflight.action_manifest_sha256,
+            lockfile_sha256: preflight.lockfile_sha256,
             input_files: preflight.input_files,
             output_sha256: outputSha256,
             outcome: process.env.E3_ACTION_OUTCOME,
@@ -221,8 +225,12 @@ jobs:
           const { result, run_incomplete } = await loadActionRun({
             caseRecord,
             inputRoot: 'corpus/adversarial/cases/local-reusable',
+            actionManifestPath: 'action.yml',
             actionBundlePath: 'dist/action.js',
+            lockfilePath: 'pnpm-lock.yaml',
+            expectedManifestSha256: preflight.action_manifest_sha256,
             expectedBundleSha256: preflight.action_bundle_sha256,
+            expectedLockfileSha256: preflight.lockfile_sha256,
             expectedActionCommit: preflight.action_commit,
             jsonPath,
             outputRoot: 'artifacts',
