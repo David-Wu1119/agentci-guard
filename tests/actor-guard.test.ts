@@ -201,6 +201,24 @@ jobs:
     expect(hasWriteTokenFinding(rules)).toBe(false);
   });
 
+  it("does not trust the parent Issue inside an owner commenter's event JSON", () => {
+    const rules = ruleIds(`
+on:
+  issue_comment:
+    types: [created]
+permissions:
+  contents: write
+jobs:
+  respond:
+    runs-on: ubuntu-latest
+    if: github.event.comment.author_association == 'OWNER'
+    steps:
+      - run: claude -p "\${{ toJSON(github.event) }}"
+`);
+    expect(rules).toContain("agentci/untrusted-input-in-prompt");
+    expect(hasWriteTokenFinding(rules)).toBe(true);
+  });
+
   it.each(["MEMBER", "COLLABORATOR"])(
     "does not equate %s association with repository write access",
     (association) => {

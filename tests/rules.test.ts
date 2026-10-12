@@ -72,6 +72,157 @@ jobs:
     expect(rules).toContain("agentci/untrusted-input-in-prompt");
   });
 
+  it("traces a serialized issue-comment payload passed into the agent prompt", () => {
+    const rules = rulesFor(`
+on:
+  issue_comment:
+    types: [created]
+permissions:
+  contents: write
+env:
+  PAYLOAD: \${{ toJSON(github.event) }}
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - run: claude -p "$PAYLOAD"
+`);
+    expect(rules).toContain("agentci/untrusted-input-in-prompt");
+    expect(rules).toContain("agentci/untrusted-ai-write-token");
+  });
+
+  it("does not generalize serialized event payload matching to push", () => {
+    const rules = rulesFor(`
+on: push
+permissions:
+  contents: write
+env:
+  PAYLOAD: \${{ toJSON(github.event) }}
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - run: claude -p "$PAYLOAD"
+`);
+    expect(rules).not.toContain("agentci/untrusted-input-in-prompt");
+    expect(rules).not.toContain("agentci/untrusted-ai-write-token");
+  });
+
+  it("does not treat unused Action environment JSON as agent task input", () => {
+    const rules = rulesFor(`
+on:
+  issue_comment:
+    types: [created]
+permissions:
+  contents: write
+env:
+  UNUSED_EVENT_LOG: \${{ toJSON(github.event) }}
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc
+        with:
+          prompt: Review this issue.
+          anthropic_api_key: \${{ secrets.ANTHROPIC_API_KEY }}
+`);
+    expect(rules).not.toContain("agentci/untrusted-input-in-prompt");
+    expect(rules).not.toContain("agentci/untrusted-ai-write-token");
+  });
+
+  it("traces serialized event JSON referenced by an Action prompt", () => {
+    const rules = rulesFor(`
+on:
+  issue_comment:
+    types: [created]
+permissions:
+  contents: write
+env:
+  PAYLOAD: \${{ toJSON(github.event) }}
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc
+        with:
+          prompt: \${{ env.PAYLOAD }}
+          anthropic_api_key: \${{ secrets.ANTHROPIC_API_KEY }}
+`);
+    expect(rules).toContain("agentci/untrusted-input-in-prompt");
+    expect(rules).toContain("agentci/untrusted-ai-write-token");
+  });
+
+  it("traces a standalone event serialization in an Action prompt", () => {
+    const rules = rulesFor(`
+on: issue_comment
+permissions:
+  contents: write
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc
+        with:
+          prompt: \${{ toJSON(github.event) }}
+          anthropic_api_key: \${{ secrets.ANTHROPIC_API_KEY }}
+`);
+    expect(rules).toContain("agentci/untrusted-input-in-prompt");
+  });
+
+  it("treats a tag-mode Action prompt as agent input", () => {
+    const rules = rulesFor(`
+on: issue_comment
+permissions:
+  contents: write
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc
+        with:
+          prompt: \${{ toJSON(github.event) }}
+          track_progress: "true"
+          anthropic_api_key: \${{ secrets.ANTHROPIC_API_KEY }}
+`);
+    expect(rules).toContain("agentci/untrusted-input-in-prompt");
+  });
+
+  it("does not treat an unsupported Action input as prompt text", () => {
+    const rules = rulesFor(`
+on: issue_comment
+permissions:
+  contents: write
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc
+        with:
+          prompt: Review this issue.
+          unused_event_log: \${{ toJSON(github.event) }}
+          anthropic_api_key: \${{ secrets.ANTHROPIC_API_KEY }}
+`);
+    expect(rules).not.toContain("agentci/untrusted-input-in-prompt");
+    expect(rules).not.toContain("agentci/untrusted-ai-write-token");
+  });
+
+  it("does not claim whole-event prompt ingestion for an unverified Action ref", () => {
+    const rules = rulesFor(`
+on: issue_comment
+permissions:
+  contents: write
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          prompt: \${{ toJSON(github.event) }}
+`);
+    expect(rules).not.toContain("agentci/untrusted-input-in-prompt");
+    expect(rules).not.toContain("agentci/untrusted-ai-write-token");
+  });
+
   it("attributes a prompt finding only to events that supply its input", () => {
     const raw = `
 on: [push, issue_comment]
@@ -186,6 +337,18 @@ jobs:
     expect(
       untrustedGitHubContextEvents("${{ github.event.review_comment.body }}"),
     ).toEqual([]);
+  });
+
+  it("does not treat a boolean use of event JSON as agent task text", () => {
+    expect(
+      untrustedGitHubContextEvents(
+        "${{ contains(toJSON(github.event), 'test') }}",
+      ),
+    ).toEqual([]);
+    expect(untrustedGitHubContextEvents("${{ toJSON(steps) }}")).toEqual([]);
+    expect(untrustedGitHubContextEvents("${{ github.event_path }}")).toEqual(
+      [],
+    );
   });
 
   it("does not treat a fixed-format pull request SHA as prompt injection text", () => {

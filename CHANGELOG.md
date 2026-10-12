@@ -53,6 +53,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A standalone `toJSON(github.event)` from `issue_comment` now counts as both
+  comment and parent Issue/PR text when passed to a local AI CLI, or to a
+  verified Anthropic Action's direct prompt or bare environment reference. An unused Action
+  environment value, unsupported input, or Boolean use does not count as task
+  text. Compound Action prompt expressions and other event containers remain
+  outside this narrow fix. A schema-v4 before/after comparison changed 0 of
+  152 fixed public development workflows; this is not measured accuracy.
 - `pull_request_review_comment` no longer treats nonexistent
   `github.event.review_comment.body` as attacker text. The documented
   `github.event.comment.body` route remains recognized; this is a narrow

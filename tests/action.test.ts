@@ -36,7 +36,7 @@ function captureIo(): ActionIo & { logs: string[]; errors: string[] } {
 }
 
 describe("JavaScript Action entrypoint", () => {
-  it("keeps the synthetic Action receipt and raw evidence in the same CI job", async () => {
+  it("keeps synthetic Action regressions and raw evidence in the same CI job", async () => {
     const ci = YAML.parse(
       await fs.readFile(".github/workflows/ci.yml", "utf8"),
     ) as {
@@ -56,6 +56,25 @@ describe("JavaScript Action entrypoint", () => {
       };
     };
     const steps = ci.jobs.verify.steps;
+    const eventIndex = steps.findIndex((step) => step.id === "event_json");
+    expect(steps[eventIndex]).toMatchObject({
+      uses: "./",
+      with: {
+        path: "corpus/adversarial/cases/issue-comment-event-json",
+        sarif: "artifacts/event-json.sarif",
+        json: "artifacts/event-json.json",
+        "fail-on": "none",
+      },
+    });
+    expect(steps[eventIndex + 1].env?.OUTPUT_JSON_SHA256).toBe(
+      "${{ steps.event_json.outputs.json-sha256 }}",
+    );
+    expect(steps[eventIndex + 1].run).toContain(
+      "agentci/untrusted-input-in-prompt",
+    );
+    expect(steps[eventIndex + 1].run).toContain(
+      "agentci/untrusted-ai-write-token",
+    );
     const actionIndex = steps.findIndex((step) => step.id === "reusable");
     expect(steps[actionIndex - 1].run).toContain(
       "['show', `${actionCommit}:${file}`]",
@@ -116,6 +135,7 @@ describe("JavaScript Action entrypoint", () => {
       "artifacts/e4-incomplete-receipt.json",
     );
     for (const run of [
+      steps[eventIndex + 1].run,
       steps[actionIndex - 1].run,
       steps[actionIndex + 1].run,
       steps[actionIndex + 3].run,

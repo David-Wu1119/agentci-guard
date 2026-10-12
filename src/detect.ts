@@ -85,6 +85,7 @@ const UNTRUSTED_CONTEXT_PATTERNS: Array<{
     | "review"
     | "commit"
     | "other";
+  wholeEvent?: boolean;
 }> = [
   {
     pattern:
@@ -133,6 +134,20 @@ const UNTRUSTED_CONTEXT_PATTERNS: Array<{
       "discussion_comment",
       "pull_request_review_comment",
     ],
+  },
+  {
+    // shortcut: recognize only standalone serialization; nested expressions need result-aware dataflow.
+    pattern: /^\s*toJSON\s*\(\s*github\.event\s*\)\s*$/i,
+    source: "comment",
+    events: ["issue_comment"],
+    wholeEvent: true,
+  },
+  {
+    pattern: /^\s*toJSON\s*\(\s*github\.event\s*\)\s*$/i,
+    source: "issue",
+    events: ["issue_comment"],
+    parentEvents: ["issue_comment"],
+    wholeEvent: true,
   },
   {
     pattern:
@@ -1446,9 +1461,14 @@ function matchingGitHubContextPatterns(value: string): ContextPattern[] {
 export function untrustedGitHubContextMatches(value: string): Array<{
   event: string;
   source: ContextPattern["source"];
+  wholeEvent: boolean;
 }> {
   return matchingGitHubContextPatterns(value).flatMap((candidate) =>
-    candidate.events.map((event) => ({ event, source: candidate.source })),
+    candidate.events.map((event) => ({
+      event,
+      source: candidate.source,
+      wholeEvent: candidate.wholeEvent ?? false,
+    })),
   );
 }
 

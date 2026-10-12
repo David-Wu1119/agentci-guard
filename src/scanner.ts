@@ -1130,7 +1130,26 @@ function analyzeWorkflow(
           literalGithubOutputWrite ? [] : stepReachability.events,
         );
       }
-      const sinkMatches = activeMatches(sinkMaterial);
+      const actionPrompt = isRecord(rawStep.with) ? rawStep.with.prompt : "";
+      // shortcut: whole-event JSON only via direct prompt/bare env; compound prompts need result-aware dataflow.
+      const actionPromptMaterial = materializeInputs(
+        JSON.stringify({
+          prompt: actionPrompt,
+          env: referencedEnvironment(String(actionPrompt ?? ""), ""),
+        }),
+        context.inputValues,
+      );
+      const sinkMatches = stepUsesAiAction
+        ? [
+            ...activeMatches(sinkMaterial).filter((match) => !match.wholeEvent),
+            ...(pinnedAnthropicRef === ANTHROPIC_ACTION_WITHOUT_DISCUSSION ||
+            pinnedAnthropicRef === ANTHROPIC_ACTION_AGENT_PROMPT_VERIFIED
+              ? activeMatches(actionPromptMaterial).filter(
+                  (match) => match.wholeEvent,
+                )
+              : []),
+          ]
+        : activeMatches(sinkMaterial);
       const pipedInputMatches = cliInvocations.flatMap((invocation) =>
         activeMatches(invocation.pipedInput),
       );

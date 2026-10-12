@@ -201,6 +201,7 @@ declare const UNTRUSTED_CONTEXT_PATTERNS: Array<{
     events: string[];
     parentEvents?: string[];
     source: "issue" | "pull_request" | "pr_head_ref" | "discussion" | "comment" | "review" | "commit" | "other";
+    wholeEvent?: boolean;
 }>;
 /**
  * anthropics/claude-code-action refuses to run for users without repository
@@ -271,6 +272,7 @@ type ContextPattern = (typeof UNTRUSTED_CONTEXT_PATTERNS)[number];
 declare function untrustedGitHubContextMatches(value: string): Array<{
     event: string;
     source: ContextPattern["source"];
+    wholeEvent: boolean;
 }>;
 /** With parentOnly, keep only fields whose author can differ from the commenter. */
 declare function untrustedGitHubContextEvents(value: string, parentOnly?: boolean): string[];

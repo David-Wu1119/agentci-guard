@@ -11038,6 +11038,20 @@ var UNTRUSTED_CONTEXT_PATTERNS = [
     ]
   },
   {
+    // shortcut: recognize only standalone serialization; nested expressions need result-aware dataflow.
+    pattern: /^\s*toJSON\s*\(\s*github\.event\s*\)\s*$/i,
+    source: "comment",
+    events: ["issue_comment"],
+    wholeEvent: true
+  },
+  {
+    pattern: /^\s*toJSON\s*\(\s*github\.event\s*\)\s*$/i,
+    source: "issue",
+    events: ["issue_comment"],
+    parentEvents: ["issue_comment"],
+    wholeEvent: true
+  },
+  {
     pattern: /(?:^|[^A-Za-z0-9_.])github\.event\.review\.body(?![A-Za-z0-9_-])/i,
     source: "review",
     events: ["pull_request_review"]
@@ -11960,7 +11974,11 @@ function matchingGitHubContextPatterns(value) {
 }
 function untrustedGitHubContextMatches(value) {
   return matchingGitHubContextPatterns(value).flatMap(
-    (candidate) => candidate.events.map((event) => ({ event, source: candidate.source }))
+    (candidate) => candidate.events.map((event) => ({
+      event,
+      source: candidate.source,
+      wholeEvent: candidate.wholeEvent ?? false
+    }))
   );
 }
 function containsSecretReference(value) {
@@ -13385,7 +13403,20 @@ ${writerInput.material}`,
           literalGithubOutputWrite ? [] : stepReachability.events
         );
       }
-      const sinkMatches = activeMatches(sinkMaterial);
+      const actionPrompt = isRecord2(rawStep.with) ? rawStep.with.prompt : "";
+      const actionPromptMaterial = materializeInputs(
+        JSON.stringify({
+          prompt: actionPrompt,
+          env: referencedEnvironment(String(actionPrompt ?? ""), "")
+        }),
+        context.inputValues
+      );
+      const sinkMatches = stepUsesAiAction ? [
+        ...activeMatches(sinkMaterial).filter((match) => !match.wholeEvent),
+        ...pinnedAnthropicRef === ANTHROPIC_ACTION_WITHOUT_DISCUSSION || pinnedAnthropicRef === ANTHROPIC_ACTION_AGENT_PROMPT_VERIFIED ? activeMatches(actionPromptMaterial).filter(
+          (match) => match.wholeEvent
+        ) : []
+      ] : activeMatches(sinkMaterial);
       const pipedInputMatches = cliInvocations.flatMap(
         (invocation) => activeMatches(invocation.pipedInput)
       );
