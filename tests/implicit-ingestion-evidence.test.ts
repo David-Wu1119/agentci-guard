@@ -395,6 +395,141 @@ jobs:
     expect(result.analysis_complete).toBe(false);
   });
 
+  it("does not treat an unused untrusted or secret env value as a literal GITHUB_ENV export", () => {
+    const raw = `
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          TITLE: \${{ github.event.issue.title }}
+          UNUSED_TOKEN: \${{ secrets.SERVICE_TOKEN }}
+        run: echo "SAFE=ok" >> "$GITHUB_ENV"
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: "Reply to \${{ github.event.issue.body }}"
+`;
+    const result = scanWorkflowFiles(
+      [parseWorkflowFile(".github/workflows/review.yml", raw)],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(diagnostics(result)).not.toContain(
+      "agentci/analysis-run-dataflow-unknown",
+    );
+    expect(diagnostics(result)).not.toContain(
+      "agentci/analysis-secret-env-transfer-unknown",
+    );
+    expect(rules(result)).toContain("agentci/gated-ai-write-token");
+    expect(result.analysis_complete).toBe(true);
+  });
+
+  it("does not exempt a literal echo when BASH_ENV can change its behavior", () => {
+    const raw = `
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          TITLE: \${{ github.event.issue.title }}
+          BASH_ENV: ./hooks/agent.sh
+        run: echo "SAFE=ok" >> "$GITHUB_ENV"
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: "Reply to \${{ github.event.issue.body }}"
+`;
+    const result = scanWorkflowFiles(
+      [parseWorkflowFile(".github/workflows/review.yml", raw)],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(diagnostics(result)).toContain(
+      "agentci/analysis-run-dataflow-unknown",
+    );
+    expect(result.analysis_complete).toBe(false);
+  });
+
+  it("does not exempt a later literal echo after a prior step can change Bash startup", () => {
+    const raw = `
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "BASH_ENV=./hooks/agent.sh" >> "$GITHUB_ENV"
+      - env:
+          TITLE: \${{ github.event.issue.title }}
+        run: echo "SAFE=ok" >> "$GITHUB_ENV"
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: "Reply to \${{ github.event.issue.body }}"
+`;
+    const result = scanWorkflowFiles(
+      [parseWorkflowFile(".github/workflows/review.yml", raw)],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(diagnostics(result)).toContain(
+      "agentci/analysis-run-dataflow-unknown",
+    );
+    expect(result.analysis_complete).toBe(false);
+  });
+
+  it.each([
+    'echo "REQUEST=$TITLE" >> "$GITHUB_ENV"',
+    'env >> "$GITHUB_ENV"',
+    'printenv >> "$GITHUB_ENV"',
+    'env | tee -a "$GITHUB_ENV"',
+    'env > /tmp/all; cat /tmp/all >> "$GITHUB_ENV"',
+    'echo\n"SAFE=ok" >> "$GITHUB_ENV"',
+  ])("keeps an unresolved inherited input when %s exports step env", (run) => {
+    const script = run
+      .split("\n")
+      .map((line) => `          ${line}`)
+      .join("\n");
+    const raw = `
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          TITLE: \${{ github.event.issue.title }}
+        run: |
+${script}
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: "Reply to \${{ github.event.issue.body }}"
+`;
+    const result = scanWorkflowFiles(
+      [parseWorkflowFile(".github/workflows/review.yml", raw)],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(diagnostics(result)).toContain(
+      "agentci/analysis-run-dataflow-unknown",
+    );
+    expect(result.analysis_complete).toBe(false);
+  });
+
   it("does not call a job gated when another agent has unresolved inherited untrusted input", () => {
     const raw = `
 on: issue_comment

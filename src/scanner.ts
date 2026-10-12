@@ -717,8 +717,29 @@ function analyzeWorkflow(
           });
         }
       }
+      // shortcut: only the first step's default Ubuntu literal assignment has no prior step state; upgrade with shell dataflow.
+      const defaultUbuntuShell =
+        index === 0 &&
+        typeof rawJob["runs-on"] === "string" &&
+        /^ubuntu-(?:latest|\d{2}\.\d{2})$/.test(rawJob["runs-on"]) &&
+        rawJob.container === undefined &&
+        rawStep.shell === undefined &&
+        doc.defaults === undefined &&
+        rawJob.defaults === undefined;
+      const literalGithubEnvWrite =
+        defaultUbuntuShell &&
+        !Object.keys(effectiveEnvironment).some(
+          (name) =>
+            ["BASH_ENV", "ENV", "BASHOPTS", "SHELLOPTS"].includes(name) ||
+            name.startsWith("BASH_FUNC_"),
+        ) &&
+        /^[ \t]*echo[ \t]+(?:"[A-Za-z_]\w*=[A-Za-z0-9._/-]*"|'[A-Za-z_]\w*=[A-Za-z0-9._/-]*')[ \t]*>>[ \t]*(?:"\$GITHUB_ENV"|\$GITHUB_ENV)[ \t]*$/.test(
+          materializedRun,
+        );
+      const mayTransferToGithubEnv =
+        /\bGITHUB_ENV\b/.test(materializedRun) && !literalGithubEnvWrite;
       if (
-        /\bGITHUB_ENV\b/.test(materializedRun) &&
+        mayTransferToGithubEnv &&
         (containsSecretReference(materializedRun) ||
           containsSecretReference(JSON.stringify(effectiveEnvironment)))
       ) {
@@ -740,7 +761,7 @@ function analyzeWorkflow(
               creationOnlyEvents,
             ),
         );
-      if (/\bGITHUB_ENV\b/.test(materializedRun)) {
+      if (mayTransferToGithubEnv) {
         for (const match of activeMatches(
           JSON.stringify({ run: materializedRun, env: effectiveEnvironment }),
         )) {

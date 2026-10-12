@@ -40,6 +40,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- For a job's first step on a default Ubuntu shell without startup overrides,
+  a single literal `echo "NAME=value" >> "$GITHUB_ENV"` no longer treats unused
+  untrusted or secret step environment values as exported to later AI steps.
+  Variable expansion, environment dumps, pipelines, file hops, later steps,
+  custom shells, and shell-startup overrides remain analysis-incomplete.
+  Synthetic regressions cover both sides; the schema-v4
+  comparison changed 0 of 152 fixed development workflows (4 critical, 36
+  high, 180 medium in both). This is not measured accuracy.
 - Write-token findings now partition disjoint trigger events: a critical path on
   one event no longer makes a separately gated event critical, and uncertainty
   on one event no longer erases a proven finding on another. CLI shell-variable,

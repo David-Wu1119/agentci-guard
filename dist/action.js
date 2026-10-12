@@ -9633,7 +9633,14 @@ function analyzeWorkflow(workflow, repository, context) {
           });
         }
       }
-      if (/\bGITHUB_ENV\b/.test(materializedRun) && (containsSecretReference(materializedRun) || containsSecretReference(JSON.stringify(effectiveEnvironment)))) {
+      const defaultUbuntuShell = index === 0 && typeof rawJob["runs-on"] === "string" && /^ubuntu-(?:latest|\d{2}\.\d{2})$/.test(rawJob["runs-on"]) && rawJob.container === void 0 && rawStep.shell === void 0 && doc.defaults === void 0 && rawJob.defaults === void 0;
+      const literalGithubEnvWrite = defaultUbuntuShell && !Object.keys(effectiveEnvironment).some(
+        (name) => ["BASH_ENV", "ENV", "BASHOPTS", "SHELLOPTS"].includes(name) || name.startsWith("BASH_FUNC_")
+      ) && /^[ \t]*echo[ \t]+(?:"[A-Za-z_]\w*=[A-Za-z0-9._/-]*"|'[A-Za-z_]\w*=[A-Za-z0-9._/-]*')[ \t]*>>[ \t]*(?:"\$GITHUB_ENV"|\$GITHUB_ENV)[ \t]*$/.test(
+        materializedRun
+      );
+      const mayTransferToGithubEnv = /\bGITHUB_ENV\b/.test(materializedRun) && !literalGithubEnvWrite;
+      if (mayTransferToGithubEnv && (containsSecretReference(materializedRun) || containsSecretReference(JSON.stringify(effectiveEnvironment)))) {
         for (const event of stepReachability.events) {
           secretEnvTransferEvents.add(event);
         }
@@ -9649,7 +9656,7 @@ function analyzeWorkflow(workflow, repository, context) {
           creationOnlyEvents
         )
       );
-      if (/\bGITHUB_ENV\b/.test(materializedRun)) {
+      if (mayTransferToGithubEnv) {
         for (const match of activeMatches(
           JSON.stringify({ run: materializedRun, env: effectiveEnvironment })
         )) {
