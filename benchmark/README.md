@@ -47,6 +47,14 @@ checks any public label package.
 `benchmark:smoke` runs the annotation and scoring toolchain using temporary
 synthetic labels only.
 
+For an optional, network-dependent origin check, run
+`pnpm benchmark:verify-upstream` with GitHub CLI access. It checks each v3
+snapshot against the workflow path at its pinned upstream commit and emits a
+JSON receipt; it exits nonzero unless every case matches. This is not part of
+routine CI because upstream repositories can become unavailable. See
+[`../REPRODUCIBILITY.md`](../REPRODUCIBILITY.md#upstream-origin-check) for the
+dated result and limits.
+
 ## Human workflow
 
 Follow the current development-only

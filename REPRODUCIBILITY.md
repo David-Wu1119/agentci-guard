@@ -112,6 +112,34 @@ The collection scripts document how the frozen files were selected, but rerun
 search is not the reproduction unit because public search ranking changes. The
 manifest and snapshots are.
 
+### Upstream origin check
+
+With GitHub CLI access and a network connection, run:
+
+```bash
+pnpm benchmark:verify-upstream
+```
+
+This optional command first validates the checked-in v3 manifest and snapshots,
+then requests each workflow through the GitHub Contents API at the manifest's
+exact repository, path, and commit. It compares returned blob SHA, size, and
+bytes with the frozen snapshot and emits a timestamped JSON receipt. It exits
+nonzero for any mismatch, unavailable upstream, or API error. This check is
+separate from routine CI because it depends on mutable repository availability
+and GitHub API access. It does not prove when or how the original collector
+obtained a snapshot.
+
+At `2026-10-12T02:20:31.944Z`, the check of manifest SHA-256
+`e66632f3926ac9a02c9107907e91d4ff12820fd3c9057f012d272cb8bd00830a`
+found **146 matches, 0 mismatches, 6 HTTP 404 unavailable upstreams, and 0
+other API errors**. The six cases were `ai-008`, `ai-009`, `ai-018`, `ai-021`,
+`ai-040`, and `control-028`. Their repository endpoints also returned HTTP 404
+when checked separately. HTTP 404 establishes that they were inaccessible at
+those names to this account then; it does not establish whether they were
+renamed, made private, or deleted. The six checked-in snapshots still pass the
+offline integrity check, but their repository/commit/path origins are not
+currently independently verifiable. A later run may produce different counts.
+
 ## Annotation toolchain smoke
 
 ```bash
