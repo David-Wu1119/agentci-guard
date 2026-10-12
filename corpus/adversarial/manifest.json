@@ -15,6 +15,18 @@
       "url": "https://docs.github.com/en/actions/reference/evaluate-expressions-in-workflows-and-actions",
       "claim": "Job and step conditions use boolean expressions and GitHub contexts."
     },
+    "event-json": {
+      "type": "primary",
+      "title": "GitHub Actions context and toJSON expression",
+      "url": "https://docs.github.com/en/actions/reference/workflows-and-actions/contexts",
+      "claim": "github.event is the complete webhook payload, and toJSON can serialize a context value for use in an environment variable."
+    },
+    "issue-comment-payload": {
+      "type": "primary",
+      "title": "GitHub issue_comment webhook payload",
+      "url": "https://docs.github.com/en/webhooks/webhook-events-and-payloads#issue_comment",
+      "claim": "The issue_comment created payload contains both a comment object and the parent issue object, including when the comment is on a pull request."
+    },
     "event-security": {
       "type": "primary",
       "title": "Events that trigger workflows",
@@ -1920,6 +1932,68 @@
       },
       "rationale": "google-github-actions publishes auth, setup-gcloud, and deploy actions that are not agents. Matching the organization instead of the exact repository would flag ordinary deployment workflows; this case pins that they stay silent even on an untrusted event with a write token.",
       "assumption_sources": ["project-rule-contract"]
+    },
+    {
+      "id": "issue-comment-event-json",
+      "path": "cases/issue-comment-event-json",
+      "targets": [
+        "complete issue_comment payload passed through env into a local AI CLI"
+      ],
+      "subject": {
+        "file": ".github/workflows/agent.yml",
+        "job": "triage"
+      },
+      "expected": {
+        "reachable_events": ["issue_comment"],
+        "findings": [
+          {
+            "rule_id": "agentci/untrusted-ai-write-token",
+            "severity": "critical",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "triage",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/untrusted-input-in-prompt",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "triage",
+              "step": "step 1",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/ai-shell-access",
+            "severity": "high",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "triage",
+              "step": "step 1",
+              "line_min": 2
+            }
+          },
+          {
+            "rule_id": "agentci/broad-write-permissions",
+            "severity": "medium",
+            "location": {
+              "file": ".github/workflows/agent.yml",
+              "job": "triage",
+              "line_min": 2
+            }
+          }
+        ],
+        "diagnostics": [],
+        "analysis_complete": true
+      },
+      "rationale": "The issue_comment webhook payload includes both the comment and its parent Issue or PR text. The workflow serializes that payload, passes it to the Claude CLI prompt, and grants the job contents write permission.",
+      "assumption_sources": [
+        "event-json",
+        "issue-comment-payload",
+        "project-rule-contract"
+      ]
     },
     {
       "id": "lookalike-prefixed-owner",
