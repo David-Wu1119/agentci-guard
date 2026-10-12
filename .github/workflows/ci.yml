@@ -196,6 +196,7 @@ jobs:
           import assert from 'node:assert/strict';
           import { createHash } from 'node:crypto';
           import { readFileSync } from 'node:fs';
+          import { RULES } from './dist/index.js';
           import { loadActionRun, projectPrimary } from './scripts/benchmark/v4-primary-projection.mjs';
 
           const preflight = JSON.parse(readFileSync('artifacts/e3-reusable-preflight.json', 'utf8'));
@@ -240,8 +241,11 @@ jobs:
             row('broad-write', 'job', 'agentci/broad-write-permissions'),
           ];
           const expectedUnitIds = ['agent-usage', 'prompt', 'shell', 'gated-write', 'broad-write'];
-          const projected = projectPrimary({ caseRecord, registryRows, expectedUnitIds, result });
+          // Synthetic smoke only; formal scoring must use the frozen manifest vocabulary.
+          const registeredTaskIds = ['agentci/agent-usage', ...Object.keys(RULES)];
+          const projected = projectPrimary({ caseRecord, registryRows, expectedUnitIds, registeredTaskIds, result });
           assert.deepEqual(projected.parse_gap_unit_ids, []);
+          assert.deepEqual(projected.structural_gap_unit_ids, []);
           assert.deepEqual(projected.out_of_scope_records, []);
           assert.deepEqual(projected.units.map((unit) => [unit.unit_id, unit.alert, unit.matched_records]), [
             ['agent-usage', true, [{ kind: 'agent_usage', index: 0, id: '.github/workflows/reusable.yml:agent:0:.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],

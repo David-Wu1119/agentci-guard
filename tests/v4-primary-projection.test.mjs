@@ -10,9 +10,10 @@ import {
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { parseWorkflowFile, scanWorkflowFiles } from "../src/scanner.ts";
 import {
   loadActionRun,
-  projectPrimary,
+  projectPrimary as projectPrimaryWithTasks,
 } from "../scripts/benchmark/v4-primary-projection.mjs";
 
 const source = ".github/workflows/caller.yml";
@@ -22,6 +23,21 @@ const agentTask = "agentci/agent-usage";
 const jobRule = "agentci/broad-write-permissions";
 const stepRule = "agentci/unpinned-ai-action";
 const caseRecord = { case_id: "synthetic-001", source_path: source };
+const registeredTaskIds = [
+  agentTask,
+  jobRule,
+  stepRule,
+  "agentci/untrusted-ai-write-token",
+  "agentci/gated-ai-write-token",
+  "agentci/ai-with-secrets",
+];
+
+function projectPrimary(options) {
+  return projectPrimaryWithTasks({
+    registeredTaskIds,
+    ...options,
+  });
+}
 
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
@@ -388,6 +404,7 @@ describe("synthetic E3 primary unit projection", () => {
         },
       ],
       parse_gap_unit_ids: [],
+      structural_gap_unit_ids: [],
       out_of_scope_records: [],
     });
   });
@@ -458,6 +475,7 @@ describe("synthetic E3 primary unit projection", () => {
         },
       ],
       parse_gap_unit_ids: [],
+      structural_gap_unit_ids: [],
       out_of_scope_records: [],
     });
   });
@@ -496,6 +514,7 @@ describe("synthetic E3 primary unit projection", () => {
         },
       ],
       parse_gap_unit_ids: [],
+      structural_gap_unit_ids: [],
       out_of_scope_records: [
         { kind: "agent_usage", index: 1, id: "auxiliary-agent" },
       ],
@@ -580,6 +599,7 @@ describe("synthetic E3 primary unit projection", () => {
         },
       ],
       parse_gap_unit_ids: [],
+      structural_gap_unit_ids: [],
       out_of_scope_records: [],
     });
   });
@@ -626,6 +646,38 @@ describe("synthetic E3 primary unit projection", () => {
     ).toThrow();
   });
 
+  it("rejects a selected-source finding for a registered task without a unit", () => {
+    expect(() =>
+      projectPrimary({
+        caseRecord,
+        registryRows: [unit("known", "job", "agent", null, jobRule)],
+        expectedUnitIds: ["known"],
+        registeredTaskIds: [jobRule, "agentci/ai-with-secrets"],
+        result: scan({
+          findings: [finding("missing-unit", "agentci/ai-with-secrets")],
+        }),
+      }),
+    ).toThrow();
+  });
+
+  it("requires an independent task vocabulary and audits unregistered findings separately", () => {
+    const options = {
+      caseRecord,
+      registryRows: [unit("known", "job", "agent", null, jobRule)],
+      expectedUnitIds: ["known"],
+      result: scan({
+        findings: [finding("new-rule", "agentci/not-in-frozen-contract")],
+      }),
+    };
+    expect(() => projectPrimaryWithTasks(options)).toThrow();
+    expect(projectPrimary(options)).toEqual({
+      units: [{ unit_id: "known", alert: false, matched_records: [] }],
+      parse_gap_unit_ids: [],
+      structural_gap_unit_ids: [],
+      out_of_scope_records: [{ kind: "finding", index: 0, id: "new-rule" }],
+    });
+  });
+
   it("rejects a job unit without a concrete job ID", () => {
     expect(() =>
       projectPrimary({
@@ -641,6 +693,7 @@ describe("synthetic E3 primary unit projection", () => {
 
   it("marks workflow parse-gap units no-alert and separately incomplete", () => {
     const registryRows = [unit("parse-gap", "workflow", null, null, agentTask)];
+    const sourceBytes = Buffer.from("on: [\n");
     const result = scan({
       analysis_complete: false,
       diagnostics: [
@@ -655,16 +708,64 @@ describe("synthetic E3 primary unit projection", () => {
     });
     expect(
       projectPrimary({
-        caseRecord,
+        caseRecord: { ...caseRecord, sha256: sha256(sourceBytes) },
         registryRows,
         expectedUnitIds: ["parse-gap"],
+        sourceBytes,
         result,
       }),
     ).toEqual({
       units: [{ unit_id: "parse-gap", alert: false, matched_records: [] }],
       parse_gap_unit_ids: ["parse-gap"],
+      structural_gap_unit_ids: [],
       out_of_scope_records: [],
     });
+  });
+
+  it("keeps a no-jobs workflow row no-alert and structurally incomplete", () => {
+    const root = "/synthetic-e3-no-jobs";
+    const sourceBytes = Buffer.from("on: push\nname: Synthetic\n");
+    const workflow = parseWorkflowFile(
+      path.join(root, source),
+      sourceBytes.toString("utf8"),
+    );
+    const result = scanWorkflowFiles([workflow], root, {
+      ignore: [],
+      ignorePaths: [],
+    });
+    expect(result.analysis_complete).toBe(true);
+    expect(result.diagnostics).toEqual([]);
+    expect(
+      projectPrimary({
+        caseRecord: { ...caseRecord, sha256: sha256(sourceBytes) },
+        registryRows: [unit("no-jobs", "workflow", null, null, agentTask)],
+        expectedUnitIds: ["no-jobs"],
+        sourceBytes,
+        result,
+      }),
+    ).toEqual({
+      units: [{ unit_id: "no-jobs", alert: false, matched_records: [] }],
+      parse_gap_unit_ids: [],
+      structural_gap_unit_ids: ["no-jobs"],
+      out_of_scope_records: [],
+    });
+  });
+
+  it("rejects a workflow row for a hash-bound source that has jobs", () => {
+    const sourceBytes = Buffer.from(
+      "on: push\njobs:\n  agent:\n    runs-on: ubuntu-latest\n",
+    );
+    expect(() =>
+      projectPrimary({
+        caseRecord: { ...caseRecord, sha256: sha256(sourceBytes) },
+        registryRows: [
+          unit("wrong-workflow", "workflow", null, null, agentTask),
+        ],
+        expectedUnitIds: ["wrong-workflow"],
+        sourceBytes,
+        result: scan(),
+      }),
+    ).toThrow();
   });
 
   it.each([
@@ -700,6 +801,7 @@ describe("synthetic E3 primary unit projection", () => {
       ).toEqual({
         units: [{ unit_id: "call", alert: false, matched_records: [] }],
         parse_gap_unit_ids: [],
+        structural_gap_unit_ids: [],
         out_of_scope_records: [],
       });
     },

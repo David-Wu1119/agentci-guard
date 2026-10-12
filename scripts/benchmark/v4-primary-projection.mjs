@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import YAML from "yaml";
 
 const AGENT_TASK = "agentci/agent-usage";
 const CONFIG_FILES = ["agentci.config.json", ".agentcirc.json"];
@@ -342,10 +343,13 @@ function registryKey(caseId, file, scope, job, step, rule) {
   return JSON.stringify([caseId, file, scope, job, step, rule]);
 }
 
+// Use the frozen task vocabulary; deriving it from one case's rows can hide a missing unit.
 export function projectPrimary({
   caseRecord,
   registryRows,
   expectedUnitIds,
+  registeredTaskIds,
+  sourceBytes,
   result,
 }) {
   requireValue(
@@ -366,6 +370,17 @@ export function projectPrimary({
     "duplicate frozen unit ID",
   );
   requireValue(
+    Array.isArray(registeredTaskIds) &&
+      registeredTaskIds.length > 0 &&
+      registeredTaskIds.every((id) => typeof id === "string" && id),
+    "missing registered task IDs",
+  );
+  const ruleIds = new Set(registeredTaskIds);
+  requireValue(
+    ruleIds.size === registeredTaskIds.length,
+    "duplicate registered task ID",
+  );
+  requireValue(
     /^\.github\/workflows\/[^/]+\.ya?ml$/.test(
       relativeFile(caseRecord.source_path),
     ),
@@ -378,7 +393,6 @@ export function projectPrimary({
   validateResult(result);
   const byKey = new Map();
   const unitIds = new Set();
-  const ruleIds = new Set();
   const units = registryRows.map((row) => {
     requireValue(isRecord(row), "malformed registry row");
     requireValue(
@@ -402,6 +416,7 @@ export function projectPrimary({
       typeof row.rule_id === "string" && row.rule_id,
       "missing registry rule",
     );
+    requireValue(ruleIds.has(row.rule_id), "unregistered registry rule");
     requireValue(
       row.scope !== "workflow" || row.job_id === null,
       "workflow row has a job",
@@ -439,7 +454,6 @@ export function projectPrimary({
     const unit = { unit_id: row.unit_id, alert: false, matched_records: [] };
     byKey.set(key, unit);
     unitIds.add(row.unit_id);
-    ruleIds.add(row.rule_id);
     return unit;
   });
   requireValue(
@@ -513,16 +527,39 @@ export function projectPrimary({
     (diagnostic) =>
       diagnostic.kind === "parse" && diagnostic.file === caseRecord.source_path,
   );
-  const parseGapIds = registryRows
+  const workflowGapIds = registryRows
     .filter((row) => row.scope === "workflow")
     .map((row) => row.unit_id);
   requireValue(
-    parseGapIds.length === 0 || hasParseGap,
-    "workflow units lack a parse diagnostic",
+    !hasParseGap || workflowGapIds.length > 0,
+    "selected parse diagnostic lacks workflow units",
   );
+  if (workflowGapIds.length > 0) {
+    requireValue(
+      Buffer.isBuffer(sourceBytes) &&
+        validHash(caseRecord.sha256) &&
+        digest(sourceBytes) === caseRecord.sha256,
+      "workflow gap source snapshot mismatch",
+    );
+    const document = YAML.parseDocument(sourceBytes.toString("utf8"), {
+      prettyErrors: true,
+    });
+    requireValue(
+      document.errors.length > 0 === hasParseGap,
+      "workflow gap contradicts source parse status",
+    );
+    if (!hasParseGap) {
+      const parsed = document.toJS();
+      requireValue(
+        !isRecord(parsed) || !isRecord(parsed.jobs),
+        "workflow units contradict source jobs",
+      );
+    }
+  }
   return {
     units,
-    parse_gap_unit_ids: parseGapIds,
+    parse_gap_unit_ids: hasParseGap ? workflowGapIds : [],
+    structural_gap_unit_ids: hasParseGap ? [] : workflowGapIds,
     out_of_scope_records: outOfScope,
   };
 }
