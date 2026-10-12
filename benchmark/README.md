@@ -13,10 +13,11 @@ directory contains the machine-verifiable research artifacts:
   superseded unlabeled candidate manifests.
 - `annotation-sheet.csv`: 7,056 blank workflow/job/step/task units.
 - `review-sheet.csv`: deterministic 5,676-unit candidate secondary-pass plan.
-- `candidate-pilot/`: current nine-rule, 160-unit development-only
-  single-annotator test-retest packet; never counted as accuracy evidence.
+- `candidate-pilot/`: nine-rule, 160-unit development-only single-annotator
+  test-retest packet pinned to scanner commit `38a3272`; not current-scanner
+  accuracy or rule-semantics evidence.
 - `pilot/`: historical v0.1.1 eight-rule, 168-unit development-only pilot;
-  retained separately from the current candidate packet.
+  retained separately from the nine-rule candidate packet.
 - `schemas/`: manifest and annotation JSON Schemas.
 - `labels/`: human source labels, adjudicated labels, and post-evaluation error
   analysis when available.
@@ -57,16 +58,18 @@ dated result and limits.
 
 ## Human workflow
 
-Follow the current development-only
-[`candidate-pilot/README.md`](candidate-pilot/README.md) procedure for the
-nine-rule, 160-unit packet. Use only its standalone `CONTRACT.md` for decisions;
-the historical [`pilot/README.md`](pilot/README.md) is an incompatible
-eight-rule, 168-unit procedure. The current two-human import/adjudication
-scripts remain for historical toolchain smoke;
-they do not create independent review when one person supplies both files.
-Formal evaluation requires a fresh v4 sample, a nine-rule annotation registry,
-and a frozen human protocol. The v3 scorer rejects `eval` and `all` regardless
-of manifest status or label presence.
+For repeatability under its frozen contract, follow the `38a3272`-pinned
+development-only [`candidate-pilot/README.md`](candidate-pilot/README.md)
+procedure for the nine-rule, 160-unit packet. Use only its standalone
+`CONTRACT.md` for decisions; the historical
+[`pilot/README.md`](pilot/README.md) is an incompatible
+eight-rule, 168-unit procedure. Evaluating the current scanner's rules needs a
+new versioned contract and packet before human labeling. The existing two-human
+import/adjudication scripts remain for historical toolchain smoke; they do not
+create independent review when one person supplies both files.
+Formal evaluation requires a qualified, separately sealed v4 sample, a
+nine-rule annotation registry, and a frozen human protocol. The v3 scorer
+rejects `eval` and `all` regardless of manifest status or label presence.
 
 The registry generator can be tested against a separate, synthetic manifest
 without changing v3: `pnpm vitest run tests/benchmark-registry.test.ts`. After

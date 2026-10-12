@@ -137,7 +137,7 @@ contact maintainers, execute untrusted code, or attempt exploitation.
 ## Maintenance and leakage policy
 
 The v3 evaluation partition is development data. Its `eval` and `all` scoring
-paths reject formal runs. A future v4 sample must be repository-disjoint from
+paths reject formal runs. Any v4 sample must be repository-disjoint from
 development data, sealed before rule tuning, and annotated under a versioned
 protocol with all current rules.
 

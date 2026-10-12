@@ -2,7 +2,8 @@
 
 This document reproduces the current scanner, the frozen v3 development corpus,
 and its annotation toolchain. No human-labeled accuracy metric exists. Formal
-evaluation requires a separate, fresh v4 sample and nine-rule registry.
+evaluation requires a qualified, separately sealed v4 sample and a compatible
+nine-rule registry.
 
 ## Environment
 
@@ -188,8 +189,8 @@ benchmark/labels/adjudicated.jsonl
 
 Even a genuine two-human review of v3 would produce development evidence, not
 held-out accuracy. Do not change the v3 manifest status to bypass the scorer's
-`eval`/`all` rejection. Wait for a separate v4 sample and a versioned human
-protocol before formal evaluation.
+`eval`/`all` rejection. Use only a qualified, separately sealed v4 sample and a
+versioned human protocol for formal evaluation.
 
 ## Metrics and error analysis
 
@@ -204,8 +205,8 @@ AGENTCI_BENCHMARK_SPLIT=dev \
 
 This output is explicitly development-only and lists scanner rules absent from
 the v3 registry. The scorer rejects v3 `eval` and `all` even if labels exist or
-the v3 manifest status changes. A future v4 scoring path must be built around
-new repository-disjoint snapshots, a registry for every current rule, a frozen
+the v3 manifest status changes. A v4 scoring path must be built around
+repository-disjoint snapshots, a registry for every current rule, a frozen
 human review protocol, and complete error classification before any formal
 accuracy claim.
 

@@ -52,6 +52,8 @@ original manifest split was `eval` before the leakage reclassification. Its
 neutral-ID packet and single-human test–retest checks assess annotation
 feasibility and rule ambiguity only. These labels cannot supply held-out
 precision or recall, and they do not unblock a v4 repository-disjoint sample.
+The packet pins scanner commit `38a3272` and a contract that differs from the
+current scanner rules; labels under it cannot validate the current scanner.
 
 **Formal-evaluation blocker — rule registry mismatch.** The manifest's
 annotation registry (`annotation_schema_version` 2) names eight rules. The
@@ -117,16 +119,18 @@ is `benchmark/schemas/annotation-record.schema.json`.
 
 ## Human review protocol
 
-- Before formal labeling, the sole available human runs the current nine-rule,
-  160-unit development-only micro-pilot under
-  [`benchmark/candidate-pilot/`](benchmark/candidate-pilot/README.md).
+- The existing nine-rule, 160-unit development-only micro-pilot under
+  [`benchmark/candidate-pilot/`](benchmark/candidate-pilot/README.md) is pinned
+  to scanner commit `38a3272`. It may measure repeatability under its own
+  contract, not the current scanner's accuracy or rule semantics. A pilot of
+  current rules needs a new versioned contract and packet before labeling.
 - The six-workflow, 168-unit eight-rule pilot under `benchmark/pilot/` is a
-  historical v0.1.1 protocol. Do not use its packet or contract for the current
+  historical v0.1.1 protocol. Do not use its packet or contract for the pinned
   candidate pilot, and do not combine labels from the two versions.
 - The same stable pseudonym is used for both pilot passes. Pass 2 starts at
   least seven full days after pass 1 ends, and pass-1 decisions remain closed
   until pass 2 is complete.
-- The current pilot records self-reported active time and per-rule label
+- The pinned pilot records self-reported active time and per-rule label
   distributions and disagreements across 160 development units. It is not
   accuracy or inter-rater agreement evidence.
 - Formal evaluation labeling has not begun. The current formal comparison,
@@ -144,7 +148,7 @@ is `benchmark/schemas/annotation-record.schema.json`.
   commit are frozen. If rules change after evaluation errors are seen, the
   affected evaluation data becomes development data.
 
-For the current candidate pilot, use its standalone
+For the pinned candidate pilot, use its standalone
 [`CONTRACT.md`](benchmark/candidate-pilot/CONTRACT.md). The repository
 [`ANNOTATION_GUIDE.md`](ANNOTATION_GUIDE.md) documents the historical eight-rule
 v3 registry and pilot, not this candidate packet.
@@ -214,11 +218,13 @@ AGENTCI_BENCHMARK_SPLIT=dev \
   node scripts/benchmark/score.mjs benchmark/labels/adjudicated.jsonl
 ```
 
-No v4 sample, annotation registry, labels, or accuracy results exist yet. The
-v3 `eval`/`all` commands intentionally fail; future formal evaluation needs a
-separate v4 manifest, nine-rule registry, versioned human protocol, and scorer.
-The [v4 intake gate](benchmark/v4/README.md) checks only future sample
-provenance and separation; its synthetic tests do not constitute a v4 sample.
+No v4 sample, v4 annotation registry, human labels, or formal accuracy results
+are checked into this repository. The v3 `eval`/`all` commands intentionally
+fail; formal evaluation needs a separately sealed v4 manifest, nine-rule
+registry, versioned human protocol, and scorer. The
+[v4 intake gate](benchmark/v4/README.md)
+checks only sample provenance and separation; its synthetic tests do not
+constitute a v4 sample.
 
 See [`REPRODUCIBILITY.md`](REPRODUCIBILITY.md) and
 [`DATA_CARD.md`](DATA_CARD.md) for provenance and limitations.
