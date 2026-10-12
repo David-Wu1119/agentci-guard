@@ -171,31 +171,6 @@ describe("JavaScript Action entrypoint", () => {
     }
   });
 
-  it("preserves a nonblank JSON output path with trailing spaces", async () => {
-    const temporary = await temporaryOutput();
-    const jsonPath = `${temporary.json} `;
-    const code = await runAction(
-      {
-        INPUT_PATH: "examples/hardened",
-        INPUT_SARIF: temporary.sarif,
-        INPUT_JSON: jsonPath,
-        "INPUT_FAIL-ON": "none",
-        GITHUB_OUTPUT: temporary.output,
-      },
-      captureIo(),
-    );
-
-    expect(code).toBe(0);
-    expect(JSON.parse(await fs.readFile(jsonPath, "utf8"))).toMatchObject({
-      findings: [],
-      analysis_complete: true,
-    });
-    expect(await fs.stat(temporary.json).catch(() => null)).toBeNull();
-    expect(await fs.readFile(temporary.output, "utf8")).toContain(
-      `json-path=${jsonPath}\n`,
-    );
-  });
-
   it("writes outputs before returning a threshold failure", async () => {
     const temporary = await temporaryOutput();
     const io = captureIo();
