@@ -20,6 +20,11 @@ async function sarifPath(): Promise<string> {
   return path.join(directory, "out.sarif");
 }
 
+async function jsonPath(): Promise<string> {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "agentci-inputs-"));
+  return path.join(directory, "out.json");
+}
+
 describe("JavaScript Action input handling", () => {
   it("accepts the underscore alias GitHub does not use but local runners do", async () => {
     const io = captureIo();
@@ -27,6 +32,7 @@ describe("JavaScript Action input handling", () => {
       {
         INPUT_PATH: "examples/vulnerable",
         INPUT_SARIF: await sarifPath(),
+        INPUT_JSON: await jsonPath(),
         INPUT_FAIL_ON: "none",
       },
       io,
@@ -41,6 +47,7 @@ describe("JavaScript Action input handling", () => {
       {
         INPUT_PATH: "examples/vulnerable",
         INPUT_SARIF: await sarifPath(),
+        INPUT_JSON: await jsonPath(),
         "INPUT_FAIL-ON": "critical",
         INPUT_FAIL_ON: "none",
       },
@@ -58,6 +65,39 @@ describe("JavaScript Action input handling", () => {
       ),
     ).toBe(1);
     expect(io.errors.join("\n")).toContain("sarif input must not be empty");
+  });
+
+  it("rejects an empty JSON path", async () => {
+    const io = captureIo();
+    expect(
+      await runAction(
+        {
+          INPUT_PATH: "examples/hardened",
+          INPUT_SARIF: await sarifPath(),
+          INPUT_JSON: "   ",
+        },
+        io,
+      ),
+    ).toBe(1);
+    expect(io.errors.join("\n")).toContain("json input must not be empty");
+  });
+
+  it("rejects JSON and SARIF paths that resolve to the same file", async () => {
+    const io = captureIo();
+    const output = await sarifPath();
+    expect(
+      await runAction(
+        {
+          INPUT_PATH: "examples/hardened",
+          INPUT_SARIF: output,
+          INPUT_JSON: output,
+        },
+        io,
+      ),
+    ).toBe(1);
+    expect(io.errors.join("\n")).toContain(
+      "json and sarif inputs must refer to different files",
+    );
   });
 
   it("rejects an empty path input", async () => {
@@ -89,6 +129,7 @@ describe("JavaScript Action input handling", () => {
         {
           INPUT_PATH: "examples/hardened",
           INPUT_SARIF: await sarifPath(),
+          INPUT_JSON: await jsonPath(),
           "INPUT_FAIL-ON": "HIGH",
         },
         io,

@@ -13,6 +13,10 @@ inputs:
     description: SARIF output path.
     required: false
     default: "agentci-results.sarif"
+  json:
+    description: Complete machine-readable scan result output path.
+    required: false
+    default: "agentci-results.json"
   fail-on:
     description: Minimum severity that fails the action. One of none, low, medium, high, critical.
     required: false
@@ -30,6 +34,8 @@ outputs:
     description: Number of low-severity findings.
   sarif-path:
     description: Path to the written SARIF file.
+  json-path:
+    description: Path to the written complete scan result JSON file.
   diagnostics:
     description: Number of parse or incomplete-analysis diagnostics.
   analysis-complete:

@@ -44,7 +44,7 @@ if (!fs.existsSync(path.join(root, "dist", "action.js"))) {
   }
 }
 
-const requiredInputs = ["path", "sarif", "fail-on"];
+const requiredInputs = ["path", "sarif", "json", "fail-on"];
 for (const name of requiredInputs) {
   if (!manifest?.inputs?.[name]) errors.push(`missing input ${name}`);
 }
@@ -55,6 +55,7 @@ const requiredOutputs = [
   "medium",
   "low",
   "sarif-path",
+  "json-path",
   "diagnostics",
   "analysis-complete",
 ];

@@ -186,6 +186,7 @@ describe("CLI and Action surface completeness", () => {
       {
         INPUT_PATH: root,
         INPUT_SARIF: path.join(root, "a.sarif"),
+        INPUT_JSON: path.join(root, "a.json"),
         "INPUT_FAIL-ON": "none",
         GITHUB_OUTPUT: outputs,
         GITHUB_STEP_SUMMARY: summary,

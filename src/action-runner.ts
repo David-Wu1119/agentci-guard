@@ -34,14 +34,25 @@ export async function runAction(
   try {
     const target = input(environment, "PATH", ".");
     const sarifPath = input(environment, "SARIF", "agentci-results.sarif");
+    const jsonPath = input(environment, "JSON", "agentci-results.json");
     const failOn = parseFailOn(
       input(environment, "FAIL-ON", "high").toLowerCase(),
     );
 
     if (!target.trim()) throw new Error("path input must not be empty.");
     if (!sarifPath.trim()) throw new Error("sarif input must not be empty.");
-    if (/[\r\n]/.test(target) || /[\r\n]/.test(sarifPath)) {
-      throw new Error("path and sarif inputs must be single-line values.");
+    if (!jsonPath.trim()) throw new Error("json input must not be empty.");
+    if (
+      /[\r\n]/.test(target) ||
+      /[\r\n]/.test(sarifPath) ||
+      /[\r\n]/.test(jsonPath)
+    ) {
+      throw new Error(
+        "path, sarif and json inputs must be single-line values.",
+      );
+    }
+    if (path.resolve(jsonPath) === path.resolve(sarifPath)) {
+      throw new Error("json and sarif inputs must refer to different files.");
     }
 
     const targetStat = await fs.stat(path.resolve(target)).catch(() => null);
@@ -55,6 +66,13 @@ export async function runAction(
     await fs.writeFile(
       resolvedSarif,
       `${JSON.stringify(toSarif(result), null, 2)}\n`,
+      "utf8",
+    );
+    const resolvedJson = path.resolve(jsonPath);
+    await fs.mkdir(path.dirname(resolvedJson), { recursive: true });
+    await fs.writeFile(
+      resolvedJson,
+      `${JSON.stringify(result, null, 2)}\n`,
       "utf8",
     );
 
@@ -81,7 +99,7 @@ export async function runAction(
     if (outputFile) {
       await fs.appendFile(
         outputFile,
-        formatGithubOutputs(result, sarifPath),
+        `${formatGithubOutputs(result, sarifPath)}json-path=${jsonPath}\n`,
         "utf8",
       );
     }

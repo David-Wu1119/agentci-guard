@@ -139,8 +139,15 @@ jobs:
           sarif_file: agentci-results.sarif
 ```
 
-The Action sets `findings`, `critical`, `high`, `medium`, `low`, `sarif-path`,
-`diagnostics`, and `analysis-complete` as outputs. When the analysis is
+The tagged `v0.6.2` Action sets `findings`, `critical`, `high`, `medium`, `low`,
+`sarif-path`, `diagnostics`, and `analysis-complete` as outputs. The Action in
+this source tree additionally writes the complete CLI-shaped scan result to
+`agentci-results.json` by default and exposes its location as `json-path`;
+this is not part of the tagged `v0.6.2` release. That JSON includes finding
+IDs, agent usages, call chains, diagnostics, and `analysis_complete`; SARIF is
+still written separately. The JSON is a local file, not an automatically
+uploaded artifact, and may contain repository paths and workflow evidence.
+When the analysis is
 incomplete it also prints a `::warning::` annotation naming the diagnostic
 codes and appends the same note to the step summary, so a step with zero
 findings cannot look clean when the analyzer did not finish:

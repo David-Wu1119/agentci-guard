@@ -12,12 +12,14 @@ const escaped = VERSION.replaceAll(".", "\\.");
 async function temporaryOutput(): Promise<{
   output: string;
   sarif: string;
+  json: string;
 }> {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "agentci-action-"));
   const output = path.join(directory, "github-output");
   const sarif = path.join(directory, "result.sarif");
+  const json = path.join(directory, "result.json");
   await fs.writeFile(output, "", "utf8");
-  return { output, sarif };
+  return { output, sarif, json };
 }
 
 function captureIo(): ActionIo & { logs: string[]; errors: string[] } {
@@ -80,6 +82,7 @@ describe("JavaScript Action entrypoint", () => {
       {
         INPUT_PATH: "examples/vulnerable",
         INPUT_SARIF: temporary.sarif,
+        INPUT_JSON: temporary.json,
         "INPUT_FAIL-ON": "none",
         GITHUB_OUTPUT: temporary.output,
       },
@@ -100,6 +103,49 @@ describe("JavaScript Action entrypoint", () => {
     expect(io.errors).toEqual([]);
   });
 
+  it("writes the complete scan result as JSON and exposes its path before threshold failure", async () => {
+    const manifest = YAML.parse(await fs.readFile("action.yml", "utf8")) as {
+      inputs: Record<string, { default?: string }>;
+      outputs: Record<string, unknown>;
+    };
+    expect(manifest.inputs.json.default).toBe("agentci-results.json");
+    expect(manifest.outputs["json-path"]).toBeDefined();
+
+    const temporary = await temporaryOutput();
+    const io = captureIo();
+    const code = await runAction(
+      {
+        INPUT_PATH: "examples/vulnerable",
+        INPUT_SARIF: temporary.sarif,
+        INPUT_JSON: temporary.json,
+        "INPUT_FAIL-ON": "high",
+        GITHUB_OUTPUT: temporary.output,
+      },
+      io,
+    );
+
+    expect(code).toBe(2);
+    const result = JSON.parse(await fs.readFile(temporary.json, "utf8"));
+    expect(Object.keys(result).sort()).toEqual(
+      [
+        "scanned_at",
+        "root",
+        "workflow_count",
+        "agent_usages",
+        "findings",
+        "summary",
+        "diagnostics",
+        "analysis_complete",
+      ].sort(),
+    );
+    expect(result.agent_usages.length).toBeGreaterThan(0);
+    expect(result.findings[0].id).toBeTruthy();
+    expect(result.analysis_complete).toBe(false);
+    expect(await fs.readFile(temporary.output, "utf8")).toContain(
+      `json-path=${temporary.json}`,
+    );
+  });
+
   it("writes outputs before returning a threshold failure", async () => {
     const temporary = await temporaryOutput();
     const io = captureIo();
@@ -107,6 +153,7 @@ describe("JavaScript Action entrypoint", () => {
       {
         INPUT_PATH: "examples/vulnerable",
         INPUT_SARIF: temporary.sarif,
+        INPUT_JSON: temporary.json,
         "INPUT_FAIL-ON": "high",
         GITHUB_OUTPUT: temporary.output,
       },
@@ -116,6 +163,29 @@ describe("JavaScript Action entrypoint", () => {
     expect(code).toBe(2);
     expect(await fs.readFile(temporary.output, "utf8")).toContain("critical=");
     expect(io.errors[0]).toContain("at or above high");
+  });
+
+  it("preserves reusable-workflow caller paths in the JSON output", async () => {
+    const temporary = await temporaryOutput();
+    const code = await runAction({
+      INPUT_PATH: "corpus/adversarial/cases/local-reusable",
+      INPUT_SARIF: temporary.sarif,
+      INPUT_JSON: temporary.json,
+      "INPUT_FAIL-ON": "none",
+      GITHUB_OUTPUT: temporary.output,
+    });
+
+    expect(code).toBe(0);
+    const result = JSON.parse(await fs.readFile(temporary.json, "utf8"));
+    expect(result.agent_usages[0].call_chain).toEqual([
+      ".github/workflows/caller.yml#agent",
+      ".github/workflows/bridge.yml#agent",
+    ]);
+    expect(
+      result.findings.some((finding: { call_chain?: string[] }) =>
+        finding.call_chain?.includes(".github/workflows/caller.yml#agent"),
+      ),
+    ).toBe(true);
   });
 
   it("reports invalid inputs as an Action error", async () => {
@@ -140,6 +210,7 @@ describe("JavaScript Action entrypoint", () => {
       {
         INPUT_PATH: "corpus/adversarial/cases/parse-error",
         INPUT_SARIF: temporary.sarif,
+        INPUT_JSON: temporary.json,
         "INPUT_FAIL-ON": "none",
         GITHUB_OUTPUT: temporary.output,
       },
@@ -150,6 +221,13 @@ describe("JavaScript Action entrypoint", () => {
     expect(await fs.readFile(temporary.output, "utf8")).toContain("findings=0");
     expect(await fs.readFile(temporary.output, "utf8")).toContain(
       "analysis-complete=false",
+    );
+    expect(JSON.parse(await fs.readFile(temporary.json, "utf8"))).toMatchObject(
+      {
+        findings: [],
+        analysis_complete: false,
+        diagnostics: [{ code: "agentci/parse-error", severity: "error" }],
+      },
     );
     expect(io.errors[0]).toContain("1 error diagnostic");
   });

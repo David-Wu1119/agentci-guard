@@ -83,6 +83,7 @@ try {
   );
 
   const sarifPath = path.join(temporary, "action.sarif");
+  const jsonPath = path.join(temporary, "action.json");
   const outputPath = path.join(temporary, "github-output");
   const action = spawnSync(process.execPath, ["dist/action.js"], {
     cwd: packageRoot,
@@ -91,6 +92,7 @@ try {
       ...process.env,
       INPUT_PATH: "examples/vulnerable",
       INPUT_SARIF: sarifPath,
+      INPUT_JSON: jsonPath,
       "INPUT_FAIL-ON": "none",
       GITHUB_OUTPUT: outputPath,
     },
@@ -105,11 +107,18 @@ try {
     throw new Error("Packed Action did not emit the 9-fixture SARIF baseline.");
   }
   const actionOutputs = fs.readFileSync(outputPath, "utf8");
+  const actionResult = JSON.parse(fs.readFileSync(jsonPath, "utf8"));
   if (
     !actionOutputs.includes("analysis-complete=false") ||
-    !actionOutputs.includes("diagnostics=1")
+    !actionOutputs.includes("diagnostics=1") ||
+    !actionOutputs.includes(`json-path=${jsonPath}`) ||
+    actionResult.findings.length !== 9 ||
+    actionResult.agent_usages.length === 0 ||
+    actionResult.diagnostics.length !== 1
   ) {
-    throw new Error("Packed Action did not expose incomplete GitHub outputs.");
+    throw new Error(
+      "Packed Action did not expose complete JSON and incomplete-analysis outputs.",
+    );
   }
 
   const cliOutput = execFileSync(
@@ -127,7 +136,7 @@ try {
   }
 
   check(
-    "packed Action: examples/vulnerable emits the 9-finding SARIF baseline and incomplete-analysis outputs",
+    "packed Action: examples/vulnerable emits complete JSON, the 9-finding SARIF baseline, and incomplete-analysis outputs",
     true,
   );
   check(
