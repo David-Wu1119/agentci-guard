@@ -22,6 +22,10 @@ export function relevantDiagnostics(annotation, result) {
     ...writeTokenRules,
     "agentci/broad-write-permissions",
   ];
+  const inputDependent = [
+    ...writeTokenRules,
+    "agentci/untrusted-input-in-prompt",
+  ];
   return result.diagnostics.filter((diagnostic) => {
     if (diagnostic.file !== annotation.workflow_file) return false;
     if (diagnostic.job && diagnostic.job !== annotation.job_id) return false;
@@ -57,6 +61,23 @@ export function relevantDiagnostics(annotation, result) {
       [
         "agentci/analysis-agent-tool-fetch-unknown",
         "agentci/analysis-agent-implicit-ingestion-unknown",
+        "agentci/analysis-remote-agent-capability-unknown",
+      ].includes(diagnostic.code) &&
+      !writeTokenRules.includes(annotation.rule_id)
+    ) {
+      return false;
+    }
+    if (
+      diagnostic.code === "agentci/analysis-run-dataflow-unknown" &&
+      !inputDependent.includes(annotation.rule_id)
+    ) {
+      return false;
+    }
+    if (
+      [
+        "agentci/analysis-output-provenance-unknown",
+        "agentci/analysis-matrix-provenance-unknown",
+        "agentci/analysis-reusable-input-provenance-unknown",
       ].includes(diagnostic.code) &&
       !writeTokenRules.includes(annotation.rule_id)
     ) {

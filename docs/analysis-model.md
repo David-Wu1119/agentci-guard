@@ -181,6 +181,38 @@ the candidate traces the request body and only environment variables
 referenced by that body. These bounded parsers are not general shell dataflow
 analysis.
 
+GitHub can pass data from a completed step through
+[`$GITHUB_OUTPUT` and `steps.<id>.outputs`](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts),
+or from another job through
+[`needs.<job>.outputs`](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/pass-job-outputs).
+An AI input that consumes such an alias with unresolved provenance now emits
+`analysis-output-provenance-unknown` on the overlapping event path, rather than
+claiming a complete clean analysis. This does not create a definite prompt or
+write-token finding. A first-step literal output on the default Ubuntu shell,
+or a literal declared job output, can be closed; computed outputs and values
+forwarded across a reusable-workflow boundary cannot. This is a limited
+abstention rule, not transitive output tracing. The development scorer assigns
+this uncertainty to write-token rules, not to the separate direct-event prompt
+predicate. Serialization of a whole `steps`/`needs` context and a known output
+alias forwarded through `GITHUB_ENV` are covered by the same abstention; the
+scanner does not infer a definite source-to-agent flow from either.
+An unresolved job output used to build `strategy.matrix` also abstains when
+the AI input references that matrix; a literal job output does not.
+An AI input that reads a matrix built directly from a supported untrusted
+event field emits `analysis-matrix-provenance-unknown`, not a definite prompt
+finding. Matrix expansion and arbitrary shell dataflow are not proven.
+Composed `inputs.*` expressions in local reusable workflows inspect the
+caller's value for output aliases. Dynamic values that remain opaque across a
+further reusable boundary emit `analysis-reusable-input-provenance-unknown`;
+this is an abstention, not transitive input evaluation. Literal values remain
+closed. Output, matrix, and opaque reusable-input uncertainty can also flow
+through an earlier `GITHUB_ENV` write to the later AI step. Matrix tracking is
+whole-matrix, so an unused dynamic axis can cause a conservative abstention.
+A reusable-workflow caller job can itself have a dynamic matrix and pass a
+`matrix.*` value through `with`; the callee's AI step receives a scoped
+reusable-input diagnostic. Caller matrix expressions currently keep every
+reachable caller event possible rather than tracking individual members.
+
 The second route is Action self-fetching, which depends on vendor and mode.
 At the pinned Anthropic revision, [tag mode fetches parent Issue/PR data](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/modes/tag/index.ts)
 and builds a prompt from it. The [mode detector](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/modes/detector.ts)

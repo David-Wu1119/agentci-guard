@@ -91,6 +91,31 @@ not proven HTTP prompt input. Opaque or unresolved shell flow emits
 `analysis-run-dataflow-unknown`; this bounded parser is not a general shell
 dataflow analysis.
 
+When an AI input references a prior `steps.<id>.outputs` value or a
+`needs.<job>.outputs` value, the scanner does not claim a direct untrusted
+input finding without proving the source. An unresolved output alias instead
+emits `analysis-output-provenance-unknown` and makes the scan incomplete. The
+first-step default-Ubuntu single literal `$GITHUB_OUTPUT` assignment and a
+literal declared job output are narrow safe exceptions. Producer/consumer
+event paths must overlap; outputs forwarded through a reusable workflow remain
+unresolved. Whole-context serialization and output aliases passed through a
+later `GITHUB_ENV` write, or through `strategy.matrix` into an AI input, are
+also unresolved. This is bounded provenance checking, not general shell or
+cross-job dataflow analysis.
+An AI input that reads a matrix built directly from a supported untrusted
+event field emits `analysis-matrix-provenance-unknown`; it does not become a
+definite prompt-ingestion finding solely by aliasing through `matrix.*`.
+Composed reusable-workflow `inputs.*` expressions are checked for caller-side
+output aliases. If a dynamic caller input cannot be resolved across another
+boundary, `analysis-reusable-input-provenance-unknown` keeps the scan
+incomplete; literal caller inputs remain closed. The same uncertainty follows
+an output, matrix value, or dynamic reusable input through a later
+`GITHUB_ENV` write to an AI step.
+When a reusable-workflow caller passes a value from its own dynamic matrix,
+the downstream AI input remains uncertain across that call boundary. This
+caller-matrix check treats all reachable caller events as possible; it does
+not resolve individual matrix members.
+
 A direct AI CLI may be preceded by literal shell `NAME=VALUE` assignments or
 launched through `env`. Assignment values are not prompt arguments: dynamic
 values produce `analysis-run-dataflow-unknown` unless the CLI command itself
@@ -244,6 +269,9 @@ The following are not security findings:
 - `agentci/analysis-agent-event-unknown`
 - `agentci/analysis-agent-event-unsupported`
 - `agentci/analysis-run-dataflow-unknown`
+- `agentci/analysis-output-provenance-unknown`
+- `agentci/analysis-matrix-provenance-unknown`
+- `agentci/analysis-reusable-input-provenance-unknown`
 - `agentci/analysis-remote-agent-capability-unknown`
 - `agentci/analysis-remote-reusable-workflow`
 - `agentci/org-fetch-failed` — an organization scan could not fetch a repository's workflows (error; the repository and reason are in the message; archived and fork exclusions are not diagnostics)
@@ -257,7 +285,9 @@ That exception records a verified closed event path, so it may coexist with
 diagnostic as a scanner abstention unless the scanner already emitted a positive
 observation at that annotation unit. The implicit-ingestion diagnostic affects
 only the two write-token rules; a verified unsupported Action event does not
-create a scoring abstention.
+create a scoring abstention. Output-provenance uncertainty also affects only
+the write-token rules: the step-scoped prompt rule requires a direct supported
+event reference in that AI step or its effective environment.
 
 ## Agent-usage observation task
 

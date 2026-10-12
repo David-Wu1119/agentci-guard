@@ -40,6 +40,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- AI inputs consuming unresolved prior step or cross-job outputs no longer
+  report a complete clean analysis. They emit the path-scoped
+  `analysis-output-provenance-unknown` diagnostic
+  rather than a definite untrusted-input finding; literal first-step/job
+  outputs and disjoint event paths remain closed. This also covers an output
+  routed through `strategy.matrix` into the AI input. Development scoring now keeps
+  that uncertainty off unrelated rules, and keeps hosted-agent capability
+  uncertainty off the runner's broad-permissions rule. These are synthetic
+  regressions, not a human-label accuracy result. Against the fixed 152-workflow
+  public development set at 88e8f59, 11 workflows changed only by 13 added
+  output-provenance diagnostics; agent usages stayed at 80, findings at 220,
+  and complete scans changed from 48 to 46. No formal v4 sample or human label
+  was used for this comparison.
+- AI inputs reading a matrix built directly from supported untrusted event text
+  now leave analysis incomplete instead of appearing clean. The bounded model
+  abstains rather than claiming that matrix expansion proves prompt ingestion.
+- Composed local reusable-workflow inputs now carry unresolved caller output
+  aliases into AI sink diagnostics; an opaque dynamic input after further
+  forwarding also leaves analysis incomplete. These bounded uncertainties also
+  follow `GITHUB_ENV` relays to AI steps. Dynamic matrices on reusable caller
+  jobs also propagate uncertainty to the callee AI step. Literal inputs remain
+  closed.
 - For a job's first step on a default Ubuntu shell without startup overrides,
   a single literal `echo "NAME=value" >> "$GITHUB_ENV"` no longer treats unused
   untrusted or secret step environment values as exported to later AI steps.

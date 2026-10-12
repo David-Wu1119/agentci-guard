@@ -321,4 +321,171 @@ jobs:
       "negative",
     );
   });
+
+  it("limits run dataflow uncertainty to input-dependent rules", () => {
+    const scan = result(
+      [],
+      [
+        {
+          ...diagnostic("agentci/analysis-run-dataflow-unknown"),
+          step_index: 0,
+        },
+      ],
+    );
+    for (const rule of [
+      "agentci/untrusted-ai-write-token",
+      "agentci/gated-ai-write-token",
+    ]) {
+      expect(classify(rule, scan)).toBe("unknown");
+    }
+    expect(
+      predict(
+        { ...stepAnnotation(0), rule_id: "agentci/untrusted-input-in-prompt" },
+        scan,
+        "agentci/agent-usage",
+      ),
+    ).toBe("unknown");
+    for (const rule of [
+      "agentci/pull-request-target-ai",
+      "agentci/broad-write-permissions",
+      "agentci/ai-with-secrets",
+    ]) {
+      expect(classify(rule, scan)).toBe("negative");
+    }
+    for (const rule of [
+      "agentci/agent-usage",
+      "agentci/unsafe-checkout",
+      "agentci/ai-shell-access",
+      "agentci/unpinned-ai-action",
+    ]) {
+      expect(
+        predict(
+          { ...stepAnnotation(0), rule_id: rule },
+          scan,
+          "agentci/agent-usage",
+        ),
+      ).toBe("negative");
+    }
+  });
+
+  it("limits output provenance uncertainty to write-token rules", () => {
+    const scan = result(
+      [],
+      [
+        {
+          ...diagnostic("agentci/analysis-output-provenance-unknown"),
+          step_index: 0,
+        },
+      ],
+    );
+    expect(classify("agentci/untrusted-ai-write-token", scan)).toBe("unknown");
+    expect(classify("agentci/gated-ai-write-token", scan)).toBe("unknown");
+    expect(
+      predict(
+        { ...stepAnnotation(0), rule_id: "agentci/untrusted-input-in-prompt" },
+        scan,
+        "agentci/agent-usage",
+      ),
+    ).toBe("negative");
+    expect(classify("agentci/broad-write-permissions", scan)).toBe("negative");
+  });
+
+  it("limits opaque reusable input uncertainty to write-token rules", () => {
+    const scan = result(
+      [],
+      [
+        {
+          ...diagnostic("agentci/analysis-reusable-input-provenance-unknown"),
+          step_index: 0,
+        },
+      ],
+    );
+    expect(classify("agentci/untrusted-ai-write-token", scan)).toBe("unknown");
+    expect(classify("agentci/gated-ai-write-token", scan)).toBe("unknown");
+    expect(
+      predict(
+        { ...stepAnnotation(0), rule_id: "agentci/untrusted-input-in-prompt" },
+        scan,
+        "agentci/agent-usage",
+      ),
+    ).toBe("negative");
+    expect(classify("agentci/broad-write-permissions", scan)).toBe("negative");
+  });
+
+  it("does not turn matrix-derived input into a direct-event prompt predicate", () => {
+    const issueTitle = "$" + "{{ github.event.issue.title }}";
+    const matrixText = "$" + "{{ matrix.text }}";
+    const scan = scanWorkflowFiles(
+      [
+        parseWorkflowFile(
+          file,
+          `on: issues
+permissions:
+  contents: write
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        text: ["${issueTitle}"]
+    steps:
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          anthropic_api_key: \${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: \${{ secrets.GITHUB_TOKEN }}
+          allowed_non_write_users: "*"
+          prompt: "Review ${matrixText}"
+`,
+        ),
+      ],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(scan.diagnostics.map(({ code }) => code)).toContain(
+      "agentci/analysis-matrix-provenance-unknown",
+    );
+    expect(classify("agentci/untrusted-ai-write-token", scan)).toBe("unknown");
+    expect(
+      predict(
+        { ...stepAnnotation(0), rule_id: "agentci/untrusted-input-in-prompt" },
+        scan,
+        "agentci/agent-usage",
+      ),
+    ).toBe("negative");
+  });
+
+  it("keeps remote agent capability uncertainty off the runner token rule", () => {
+    const issueTitle = "$" + "{{ github.event.issue.title }}";
+    const scan = scanWorkflowFiles(
+      [
+        parseWorkflowFile(
+          file,
+          `on: issues
+permissions:
+  contents: read
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          curl -X POST https://api.devin.ai/v1/sessions -d '{"prompt":"${issueTitle}"}'
+`,
+        ),
+      ],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(scan.agent_usages).toHaveLength(1);
+    expect(
+      scan.diagnostics.some(
+        ({ code }) =>
+          code === "agentci/analysis-remote-agent-capability-unknown",
+      ),
+    ).toBe(true);
+    expect([
+      classify("agentci/broad-write-permissions", scan),
+      classify("agentci/untrusted-ai-write-token", scan),
+      classify("agentci/gated-ai-write-token", scan),
+    ]).toEqual(["negative", "unknown", "unknown"]);
+  });
 });

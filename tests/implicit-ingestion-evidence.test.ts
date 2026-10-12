@@ -395,6 +395,1124 @@ jobs:
     expect(result.analysis_complete).toBe(false);
   });
 
+  it("does not call an agent clean when a prior step output can carry untrusted text", () => {
+    const raw = `
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - id: capture
+        env:
+          TITLE: \${{ github.event.issue.title }}
+        run: echo "text=$TITLE" >> "$GITHUB_OUTPUT"
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          anthropic_api_key: \${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: \${{ secrets.GITHUB_TOKEN }}
+          allowed_non_write_users: "*"
+          prompt: "Review \${{ steps.capture.outputs.text }}"
+`;
+    const result = scanWorkflowFiles(
+      [parseWorkflowFile(".github/workflows/review.yml", raw)],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(diagnostics(result)).toContain(
+      "agentci/analysis-output-provenance-unknown",
+    );
+    expect(
+      result.diagnostics.find(
+        ({ code }) => code === "agentci/analysis-output-provenance-unknown",
+      )?.step_index,
+    ).toBe(1);
+    expect(result.analysis_complete).toBe(false);
+    expect(rules(result)).not.toContain("agentci/untrusted-input-in-prompt");
+    expect(rules(result)).not.toContain("agentci/untrusted-ai-write-token");
+  });
+
+  it("does not truncate an output alias after a quoted closing delimiter", () => {
+    const raw = `
+on: issues
+permissions:
+  contents: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - id: capture
+        env:
+          TITLE: \${{ github.event.issue.title }}
+        run: echo "text=$TITLE" >> "$GITHUB_OUTPUT"
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: "Review \${{ format('}}', steps.capture.outputs.text) }}"
+`;
+    const result = scanWorkflowFiles(
+      [parseWorkflowFile(".github/workflows/review.yml", raw)],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(diagnostics(result)).toContain(
+      "agentci/analysis-output-provenance-unknown",
+    );
+    expect(result.analysis_complete).toBe(false);
+  });
+
+  it("keeps a prior output in an AI CLI's inherited environment unresolved", () => {
+    const raw = `
+on: issues
+permissions:
+  contents: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - id: capture
+        env:
+          TITLE: \${{ github.event.issue.title }}
+        run: echo "text=$TITLE" >> "$GITHUB_OUTPUT"
+      - env:
+          REQUEST: \${{ steps.capture.outputs.text }}
+        run: claude -p fixed
+`;
+    const result = scanWorkflowFiles(
+      [parseWorkflowFile(".github/workflows/review.yml", raw)],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(diagnostics(result)).toContain(
+      "agentci/analysis-output-provenance-unknown",
+    );
+    expect(result.analysis_complete).toBe(false);
+  });
+
+  it("keeps a prior output used by a same-step CLI shell variable unresolved", () => {
+    const raw = `
+on: issues
+permissions:
+  contents: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - id: capture
+        env:
+          TITLE: \${{ github.event.issue.title }}
+        run: echo "text=$TITLE" >> "$GITHUB_OUTPUT"
+      - run: |
+          REQUEST=\${{ steps.capture.outputs.text }}
+          claude -p "$REQUEST"
+`;
+    const result = scanWorkflowFiles(
+      [parseWorkflowFile(".github/workflows/review.yml", raw)],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(diagnostics(result)).toContain(
+      "agentci/analysis-output-provenance-unknown",
+    );
+    expect(result.analysis_complete).toBe(false);
+  });
+
+  it("keeps a prior output forwarded through GITHUB_ENV unresolved", () => {
+    const raw = `
+on: issues
+permissions:
+  contents: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - id: capture
+        env:
+          TITLE: \${{ github.event.issue.title }}
+        run: echo "text=$TITLE" >> "$GITHUB_OUTPUT"
+      - run: echo "REQUEST=\${{ steps.capture.outputs.text }}" >> "$GITHUB_ENV"
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: fixed
+`;
+    const result = scanWorkflowFiles(
+      [parseWorkflowFile(".github/workflows/review.yml", raw)],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(diagnostics(result)).toContain(
+      "agentci/analysis-output-provenance-unknown",
+    );
+    expect(result.analysis_complete).toBe(false);
+  });
+
+  it("keeps an event-derived matrix forwarded through GITHUB_ENV unresolved", () => {
+    const raw = `
+on: issues
+permissions:
+  contents: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        text: ["\${{ github.event.issue.title }}"]
+    steps:
+      - run: echo "REQUEST=\${{ matrix.text }}" >> "$GITHUB_ENV"
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: fixed
+`;
+    const result = scanWorkflowFiles(
+      [parseWorkflowFile(".github/workflows/review.yml", raw)],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(diagnostics(result)).toContain(
+      "agentci/analysis-matrix-provenance-unknown",
+    );
+    expect(
+      result.diagnostics.find(
+        ({ code }) => code === "agentci/analysis-matrix-provenance-unknown",
+      )?.step_index,
+    ).toBe(1);
+    expect(result.analysis_complete).toBe(false);
+  });
+
+  it("keeps a job-output matrix forwarded through GITHUB_ENV unresolved", () => {
+    const raw = `
+on: issues
+permissions:
+  contents: write
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: \${{ github.event.issue.title }}
+    steps:
+      - run: echo done
+  review:
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: \${{ fromJSON(needs.prepare.outputs.matrix) }}
+    steps:
+      - run: echo "REQUEST=\${{ matrix.text }}" >> "$GITHUB_ENV"
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: fixed
+`;
+    const result = scanWorkflowFiles(
+      [parseWorkflowFile(".github/workflows/review.yml", raw)],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(diagnostics(result)).toContain(
+      "agentci/analysis-output-provenance-unknown",
+    );
+    expect(
+      result.diagnostics.find(
+        ({ code }) => code === "agentci/analysis-output-provenance-unknown",
+      )?.step_index,
+    ).toBe(1);
+    expect(result.analysis_complete).toBe(false);
+  });
+
+  it("keeps literal and disjoint-event GITHUB_ENV relays complete", () => {
+    const scanRelay = (literal: boolean) => {
+      const raw = `
+on: [issues, issue_comment]
+permissions:
+  contents: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - id: capture
+        if: github.event_name == 'issues'
+        env:
+          TITLE: \${{ github.event.issue.title }}
+        run: ${literal ? 'echo "text=safe" >> "$GITHUB_OUTPUT"' : 'echo "text=$TITLE" >> "$GITHUB_OUTPUT"'}
+      - if: github.event_name == 'issues'
+        run: echo "REQUEST=\${{ steps.capture.outputs.text }}" >> "$GITHUB_ENV"
+      - if: github.event_name == '${literal ? "issues" : "issue_comment"}'
+        uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: fixed
+`;
+      return scanWorkflowFiles(
+        [parseWorkflowFile(".github/workflows/review.yml", raw)],
+        ".",
+        { ignore: [], ignorePaths: [] },
+      );
+    };
+    for (const result of [scanRelay(true), scanRelay(false)]) {
+      expect(diagnostics(result)).not.toContain(
+        "agentci/analysis-output-provenance-unknown",
+      );
+      expect(result.analysis_complete).toBe(true);
+    }
+  });
+
+  it("does not treat a first-step literal output or an unconsumed output as unknown", () => {
+    const scanOutput = (run: string, prompt: string) =>
+      scanWorkflowFiles(
+        [
+          parseWorkflowFile(
+            ".github/workflows/review.yml",
+            `
+on: issues
+permissions:
+  contents: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - id: capture
+        env:
+          TITLE: \${{ github.event.issue.title }}
+        run: ${run}
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: "${prompt}"
+`,
+          ),
+        ],
+        ".",
+        { ignore: [], ignorePaths: [] },
+      );
+    for (const result of [
+      scanOutput(
+        'echo "text=safe" >> "$GITHUB_OUTPUT"',
+        "Review \${{ steps.capture.outputs.text }}",
+      ),
+      scanOutput('echo "text=$TITLE" >> "$GITHUB_OUTPUT"', "Review fixed"),
+    ]) {
+      expect(diagnostics(result)).not.toContain(
+        "agentci/analysis-output-provenance-unknown",
+      );
+      expect(result.analysis_complete).toBe(true);
+    }
+  });
+
+  it("recognizes bracket-form step output references", () => {
+    const raw = `
+on: issues
+permissions:
+  contents: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - id: capture
+        env:
+          TITLE: \${{ github.event.issue.title }}
+        run: echo "text=$TITLE" >> "$GITHUB_OUTPUT"
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: "Review \${{ steps['capture'].outputs['text'] }}"
+`;
+    const result = scanWorkflowFiles(
+      [parseWorkflowFile(".github/workflows/review.yml", raw)],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(diagnostics(result)).toContain(
+      "agentci/analysis-output-provenance-unknown",
+    );
+    expect(result.analysis_complete).toBe(false);
+  });
+
+  it.each([
+    "toJSON(steps)",
+    "toJSON(steps.capture)",
+    "toJSON(steps.*.outputs.text)",
+  ])("does not call a serialized step output clean: %s", (expression) => {
+    const raw = `
+on: issues
+permissions:
+  contents: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - id: capture
+        env:
+          TITLE: \${{ github.event.issue.title }}
+        run: echo "text=$TITLE" >> "$GITHUB_OUTPUT"
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: "Review \${{ ${expression} }}"
+`;
+    const result = scanWorkflowFiles(
+      [parseWorkflowFile(".github/workflows/review.yml", raw)],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(diagnostics(result)).toContain(
+      "agentci/analysis-output-provenance-unknown",
+    );
+    expect(result.analysis_complete).toBe(false);
+  });
+
+  it.each([
+    "'steps.capture.outputs.text'",
+    "format('{0}', 'steps.capture.outputs.text')",
+  ])(
+    "does not mistake expression text for an output alias: %s",
+    (expression) => {
+      const raw = `
+on: issues
+permissions:
+  contents: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - id: capture
+        env:
+          TITLE: \${{ github.event.issue.title }}
+        run: echo "text=$TITLE" >> "$GITHUB_OUTPUT"
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: "Review \${{ ${expression} }}"
+`;
+      const result = scanWorkflowFiles(
+        [parseWorkflowFile(".github/workflows/review.yml", raw)],
+        ".",
+        { ignore: [], ignorePaths: [] },
+      );
+      expect(diagnostics(result)).not.toContain(
+        "agentci/analysis-output-provenance-unknown",
+      );
+      expect(result.analysis_complete).toBe(true);
+    },
+  );
+
+  it("keeps disjoint producer and consumer events separate", () => {
+    const raw = `
+on: [issues, issue_comment]
+permissions:
+  contents: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - id: capture
+        if: github.event_name == 'issues'
+        env:
+          TITLE: \${{ github.event.issue.title }}
+        run: echo "text=$TITLE" >> "$GITHUB_OUTPUT"
+      - if: github.event_name == 'issue_comment'
+        uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: "Review \${{ steps.capture.outputs.text }}"
+`;
+    const result = scanWorkflowFiles(
+      [parseWorkflowFile(".github/workflows/review.yml", raw)],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(diagnostics(result)).not.toContain(
+      "agentci/analysis-output-provenance-unknown",
+    );
+    expect(result.analysis_complete).toBe(true);
+  });
+
+  it.each([
+    "needs.prepare.outputs.text",
+    "toJSON(needs)",
+    "toJSON(needs.prepare)",
+    "toJSON(needs.*.outputs.text)",
+  ])("does not call a computed needs output clean: %s", (expression) => {
+    const raw = `
+on: issues
+permissions:
+  contents: write
+jobs:
+  review:
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: "Review \${{ ${expression} }}"
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      text: \${{ github.event.issue.title }}
+    steps:
+      - run: echo done
+`;
+    const result = scanWorkflowFiles(
+      [parseWorkflowFile(".github/workflows/review.yml", raw)],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(diagnostics(result)).toContain(
+      "agentci/analysis-output-provenance-unknown",
+    );
+    expect(result.analysis_complete).toBe(false);
+  });
+
+  it("keeps a computed job output routed through a matrix unresolved", () => {
+    const raw = `
+on: issues
+permissions:
+  contents: write
+jobs:
+  review:
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: \${{ fromJSON(needs.prepare.outputs.matrix) }}
+    steps:
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          anthropic_api_key: \${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: \${{ secrets.GITHUB_TOKEN }}
+          allowed_non_write_users: "*"
+          prompt: "Review \${{ matrix.text }}"
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: \${{ steps.capture.outputs.matrix }}
+    steps:
+      - id: capture
+        env:
+          TITLE: \${{ github.event.issue.title }}
+        run: echo "matrix=$TITLE" >> "$GITHUB_OUTPUT"
+`;
+    const result = scanWorkflowFiles(
+      [parseWorkflowFile(".github/workflows/review.yml", raw)],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(diagnostics(result)).toContain(
+      "agentci/analysis-output-provenance-unknown",
+    );
+    expect(result.analysis_complete).toBe(false);
+  });
+
+  it("keeps a matrix built from a literal job output complete", () => {
+    const raw = `
+on: issues
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: '{"text":["safe"]}'
+    steps:
+      - run: echo done
+  review:
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: \${{ fromJSON(needs.prepare.outputs.matrix) }}
+    steps:
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: "Review \${{ matrix.text }}"
+`;
+    const result = scanWorkflowFiles(
+      [parseWorkflowFile(".github/workflows/review.yml", raw)],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(diagnostics(result)).not.toContain(
+      "agentci/analysis-output-provenance-unknown",
+    );
+    expect(result.analysis_complete).toBe(true);
+  });
+
+  it("does not call an event-derived matrix value clean when an AI prompt reads it", () => {
+    const raw = `
+on: issues
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        text: ["\${{ github.event.issue.title }}"]
+    steps:
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: "Review \${{ matrix.text }}"
+`;
+    const result = scanWorkflowFiles(
+      [parseWorkflowFile(".github/workflows/review.yml", raw)],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(diagnostics(result)).toContain(
+      "agentci/analysis-matrix-provenance-unknown",
+    );
+    expect(result.analysis_complete).toBe(false);
+  });
+
+  it.each([
+    "matrix.item.text",
+    "matrix.item['text']",
+    "matrix['item'].text",
+    "toJSON(matrix.item.text)",
+  ])(
+    "keeps a nested matrix member derived from a job output unresolved: %s",
+    (expression) => {
+      const raw = `
+on: issues
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: \${{ github.event.issue.title }}
+    steps:
+      - run: echo done
+  review:
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: \${{ fromJSON(needs.prepare.outputs.matrix) }}
+    steps:
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: "Review \${{ ${expression} }}"
+`;
+      const result = scanWorkflowFiles(
+        [parseWorkflowFile(".github/workflows/review.yml", raw)],
+        ".",
+        { ignore: [], ignorePaths: [] },
+      );
+      expect(diagnostics(result)).toContain(
+        "agentci/analysis-output-provenance-unknown",
+      );
+      expect(result.analysis_complete).toBe(false);
+    },
+  );
+
+  it("does not carry an Issue matrix source into a PR-only AI step", () => {
+    const raw = `
+on: [issues, pull_request]
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        text: ["\${{ github.event.issue.title }}"]
+    steps:
+      - if: github.event_name == 'pull_request'
+        uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: "Review \${{ matrix.text }}"
+`;
+    const result = scanWorkflowFiles(
+      [parseWorkflowFile(".github/workflows/review.yml", raw)],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(diagnostics(result)).not.toContain(
+      "agentci/analysis-matrix-provenance-unknown",
+    );
+    expect(result.analysis_complete).toBe(true);
+  });
+
+  it.each(["needs.prepare.outputs.text", "toJSON(needs)"])(
+    "keeps a literal needs output complete: %s",
+    (expression) => {
+      const raw = `
+on: issues
+permissions:
+  contents: write
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      text: fixed
+    steps:
+      - run: echo done
+  review:
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: "Review \${{ ${expression} }}"
+`;
+      const result = scanWorkflowFiles(
+        [parseWorkflowFile(".github/workflows/review.yml", raw)],
+        ".",
+        { ignore: [], ignorePaths: [] },
+      );
+      expect(diagnostics(result)).not.toContain(
+        "agentci/analysis-output-provenance-unknown",
+      );
+      expect(result.analysis_complete).toBe(true);
+    },
+  );
+
+  it("does not attribute a later producer to an earlier AI step", () => {
+    const raw = `
+on: issues
+permissions:
+  contents: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: "Review \${{ steps.capture.outputs.text }}"
+      - id: capture
+        env:
+          TITLE: \${{ github.event.issue.title }}
+        run: echo "text=$TITLE" >> "$GITHUB_OUTPUT"
+`;
+    const result = scanWorkflowFiles(
+      [parseWorkflowFile(".github/workflows/review.yml", raw)],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(diagnostics(result)).not.toContain(
+      "agentci/analysis-output-provenance-unknown",
+    );
+    expect(result.analysis_complete).toBe(true);
+  });
+
+  it("keeps forwarded needs outputs unresolved inside a local reusable workflow", () => {
+    const caller = `
+on: issues
+permissions:
+  contents: write
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      text: \${{ github.event.issue.title }}
+    steps:
+      - run: echo done
+  delegate:
+    needs: prepare
+    uses: ./.github/workflows/agent.yml
+    with:
+      text: \${{ needs.prepare.outputs.text }}
+`;
+    const callee = `
+on: workflow_call
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: "Review \${{ inputs.text }}"
+`;
+    const result = scanWorkflowFiles(
+      [
+        parseWorkflowFile(".github/workflows/caller.yml", caller),
+        parseWorkflowFile(".github/workflows/agent.yml", callee),
+      ],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(diagnostics(result)).toContain(
+      "agentci/analysis-output-provenance-unknown",
+    );
+    expect(result.analysis_complete).toBe(false);
+  });
+
+  it.each([
+    "format('Review {0}', inputs.text)",
+    "inputs['text']",
+    "toJSON(inputs)",
+  ])("keeps composed reusable input aliases unresolved: %s", (expression) => {
+    const caller = `
+on: issues
+permissions:
+  contents: write
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      text: \${{ github.event.issue.title }}
+    steps:
+      - run: echo done
+  delegate:
+    needs: prepare
+    uses: ./.github/workflows/agent.yml
+    with:
+      text: \${{ needs.prepare.outputs.text }}
+`;
+    const callee = `
+on: workflow_call
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: "Review \${{ ${expression} }}"
+`;
+    const result = scanWorkflowFiles(
+      [
+        parseWorkflowFile(".github/workflows/caller.yml", caller),
+        parseWorkflowFile(".github/workflows/agent.yml", callee),
+      ],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(diagnostics(result)).toContain(
+      "agentci/analysis-output-provenance-unknown",
+    );
+    expect(result.analysis_complete).toBe(false);
+  });
+
+  it("keeps a composed reusable input forwarded through GITHUB_ENV unresolved", () => {
+    const caller = `
+on: issues
+permissions:
+  contents: write
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      text: \${{ github.event.issue.title }}
+    steps:
+      - run: echo done
+  delegate:
+    needs: prepare
+    uses: ./.github/workflows/agent.yml
+    with:
+      text: \${{ needs.prepare.outputs.text }}
+`;
+    const callee = `
+on: workflow_call
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "REQUEST=\${{ format('{0}', inputs.text) }}" >> "$GITHUB_ENV"
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: fixed
+`;
+    const result = scanWorkflowFiles(
+      [
+        parseWorkflowFile(".github/workflows/caller.yml", caller),
+        parseWorkflowFile(".github/workflows/agent.yml", callee),
+      ],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(diagnostics(result)).toContain(
+      "agentci/analysis-output-provenance-unknown",
+    );
+    expect(result.analysis_complete).toBe(false);
+  });
+
+  it("does not call a composed reusable event input clean", () => {
+    const caller = `
+on: issues
+permissions:
+  contents: write
+jobs:
+  delegate:
+    uses: ./.github/workflows/agent.yml
+    with:
+      text: \${{ github.event.issue.title }}
+`;
+    const callee = `
+on: workflow_call
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: "Review \${{ format('{0}', inputs.text) }}"
+`;
+    const result = scanWorkflowFiles(
+      [
+        parseWorkflowFile(".github/workflows/caller.yml", caller),
+        parseWorkflowFile(".github/workflows/agent.yml", callee),
+      ],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(diagnostics(result)).toContain(
+      "agentci/analysis-reusable-input-provenance-unknown",
+    );
+    expect(result.analysis_complete).toBe(false);
+  });
+
+  it("keeps a composed reusable input literal complete", () => {
+    const caller = `
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  delegate:
+    uses: ./.github/workflows/agent.yml
+    with:
+      text: safe
+`;
+    const callee = `
+on: workflow_call
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: "Review \${{ format('value {0}', inputs.text) }}"
+`;
+    const result = scanWorkflowFiles(
+      [
+        parseWorkflowFile(".github/workflows/caller.yml", caller),
+        parseWorkflowFile(".github/workflows/agent.yml", callee),
+      ],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(result.analysis_complete).toBe(true);
+  });
+
+  it("keeps nested reusable input forwarding analysis-incomplete", () => {
+    const entry = `
+on: issues
+permissions:
+  contents: write
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      text: \${{ github.event.issue.title }}
+    steps:
+      - run: echo done
+  delegate:
+    needs: prepare
+    uses: ./.github/workflows/mid.yml
+    with:
+      text: \${{ needs.prepare.outputs.text }}
+`;
+    const middle = `
+on: workflow_call
+jobs:
+  delegate:
+    uses: ./.github/workflows/agent.yml
+    with:
+      text: \${{ format('{0}', inputs.text) }}
+`;
+    const leaf = `
+on: workflow_call
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: "Review \${{ inputs.text }}"
+`;
+    const result = scanWorkflowFiles(
+      [
+        parseWorkflowFile(".github/workflows/entry.yml", entry),
+        parseWorkflowFile(".github/workflows/mid.yml", middle),
+        parseWorkflowFile(".github/workflows/agent.yml", leaf),
+      ],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(diagnostics(result)).toContain(
+      "agentci/analysis-reusable-input-provenance-unknown",
+    );
+    expect(result.analysis_complete).toBe(false);
+  });
+
+  it("keeps nested reusable matrix forwarding analysis-incomplete", () => {
+    const entry = `
+on: issues
+permissions:
+  contents: write
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: \${{ github.event.issue.title }}
+    steps:
+      - run: echo done
+  delegate:
+    needs: prepare
+    uses: ./.github/workflows/mid.yml
+    with:
+      matrix: \${{ needs.prepare.outputs.matrix }}
+`;
+    const middle = `
+on: workflow_call
+jobs:
+  delegate:
+    uses: ./.github/workflows/agent.yml
+    with:
+      matrix: \${{ format('{0}', inputs.matrix) }}
+`;
+    const leaf = `
+on: workflow_call
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: \${{ fromJSON(inputs.matrix) }}
+    steps:
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: "Review \${{ matrix.text }}"
+`;
+    const result = scanWorkflowFiles(
+      [
+        parseWorkflowFile(".github/workflows/entry.yml", entry),
+        parseWorkflowFile(".github/workflows/mid.yml", middle),
+        parseWorkflowFile(".github/workflows/agent.yml", leaf),
+      ],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(diagnostics(result)).toContain(
+      "agentci/analysis-reusable-input-provenance-unknown",
+    );
+    expect(result.analysis_complete).toBe(false);
+  });
+
+  it("keeps a forwarded output unresolved when a reusable workflow expands it through a matrix", () => {
+    const caller = `
+on: issues
+permissions:
+  contents: write
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: \${{ steps.capture.outputs.matrix }}
+    steps:
+      - id: capture
+        env:
+          TITLE: \${{ github.event.issue.title }}
+        run: echo "matrix=$TITLE" >> "$GITHUB_OUTPUT"
+  delegate:
+    needs: prepare
+    uses: ./.github/workflows/agent.yml
+    with:
+      matrix: \${{ needs.prepare.outputs.matrix }}
+`;
+    const callee = `
+on: workflow_call
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: \${{ fromJSON(inputs.matrix) }}
+    steps:
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: "Review \${{ matrix.text }}"
+`;
+    const result = scanWorkflowFiles(
+      [
+        parseWorkflowFile(".github/workflows/caller.yml", caller),
+        parseWorkflowFile(".github/workflows/agent.yml", callee),
+      ],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(diagnostics(result)).toContain(
+      "agentci/analysis-output-provenance-unknown",
+    );
+    expect(result.analysis_complete).toBe(false);
+  });
+
+  it.each([
+    {
+      name: "event-derived",
+      prepare: "",
+      matrix: `matrix:
+        text: ["\${{ github.event.issue.title }}"]`,
+      unknown: true,
+    },
+    {
+      name: "job-output-derived",
+      prepare: `  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: \${{ github.event.issue.title }}
+    steps:
+      - run: echo done
+`,
+      matrix: `matrix: \${{ fromJSON(needs.prepare.outputs.matrix) }}`,
+      unknown: true,
+    },
+    {
+      name: "literal",
+      prepare: "",
+      matrix: `matrix:
+        text: [safe]`,
+      unknown: false,
+    },
+  ])(
+    "tracks a reusable caller's $name matrix into its AI callee",
+    ({ prepare, matrix, unknown }) => {
+      const caller = `
+on: issues
+permissions:
+  contents: write
+jobs:
+${prepare}  delegate:
+    ${prepare ? "needs: prepare\n    " : ""}uses: ./.github/workflows/agent.yml
+    strategy:
+      ${matrix}
+    with:
+      text: \${{ matrix.text }}
+`;
+      const callee = `
+on: workflow_call
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251
+        with:
+          prompt: "Review \${{ inputs.text }}"
+`;
+      const result = scanWorkflowFiles(
+        [
+          parseWorkflowFile(".github/workflows/caller.yml", caller),
+          parseWorkflowFile(".github/workflows/agent.yml", callee),
+        ],
+        ".",
+        { ignore: [], ignorePaths: [] },
+      );
+      expect(
+        diagnostics(result).includes(
+          "agentci/analysis-reusable-input-provenance-unknown",
+        ),
+      ).toBe(unknown);
+      if (unknown) {
+        expect(
+          result.diagnostics.find(
+            ({ code }) =>
+              code === "agentci/analysis-reusable-input-provenance-unknown",
+          )?.step_index,
+        ).toBe(0);
+      }
+      expect(result.analysis_complete).toBe(!unknown);
+    },
+  );
+
   it("does not treat an unused untrusted or secret env value as a literal GITHUB_ENV export", () => {
     const raw = `
 on:
