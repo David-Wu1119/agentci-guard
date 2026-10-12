@@ -86,7 +86,10 @@ function renderResult(result) {
     agentUsages.append(item);
   }
 
-  for (const finding of result.findings) {
+  const severityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+  for (const finding of [...result.findings].sort((a, b) =>
+    (severityOrder[a.severity] ?? 4) - (severityOrder[b.severity] ?? 4)
+  )) {
     const item = document.createElement('li');
     const title = document.createElement('h5');
     title.textContent = `${finding.severity.toUpperCase()} · ${finding.title}`;

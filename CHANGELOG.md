@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The browser trial lists findings by review severity (critical before high,
+  medium, and low), keeping their original order within a severity. The scanner
+  result and rule priorities are unchanged.
 - Findings and agent uses now distinguish event paths resolved by modeled
   `if` predicates from paths retained only because a predicate is unknown.
   Text, Markdown, SARIF, and the browser show that distinction; the development

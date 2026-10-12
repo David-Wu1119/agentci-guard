@@ -226,6 +226,8 @@ assert.equal(
   true,
 );
 assert.equal(sample.rules.length, 2);
+assert.match(sample.rules[0], /^CRITICAL · /);
+assert.match(sample.rules[1], /^HIGH · /);
 assert.equal(sample.usages.length, 1);
 assert.match(sample.usages[0], /Evidence:.*anthropics\/claude-code-action@/);
 assert.match(sample.usages[0], /Virtual location:.*input\.yml:/);
