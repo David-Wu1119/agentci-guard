@@ -1,8 +1,8 @@
 # Static Analysis Model
 
 AgentCI Guard evaluates each AI step under an explicit effective context. This
-document describes the **unreleased source-provenance candidate in this
-checkout**. The published v0.1.1 annotation predicates in
+document describes the **source-provenance candidate in this source tree**, not
+the tagged `v0.6.2` Action/CLI. The published v0.1.1 annotation predicates in
 [`benchmark/pilot/contracts/v0.1.1/RULES.md`](../benchmark/pilot/contracts/v0.1.1/RULES.md)
 remain a historical contract; changed candidate outcomes cannot be scored
 against those labels as independent accuracy evidence. The documented vendor
@@ -336,8 +336,9 @@ are included. GitHub currently documents those events as public preview.
 The verified Anthropic Action revision
 [`1d6de8c`](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/github/context.ts#L250-L251)
 rejects both events before Claude starts. The scanner excludes only those event
-paths for that immutable ref and emits an incomplete-analysis diagnostic. A
-mutable or unverified ref retains potential findings with a separate
+paths for that immutable ref and emits a provenance diagnostic; this
+conclusively closed path does not make the analysis incomplete. A mutable or
+unverified ref retains potential findings with a separate
 compatibility diagnostic; CLI agents and other Actions remain in scope.
 
 ## Permissions
@@ -362,7 +363,7 @@ known policy through `agentci.config.json`:
 map.
 
 `broad-write-permissions` is a model of the workflow's `GITHUB_TOKEN`. The
-unreleased write-token rule also recognizes one separate capability path. At
+source-aware write-token rule also recognizes one separate capability path. At
 the pinned Anthropic revision, the full Action without an explicit
 `github_token` input [exchanges an OIDC token for its GitHub App
 token](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/github/token.ts);

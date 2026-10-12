@@ -206,9 +206,11 @@ Detection is a hand-maintained list in `src/detect.ts` with three shapes:
   reach the repository, and the `misleading-non-agent` corpus case will
   reject it.
 
-Actions are presumed to fetch the triggering event's content themselves; CLIs
-and HTTP calls are not, because a shell hands them only what the script puts
-in. Preserve that distinction when adding a pattern.
+Only inspected immutable Action revisions and event paths inherit a documented
+implicit-fetch model; do not infer self-fetching for other refs. Local CLIs and
+direct HTTP dispatches are traced through modeled command, request-body, and
+environment inputs; unresolved flow stays unknown. Preserve that distinction
+when adding a pattern.
 
 A quick audit for stale patterns: run the 16 former evaluation diversity cases
 (`benchmark/snapshots/holdout-*`, now development data) and confirm each reports at least one agent

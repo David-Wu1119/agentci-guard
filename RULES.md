@@ -1,8 +1,8 @@
 # AgentCI Guard Rule Contract
 
-This file describes the later nine-rule baseline and the unreleased candidate
-changes in this checkout. It is **not** the v0.1.1 annotation contract: that
-exact eight-rule contract is archived in
+This file describes the later nine-rule baseline and the source-aware candidate
+changes in this checkout, which are not in the tagged `v0.6.2` Action/CLI.
+It is **not** the v0.1.1 annotation contract: that exact eight-rule contract is archived in
 [`benchmark/pilot/contracts/v0.1.1/RULES.md`](benchmark/pilot/contracts/v0.1.1/RULES.md).
 A finding rates supported static semantics, not proven exploitability or
 workflow insecurity.
@@ -54,7 +54,7 @@ produce an analysis diagnostic, not AI findings. Mutable or unverified refs
 retain potential findings and a compatibility diagnostic; this does not remove
 discussion sources from CLI agents or other Actions.
 
-## Unreleased source-provenance candidate
+## Source-provenance candidate
 
 The local scanner keeps each supported event expression's source class through
 rule evaluation. A recognized actor gate authenticates the triggering actor;
@@ -186,7 +186,7 @@ or configured actor filters. See the
 and [data fetcher](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/github/data/fetcher.ts).
 
 The historical v0.1.1 write predicate uses effective workflow
-`GITHUB_TOKEN` permissions. The unreleased candidate additionally treats the
+`GITHUB_TOKEN` permissions. The source-aware candidate additionally treats the
 full Anthropic Action with no `with.github_token` and **known** effective
 `id-token: write` as potentially write-capable through an OIDC-backed App
 token. Its documented App scopes include contents, pull requests, and issues
@@ -197,7 +197,7 @@ credentials remain unmodeled. A negative finding is not proof of no write
 authority. See the pinned [token setup](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/github/token.ts)
 and [App permissions](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/docs/security.md#github-app-permissions).
 
-## Unreleased reusable-secret correction
+## Source-aware reusable-secret correction
 
 The pre-candidate table above and archived v0.1.1 contract count inherited
 secrets as `ai-with-secrets` exposure. The candidate instead requires a
@@ -220,7 +220,7 @@ Critical rules combine attacker-influenced input or privileged trigger context
 with an AI agent and repository-side authority. In the later nine-rule
 baseline, `gated-ai-write-token` was the one deliberate exception: it lowered
 the same pattern when the Action's documented default checked the triggering
-actor. The unreleased candidate narrows that downgrade to modeled content
+actor. The source-aware candidate narrows that downgrade to modeled content
 attributable to that actor. High rules expose a direct source-to-sink path,
 command capability, or attacker-controlled checkout in a privileged context.
 Medium rules describe consequential exposure or blast radius but do not, by

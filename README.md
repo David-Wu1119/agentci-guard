@@ -38,8 +38,8 @@ effect in [`CHANGELOG.md`](CHANGELOG.md). The original 41-case adversarial
 regression set overruled two proposed changes; the public corpus has since
 grown with source-provenance cases. It is not an accuracy benchmark.
 
-The source-provenance behavior described below is an **unreleased candidate in
-this checkout**, not a property of the published `v0.6.2` Action or CLI. The
+The source-provenance behavior described below is a **research candidate in
+this source tree**, not a property of the tagged `v0.6.2` Action or CLI. The
 historical v0.1.1 eight-rule annotation contract remains unchanged in
 [`benchmark/pilot/contracts/v0.1.1/RULES.md`](benchmark/pilot/contracts/v0.1.1/RULES.md);
 these edits do not retroactively validate its labels or establish accuracy for
@@ -69,7 +69,7 @@ AgentCI Guard has not demonstrated a novel detector or comparative advantage.
 
 ## What it detects
 
-Nine rules, one threat model — the baseline and unreleased candidate are
+Nine rules, one threat model — the baseline and source-aware candidate are
 documented in [`RULES.md`](RULES.md), with the reasoning in
 [`THREAT_MODEL.md`](THREAT_MODEL.md). A current nine-rule human annotation
 contract has not been frozen.
@@ -158,8 +158,8 @@ findings cannot look clean when the analyzer did not finish:
 
 The npm registry may lag the Action release (publication is a separate,
 human-authorized step; see [`docs/OPERATIONS.md`](docs/OPERATIONS.md)). To
-evaluate exactly the tested candidate, install the tarball attached to the
-release — its SHA-256 is in the release notes and in
+evaluate the tagged `v0.6.2` release rather than this newer source-aware
+candidate, install its tarball. The SHA-256 is in the release notes and in
 `evidence/sprint-2026-09-05/day9/SHA256SUMS-v0.6.2.txt`:
 
 ```bash
@@ -311,7 +311,7 @@ Concretely:
   separate untrusted history, without resolving each author's identity or
   Action-side actor filters; see the [pinned fetcher](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/github/data/fetcher.ts).
 - `broad-write-permissions` models the workflow's effective `GITHUB_TOKEN`
-  scopes. The unreleased write-token rule also recognizes one separate path:
+  scopes. The source-aware write-token rule also recognizes one separate path:
   full `anthropics/claude-code-action` without `with.github_token` and with a
   known effective `id-token: write` can exchange OIDC for an App token whose
   documented permissions include contents, issues, and pull requests at write

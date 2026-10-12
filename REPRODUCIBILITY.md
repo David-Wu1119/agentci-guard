@@ -142,6 +142,18 @@ but their recorded origins are not currently independently verifiable. The
 receipt records this tool run, not a GitHub attestation; a later run may
 produce different counts.
 
+A 2026-10-12 follow-up left the six original 404 results unchanged. Running
+the same blob-SHA, size, and byte comparison against alternate GitHub
+repositories found exact pinned matches for
+[`ai-018`](https://github.com/amir-deriv/deriv-analytics/blob/f60d5e198aa102ed97b2264e5634d38dc10ae164/.github/workflows/claude.yml)
+(`amir-deriv/deriv-analytics`) and
+[`ai-040`](https://github.com/pydantic/pydantic-ai/blob/e7c9b823cf99c75cf9b3633351b75a84ecbd9091/.github/workflows/bots.yml)
+(`pydantic/pydantic-ai`). This independently verifies those two snapshot files
+at the alternate pinned commits, but does **not** prove that either repository
+is a rename or transfer of the repository recorded in the frozen manifest.
+The other four have no verified alternate pinned source. The original-owner
+provenance of all six remains unresolved.
+
 ## Annotation toolchain smoke
 
 ```bash
