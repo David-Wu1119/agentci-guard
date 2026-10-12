@@ -199,6 +199,27 @@ for (const testCase of manifest.cases) {
   }
 }
 
+const indexedComment = scan(`on: issue_comment
+permissions:
+  contents: write
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - run: codex exec "\${{ github['event']['comment']['body'] }}"
+`);
+assert.equal(indexedComment.analysis_complete, true);
+assert.ok(
+  indexedComment.findings.some(
+    ({ rule_id }) => rule_id === "agentci/untrusted-input-in-prompt",
+  ),
+);
+assert.ok(
+  indexedComment.findings.some(
+    ({ rule_id }) => rule_id === "agentci/untrusted-ai-write-token",
+  ),
+);
+
 assert.throws(() => scan("foo: bar\n"), /not a GitHub Actions workflow/);
 assert.throws(
   () => scan("on:\njobs:\n  agent: {}\n"),
