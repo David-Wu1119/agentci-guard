@@ -9329,7 +9329,8 @@ function analyzeWorkflow(workflow, repository, context) {
           severity: "error",
           file,
           message: workflow.parse_error.message,
-          line: workflow.parse_error.line
+          line: workflow.parse_error.line,
+          ...context.callChain.length > 0 ? { call_chain: context.callChain } : {}
         }
       ]
     };
@@ -10335,6 +10336,11 @@ ${writerInput.material}`,
   }
   const ignores = parseInlineIgnores(workflow.raw);
   output.findings = ignores.all ? [] : output.findings.filter((finding) => !ignores.rules.has(finding.rule_id));
+  if (context.callChain.length > 0) {
+    for (const diagnostic of output.diagnostics) {
+      diagnostic.call_chain ??= context.callChain;
+    }
+  }
   return output;
 }
 function analyzeReusableCall(caller, jobName, rawJob, jobLine, events, uncertainEvents, creationOnlyEvents, permissions, repository, context) {
@@ -10746,7 +10752,15 @@ function dedupe(findings) {
 function dedupeDiagnostics(diagnostics) {
   const seen = /* @__PURE__ */ new Set();
   return diagnostics.filter((diagnostic) => {
-    const key = `${diagnostic.code}:${diagnostic.file}:${diagnostic.job ?? ""}:${diagnostic.step_index ?? ""}:${diagnostic.line ?? ""}:${diagnostic.message}`;
+    const key = JSON.stringify([
+      diagnostic.code,
+      diagnostic.file,
+      diagnostic.job ?? null,
+      diagnostic.step_index ?? null,
+      diagnostic.line ?? null,
+      diagnostic.message,
+      diagnostic.call_chain ?? []
+    ]);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -10936,13 +10950,22 @@ async function runAction(environment = process.env, io = DEFAULT_IO) {
   try {
     const target = input(environment, "PATH", ".");
     const sarifPath = input(environment, "SARIF", "agentci-results.sarif");
+    const jsonInput = environment.INPUT_JSON;
+    const jsonPath = jsonInput?.trim();
     const failOn = parseFailOn(
       input(environment, "FAIL-ON", "high").toLowerCase()
     );
     if (!target.trim()) throw new Error("path input must not be empty.");
     if (!sarifPath.trim()) throw new Error("sarif input must not be empty.");
-    if (/[\r\n]/.test(target) || /[\r\n]/.test(sarifPath)) {
-      throw new Error("path and sarif inputs must be single-line values.");
+    if (jsonInput && !jsonPath)
+      throw new Error("json input must not be empty.");
+    if (/[\r\n]/.test(target) || /[\r\n]/.test(sarifPath) || jsonInput && /[\r\n]/.test(jsonInput)) {
+      throw new Error(
+        "path, sarif and json inputs must be single-line values."
+      );
+    }
+    if (jsonPath && path3.resolve(jsonPath) === path3.resolve(sarifPath)) {
+      throw new Error("json and sarif inputs must refer to different files.");
     }
     const targetStat = await fs3.stat(path3.resolve(target)).catch(() => null);
     if (!targetStat?.isDirectory()) {
@@ -10957,6 +10980,15 @@ async function runAction(environment = process.env, io = DEFAULT_IO) {
 `,
       "utf8"
     );
+    if (jsonPath) {
+      const resolvedJson = path3.resolve(jsonPath);
+      await fs3.mkdir(path3.dirname(resolvedJson), { recursive: true });
+      await fs3.writeFile(resolvedJson, `${JSON.stringify(result, null, 2)}
+`, {
+        encoding: "utf8",
+        flag: "wx"
+      });
+    }
     io.log(renderTextReport(result));
     if (!result.analysis_complete) {
       const codes = [
@@ -10977,7 +11009,8 @@ async function runAction(environment = process.env, io = DEFAULT_IO) {
     if (outputFile) {
       await fs3.appendFile(
         outputFile,
-        formatGithubOutputs(result, sarifPath),
+        `${formatGithubOutputs(result, sarifPath)}${jsonPath ? `json-path=${jsonPath}
+` : ""}`,
         "utf8"
       );
     }

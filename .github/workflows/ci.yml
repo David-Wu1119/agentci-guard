@@ -86,6 +86,7 @@ jobs:
         with:
           path: examples/vulnerable
           sarif: artifacts/vulnerable.sarif
+          json: artifacts/vulnerable.json
           fail-on: none
 
       - name: Verify vulnerable Action outputs
@@ -96,6 +97,7 @@ jobs:
           EXPECT_MEDIUM: ${{ steps.vulnerable.outputs.medium }}
           EXPECT_LOW: ${{ steps.vulnerable.outputs.low }}
           OUTPUT_SARIF_PATH: ${{ steps.vulnerable.outputs.sarif-path }}
+          OUTPUT_JSON_PATH: ${{ steps.vulnerable.outputs.json-path }}
           ANALYSIS_COMPLETE: ${{ steps.vulnerable.outputs.analysis-complete }}
           EXPECT_DIAGNOSTICS: ${{ steps.vulnerable.outputs.diagnostics }}
         run: |
@@ -107,6 +109,8 @@ jobs:
           test "$EXPECT_MEDIUM" = "3"
           test "$EXPECT_LOW" = "0"
           test "$OUTPUT_SARIF_PATH" = "artifacts/vulnerable.sarif"
+          test "$OUTPUT_JSON_PATH" = "artifacts/vulnerable.json"
+          node -e 'const r = JSON.parse(require("node:fs").readFileSync(process.env.OUTPUT_JSON_PATH, "utf8")); if (r.findings.length !== 9 || r.agent_usages.length === 0 || r.diagnostics.length !== 1 || r.analysis_complete !== false || !r.findings.every((f) => f.id && f.rule_id)) process.exit(1)'
           test "$ANALYSIS_COMPLETE" = "false"
           test "$EXPECT_DIAGNOSTICS" = "1"
 
@@ -116,6 +120,7 @@ jobs:
         with:
           path: examples/hardened
           sarif: artifacts/hardened.sarif
+          json: artifacts/hardened.json
           fail-on: none
 
       - name: Verify hardened Action outputs
@@ -126,13 +131,43 @@ jobs:
           EXPECT_MEDIUM: ${{ steps.hardened.outputs.medium }}
           EXPECT_LOW: ${{ steps.hardened.outputs.low }}
           OUTPUT_SARIF_PATH: ${{ steps.hardened.outputs.sarif-path }}
+          OUTPUT_JSON_PATH: ${{ steps.hardened.outputs.json-path }}
           ANALYSIS_COMPLETE: ${{ steps.hardened.outputs.analysis-complete }}
         run: |
           node scripts/verify-sarif-schema.mjs artifacts/hardened.sarif
           node scripts/verify-sarif.mjs artifacts/hardened.sarif
           test "$EXPECT_FINDINGS" = "0"
           test "$OUTPUT_SARIF_PATH" = "artifacts/hardened.sarif"
+          test "$OUTPUT_JSON_PATH" = "artifacts/hardened.json"
+          node -e 'const r = JSON.parse(require("node:fs").readFileSync(process.env.OUTPUT_JSON_PATH, "utf8")); if (r.findings.length !== 0 || r.agent_usages.length !== 0 || r.analysis_complete !== true) process.exit(1)'
           test "$ANALYSIS_COMPLETE" = "true"
+
+      - name: Action smoke - reusable caller chain
+        uses: ./
+        with:
+          path: corpus/adversarial/cases/local-reusable
+          sarif: artifacts/reusable.sarif
+          json: artifacts/reusable.json
+          fail-on: none
+
+      - name: Verify reusable caller chain in Action JSON
+        run: |
+          node -e 'const assert = require("node:assert/strict"); const r = JSON.parse(require("node:fs").readFileSync("artifacts/reusable.json", "utf8")); assert.deepEqual(r.agent_usages[0]?.call_chain, [".github/workflows/caller.yml#agent", ".github/workflows/bridge.yml#agent"]); assert(r.findings.some((f) => f.call_chain?.[0] === ".github/workflows/caller.yml#agent"))'
+
+      - name: Action smoke - JSON omitted
+        id: no-json
+        uses: ./
+        with:
+          path: examples/hardened
+          sarif: artifacts/no-json.sarif
+          fail-on: none
+
+      - name: Verify omitted JSON stays unwritten
+        env:
+          OMITTED_JSON_PATH: ${{ steps.no-json.outputs.json-path }}
+        run: |
+          test -z "$OMITTED_JSON_PATH"
+          test ! -e agentci-results.json
 
       - name: Action smoke - threshold failure
         id: threshold
@@ -141,6 +176,7 @@ jobs:
         with:
           path: examples/vulnerable
           sarif: artifacts/threshold.sarif
+          json: artifacts/threshold.json
           fail-on: high
 
       - name: Verify Action threshold behavior
@@ -151,11 +187,14 @@ jobs:
           EXPECT_HIGH: ${{ steps.threshold.outputs.high }}
           EXPECT_MEDIUM: ${{ steps.threshold.outputs.medium }}
           EXPECT_LOW: ${{ steps.threshold.outputs.low }}
+          OUTPUT_JSON_PATH: ${{ steps.threshold.outputs.json-path }}
           STEP_OUTCOME: ${{ steps.threshold.outcome }}
         run: |
           test "$STEP_OUTCOME" = "failure"
           node scripts/verify-sarif-schema.mjs artifacts/threshold.sarif
           node scripts/verify-sarif.mjs artifacts/threshold.sarif
+          test "$OUTPUT_JSON_PATH" = "artifacts/threshold.json"
+          node -e 'const r = JSON.parse(require("node:fs").readFileSync(process.env.OUTPUT_JSON_PATH, "utf8")); if (r.findings.length !== 9 || !r.findings.every((f) => f.id)) process.exit(1)'
           test "$EXPECT_HIGH" -gt 0
 
       - name: CLI smoke

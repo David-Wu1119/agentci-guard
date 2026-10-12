@@ -34,14 +34,28 @@ export async function runAction(
   try {
     const target = input(environment, "PATH", ".");
     const sarifPath = input(environment, "SARIF", "agentci-results.sarif");
+    // The runner passes an omitted optional input as an empty environment value.
+    const jsonInput = environment.INPUT_JSON;
+    const jsonPath = jsonInput?.trim();
     const failOn = parseFailOn(
       input(environment, "FAIL-ON", "high").toLowerCase(),
     );
 
     if (!target.trim()) throw new Error("path input must not be empty.");
     if (!sarifPath.trim()) throw new Error("sarif input must not be empty.");
-    if (/[\r\n]/.test(target) || /[\r\n]/.test(sarifPath)) {
-      throw new Error("path and sarif inputs must be single-line values.");
+    if (jsonInput && !jsonPath)
+      throw new Error("json input must not be empty.");
+    if (
+      /[\r\n]/.test(target) ||
+      /[\r\n]/.test(sarifPath) ||
+      (jsonInput && /[\r\n]/.test(jsonInput))
+    ) {
+      throw new Error(
+        "path, sarif and json inputs must be single-line values.",
+      );
+    }
+    if (jsonPath && path.resolve(jsonPath) === path.resolve(sarifPath)) {
+      throw new Error("json and sarif inputs must refer to different files.");
     }
 
     const targetStat = await fs.stat(path.resolve(target)).catch(() => null);
@@ -57,6 +71,14 @@ export async function runAction(
       `${JSON.stringify(toSarif(result), null, 2)}\n`,
       "utf8",
     );
+    if (jsonPath) {
+      const resolvedJson = path.resolve(jsonPath);
+      await fs.mkdir(path.dirname(resolvedJson), { recursive: true });
+      await fs.writeFile(resolvedJson, `${JSON.stringify(result, null, 2)}\n`, {
+        encoding: "utf8",
+        flag: "wx",
+      });
+    }
 
     io.log(renderTextReport(result));
 
@@ -81,7 +103,7 @@ export async function runAction(
     if (outputFile) {
       await fs.appendFile(
         outputFile,
-        formatGithubOutputs(result, sarifPath),
+        `${formatGithubOutputs(result, sarifPath)}${jsonPath ? `json-path=${jsonPath}\n` : ""}`,
         "utf8",
       );
     }
