@@ -7535,7 +7535,7 @@ var AI_AGENT_PATTERNS = [
 ];
 var UNTRUSTED_CONTEXT_PATTERNS = [
   {
-    pattern: /github\.event\.pull_request\.(body|title)/i,
+    pattern: /(?:^|[^A-Za-z0-9_.])github\.event\.pull_request\.(body|title)(?![A-Za-z0-9_-])/i,
     source: "pull_request",
     events: [
       "pull_request",
@@ -7546,7 +7546,7 @@ var UNTRUSTED_CONTEXT_PATTERNS = [
     parentEvents: ["pull_request_review", "pull_request_review_comment"]
   },
   {
-    pattern: /github\.event\.pull_request\.head\.ref/i,
+    pattern: /(?:^|[^A-Za-z0-9_.])github\.event\.pull_request\.head\.ref(?![A-Za-z0-9_-])/i,
     source: "pr_head_ref",
     events: [
       "pull_request",
@@ -7557,19 +7557,19 @@ var UNTRUSTED_CONTEXT_PATTERNS = [
     parentEvents: ["pull_request_review", "pull_request_review_comment"]
   },
   {
-    pattern: /github\.event\.issue\.(body|title)/i,
+    pattern: /(?:^|[^A-Za-z0-9_.])github\.event\.issue\.(body|title)(?![A-Za-z0-9_-])/i,
     source: "issue",
     events: ["issues", "issue_comment"],
     parentEvents: ["issue_comment"]
   },
   {
-    pattern: /github\.event\.discussion\.(body|title)/i,
+    pattern: /(?:^|[^A-Za-z0-9_.])github\.event\.discussion\.(body|title)(?![A-Za-z0-9_-])/i,
     source: "discussion",
     events: ["discussion", "discussion_comment"],
     parentEvents: ["discussion_comment"]
   },
   {
-    pattern: /github\.event\.comment\.body/i,
+    pattern: /(?:^|[^A-Za-z0-9_.])github\.event\.comment\.body(?![A-Za-z0-9_-])/i,
     source: "comment",
     events: [
       "issue_comment",
@@ -7578,22 +7578,22 @@ var UNTRUSTED_CONTEXT_PATTERNS = [
     ]
   },
   {
-    pattern: /github\.event\.review\.body/i,
+    pattern: /(?:^|[^A-Za-z0-9_.])github\.event\.review\.body(?![A-Za-z0-9_-])/i,
     source: "review",
     events: ["pull_request_review"]
   },
   {
-    pattern: /github\.event\.head_commit\.message/i,
+    pattern: /(?:^|[^A-Za-z0-9_.])github\.event\.head_commit\.message(?![A-Za-z0-9_-])/i,
     source: "commit",
     events: ["push"]
   },
   {
-    pattern: /github\.head_ref/i,
+    pattern: /(?:^|[^A-Za-z0-9_.])github\.head_ref(?![A-Za-z0-9_-])/i,
     source: "pr_head_ref",
     events: ["pull_request", "pull_request_target"]
   },
   {
-    pattern: /github\.ref_name/i,
+    pattern: /(?:^|[^A-Za-z0-9_.])github\.ref_name(?![A-Za-z0-9_-])/i,
     source: "other",
     events: ["*"]
   }
@@ -8487,7 +8487,11 @@ function matchingGitHubContextPatterns(value) {
     let quoted = false;
     let end = -1;
     for (let index = start + 3; index < value.length; index++) {
-      if (value[index] === "'") {
+      const indexed = !quoted && value[index] === "[" ? /^\[\s*'([A-Za-z_][A-Za-z0-9_-]*)'\s*\]/.exec(value.slice(index)) : null;
+      if (indexed) {
+        expression += `.${indexed[1]}`;
+        index += indexed[0].length - 1;
+      } else if (value[index] === "'") {
         if (quoted && value[index + 1] === "'") index++;
         else quoted = !quoted;
       } else if (!quoted && value.startsWith("}}", index)) {
@@ -8498,6 +8502,7 @@ function matchingGitHubContextPatterns(value) {
       }
     }
     if (end < 0) break;
+    expression = expression.replace(/\s*\.\s*/g, ".");
     for (const candidate of UNTRUSTED_CONTEXT_PATTERNS) {
       if (candidate.pattern.test(expression)) matches.add(candidate);
     }

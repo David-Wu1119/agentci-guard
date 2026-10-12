@@ -14,6 +14,78 @@ import {
 } from "../src/index.js";
 
 describe("scanRepository", () => {
+  function scanIssueCommentPrompt(expression: string) {
+    const raw = `on: issue_comment
+permissions:
+  contents: write
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - run: codex exec "${expression}"
+`;
+    return scanWorkflowFiles(
+      [parseWorkflowFile("/repo/.github/workflows/comment.yml", raw)],
+      "/repo",
+      { ignore: [], ignorePaths: [] },
+    );
+  }
+
+  it("detects indexed GitHub comment fields as untrusted AI prompt input", () => {
+    for (const field of [
+      "github.event.comment.body",
+      "github.event['comment'].body",
+      "github.event['comment']['body']",
+      "github['event'][ 'comment' ]['body']",
+      "github.event ['comment'].body",
+      "github.event['comment'] . body",
+      "github . event . comment . body",
+      "github.event[ 'comment' ] [ 'body' ]",
+      "github . event ['comment'].body",
+    ]) {
+      const result = scanIssueCommentPrompt("${{ " + field + " }}");
+      const rules = result.findings.map((finding) => finding.rule_id);
+
+      expect(rules, field).toContain("agentci/untrusted-input-in-prompt");
+      expect(rules, field).toContain("agentci/untrusted-ai-write-token");
+      expect(result.analysis_complete, field).toBe(true);
+    }
+  });
+
+  it("does not mistake a quoted expression literal for GitHub comment input", () => {
+    const result = scanIssueCommentPrompt("${{ 'github.event.comment.body' }}");
+    const rules = result.findings.map((finding) => finding.rule_id);
+
+    expect(rules).not.toContain("agentci/untrusted-input-in-prompt");
+    expect(rules).not.toContain("agentci/untrusted-ai-write-token");
+  });
+
+  it("does not match a longer context field by its untrusted prefix", () => {
+    for (const field of [
+      "github.event.comment.bodyguard",
+      "github.event['comment']['bodyguard']",
+    ]) {
+      const result = scanIssueCommentPrompt("${{ " + field + " }}");
+      const rules = result.findings.map((finding) => finding.rule_id);
+
+      expect(rules, field).not.toContain("agentci/untrusted-input-in-prompt");
+      expect(rules, field).not.toContain("agentci/untrusted-ai-write-token");
+    }
+  });
+
+  it("does not treat a nested github property as the event context", () => {
+    for (const field of [
+      "inputs.github.event.comment.body",
+      "inputs['github']['event']['comment']['body']",
+    ]) {
+      const result = scanIssueCommentPrompt("${{ " + field + " }}");
+      const rules = result.findings.map((finding) => finding.rule_id);
+
+      expect(rules, field).not.toContain("agentci/untrusted-input-in-prompt");
+      expect(rules, field).not.toContain("agentci/untrusted-ai-write-token");
+    }
+  });
+
   it("loads direct regular workflow files in order, excluding file symlinks", async () => {
     const root = await fs.mkdtemp(path.join(tmpdir(), "agentci-workflows-"));
     try {
