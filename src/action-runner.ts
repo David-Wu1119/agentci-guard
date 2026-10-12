@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import {
@@ -71,13 +72,13 @@ export async function runAction(
       `${JSON.stringify(toSarif(result), null, 2)}\n`,
       "utf8",
     );
+    let jsonSha256: string | undefined;
     if (jsonPath) {
       const resolvedJson = path.resolve(jsonPath);
       await fs.mkdir(path.dirname(resolvedJson), { recursive: true });
-      await fs.writeFile(resolvedJson, `${JSON.stringify(result, null, 2)}\n`, {
-        encoding: "utf8",
-        flag: "wx",
-      });
+      const jsonBytes = Buffer.from(`${JSON.stringify(result, null, 2)}\n`);
+      await fs.writeFile(resolvedJson, jsonBytes, { flag: "wx" });
+      jsonSha256 = createHash("sha256").update(jsonBytes).digest("hex");
     }
 
     io.log(renderTextReport(result));
@@ -103,7 +104,7 @@ export async function runAction(
     if (outputFile) {
       await fs.appendFile(
         outputFile,
-        `${formatGithubOutputs(result, sarifPath)}${jsonPath ? `json-path=${jsonPath}\n` : ""}`,
+        `${formatGithubOutputs(result, sarifPath)}${jsonPath ? `json-path=${jsonPath}\njson-sha256=${jsonSha256}\n` : ""}`,
         "utf8",
       );
     }

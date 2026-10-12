@@ -7414,6 +7414,7 @@ var require_picocolors = __commonJS({
 });
 
 // src/action-runner.ts
+import { createHash } from "crypto";
 import fs3 from "fs/promises";
 import path3 from "path";
 
@@ -10980,14 +10981,14 @@ async function runAction(environment = process.env, io = DEFAULT_IO) {
 `,
       "utf8"
     );
+    let jsonSha256;
     if (jsonPath) {
       const resolvedJson = path3.resolve(jsonPath);
       await fs3.mkdir(path3.dirname(resolvedJson), { recursive: true });
-      await fs3.writeFile(resolvedJson, `${JSON.stringify(result, null, 2)}
-`, {
-        encoding: "utf8",
-        flag: "wx"
-      });
+      const jsonBytes = Buffer.from(`${JSON.stringify(result, null, 2)}
+`);
+      await fs3.writeFile(resolvedJson, jsonBytes, { flag: "wx" });
+      jsonSha256 = createHash("sha256").update(jsonBytes).digest("hex");
     }
     io.log(renderTextReport(result));
     if (!result.analysis_complete) {
@@ -11010,6 +11011,7 @@ async function runAction(environment = process.env, io = DEFAULT_IO) {
       await fs3.appendFile(
         outputFile,
         `${formatGithubOutputs(result, sarifPath)}${jsonPath ? `json-path=${jsonPath}
+json-sha256=${jsonSha256}
 ` : ""}`,
         "utf8"
       );

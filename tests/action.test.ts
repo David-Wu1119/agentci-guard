@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -34,6 +36,134 @@ function captureIo(): ActionIo & { logs: string[]; errors: string[] } {
 }
 
 describe("JavaScript Action entrypoint", () => {
+  it("keeps the synthetic Action receipt and raw evidence in the same CI job", async () => {
+    const ci = YAML.parse(
+      await fs.readFile(".github/workflows/ci.yml", "utf8"),
+    ) as {
+      jobs: {
+        verify: {
+          steps: Array<{
+            id?: string;
+            name?: string;
+            uses?: string;
+            with?: Record<string, string>;
+            env?: Record<string, string>;
+            run?: string;
+            if?: string;
+            "continue-on-error"?: boolean;
+          }>;
+        };
+      };
+    };
+    const steps = ci.jobs.verify.steps;
+    const actionIndex = steps.findIndex((step) => step.id === "reusable");
+    expect(steps[actionIndex - 1].run).toContain(
+      "['show', `${actionCommit}:${file}`]",
+    );
+    expect(steps[actionIndex - 1].run).toContain("'dist/action.js'");
+    expect(steps[actionIndex - 1].run).toContain(
+      "artifacts/e4-incomplete-preflight.json",
+    );
+    expect(steps[actionIndex - 1].run).toContain("artifacts/incomplete.json");
+    expect(steps[actionIndex]).toMatchObject({
+      uses: "./",
+      with: {
+        path: "corpus/adversarial/cases/local-reusable",
+        json: "artifacts/reusable.json",
+        "fail-on": "none",
+      },
+    });
+    expect(steps[actionIndex + 1]).toMatchObject({
+      env: {
+        E4_ACTION_JSON_PATH: "${{ steps.reusable.outputs.json-path }}",
+        E4_WORKFLOW_SHA: "${{ github.workflow_sha }}",
+      },
+    });
+    expect(steps[actionIndex + 1].run).toContain(
+      "artifacts/e4-synthetic-receipt.json",
+    );
+    expect(steps[actionIndex + 1].run).toContain(
+      "['show', `${process.env.E4_WORKFLOW_SHA}:.github/workflows/ci.yml`]",
+    );
+    expect(steps[actionIndex + 2]).toMatchObject({
+      id: "incomplete",
+      "continue-on-error": true,
+      uses: "./",
+      with: {
+        path: "corpus/adversarial/cases/parse-error",
+        sarif: "artifacts/incomplete.sarif",
+        json: "artifacts/incomplete.json",
+        "fail-on": "none",
+      },
+    });
+    expect(steps[actionIndex + 3]).toMatchObject({
+      env: {
+        E4_INCOMPLETE_OUTCOME: "${{ steps.incomplete.outcome }}",
+        E4_INCOMPLETE_JSON_SHA256:
+          "${{ steps.incomplete.outputs.json-sha256 }}",
+        E4_INCOMPLETE_JSON_PATH: "${{ steps.incomplete.outputs.json-path }}",
+      },
+    });
+    expect(steps[actionIndex + 3].run).toContain(
+      "assert.equal(process.env.E4_INCOMPLETE_OUTCOME, 'failure')",
+    );
+    expect(steps[actionIndex + 3].run).toContain("await loadActionRun({");
+    expect(steps[actionIndex + 3].run).toContain(
+      "assert.equal(run_incomplete, true)",
+    );
+    expect(steps[actionIndex + 3].run).toContain("agentci/parse-error");
+    expect(steps[actionIndex + 3].run).toContain(
+      "artifacts/e4-incomplete-receipt.json",
+    );
+    for (const run of [
+      steps[actionIndex - 1].run,
+      steps[actionIndex + 1].run,
+      steps[actionIndex + 3].run,
+    ]) {
+      const script = run
+        ?.split("node --input-type=module <<'NODE'\n")[1]
+        ?.split("\nNODE")[0];
+      expect(script).toBeTruthy();
+      const syntax = spawnSync(
+        process.execPath,
+        ["--input-type=module", "--check"],
+        { input: script, encoding: "utf8" },
+      );
+      expect(syntax.status, syntax.stderr).toBe(0);
+    }
+    expect(steps[actionIndex + 4]).toMatchObject({
+      if: "success()",
+      uses: "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+      with: {
+        name: "e4-synthetic-${{ github.run_id }}-${{ github.run_attempt }}",
+        "if-no-files-found": "error",
+      },
+    });
+    for (const file of [
+      "artifacts/e3-reusable-preflight.json",
+      "artifacts/reusable.json",
+      "artifacts/reusable.sarif",
+      "artifacts/e4-synthetic-receipt.json",
+      "artifacts/e4-incomplete-preflight.json",
+      "artifacts/incomplete.json",
+      "artifacts/incomplete.sarif",
+      "artifacts/e4-incomplete-receipt.json",
+    ]) {
+      expect(steps[actionIndex + 4].with?.path).toContain(file);
+    }
+    expect(steps[actionIndex + 5]).toMatchObject({
+      if: "failure()",
+      uses: "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+      with: {
+        name: "e4-synthetic-debug-${{ github.run_id }}-${{ github.run_attempt }}",
+        "if-no-files-found": "warn",
+      },
+    });
+    expect(steps[actionIndex + 5].with?.path).toContain(
+      "artifacts/e4-incomplete-receipt.json",
+    );
+  });
+
   it("is wired through a dedicated JavaScript entrypoint", async () => {
     const manifest = YAML.parse(await fs.readFile("action.yml", "utf8")) as {
       runs: { using: string; main: string; args?: unknown };
@@ -143,6 +273,77 @@ describe("JavaScript Action entrypoint", () => {
     expect(result.analysis_complete).toBe(false);
     expect(await fs.readFile(temporary.output, "utf8")).toContain(
       `json-path=${temporary.json}`,
+    );
+  });
+
+  it("declares the optional JSON digest output in the Action manifest", async () => {
+    const manifest = YAML.parse(await fs.readFile("action.yml", "utf8")) as {
+      outputs: Record<string, unknown>;
+    };
+
+    expect(manifest.outputs["json-sha256"]).toBeDefined();
+  });
+
+  it("reports the SHA-256 of exact JSON file bytes before threshold failure", async () => {
+    const temporary = await temporaryOutput();
+    const code = await runAction(
+      {
+        INPUT_PATH: "examples/vulnerable",
+        INPUT_SARIF: temporary.sarif,
+        INPUT_JSON: temporary.json,
+        "INPUT_FAIL-ON": "high",
+        GITHUB_OUTPUT: temporary.output,
+      },
+      captureIo(),
+    );
+
+    expect(code).toBe(2);
+    const writtenBytes = await fs.readFile(temporary.json);
+    const digest = createHash("sha256").update(writtenBytes).digest("hex");
+    const outputs = await fs.readFile(temporary.output, "utf8");
+    expect(outputs).toContain(`json-sha256=${digest}\n`);
+    expect(outputs.match(/^json-sha256=/gm)).toHaveLength(1);
+  });
+
+  it("does not report a JSON digest when optional JSON is omitted", async () => {
+    for (const jsonInput of [undefined, ""]) {
+      const temporary = await temporaryOutput();
+      const code = await runAction(
+        {
+          INPUT_PATH: "examples/hardened",
+          INPUT_SARIF: temporary.sarif,
+          INPUT_JSON: jsonInput,
+          "INPUT_FAIL-ON": "none",
+          GITHUB_OUTPUT: temporary.output,
+        },
+        captureIo(),
+      );
+
+      expect(code).toBe(0);
+      expect(await fs.readFile(temporary.output, "utf8")).not.toContain(
+        "json-sha256=",
+      );
+    }
+  });
+
+  it("does not report a JSON digest when the create-only JSON write fails", async () => {
+    const temporary = await temporaryOutput();
+    await fs.writeFile(temporary.json, "existing result\n", "utf8");
+    const code = await runAction(
+      {
+        INPUT_PATH: "examples/hardened",
+        INPUT_SARIF: temporary.sarif,
+        INPUT_JSON: temporary.json,
+        "INPUT_FAIL-ON": "none",
+        GITHUB_OUTPUT: temporary.output,
+      },
+      captureIo(),
+    );
+
+    expect(code).toBe(1);
+    expect(await fs.readFile(temporary.json, "utf8")).toBe("existing result\n");
+    expect(await fs.readFile(temporary.output, "utf8")).not.toContain(
+      "json-sha256=",
     );
   });
 
@@ -300,6 +501,10 @@ jobs:
     expect(await fs.readFile(temporary.output, "utf8")).toContain("findings=0");
     expect(await fs.readFile(temporary.output, "utf8")).toContain(
       "analysis-complete=false",
+    );
+    const jsonBytes = await fs.readFile(temporary.json);
+    expect(await fs.readFile(temporary.output, "utf8")).toContain(
+      `json-sha256=${createHash("sha256").update(jsonBytes).digest("hex")}\n`,
     );
     expect(JSON.parse(await fs.readFile(temporary.json, "utf8"))).toMatchObject(
       {

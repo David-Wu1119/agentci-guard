@@ -143,9 +143,12 @@ The tagged `v0.6.2` Action sets `findings`, `critical`, `high`, `medium`, `low`,
 `sarif-path`, `diagnostics`, and `analysis-complete` as outputs. The Action in
 this source tree can additionally write the complete CLI-shaped scan result
 when given a `json` path (for example, `json: artifacts/agentci-results.json`)
-and then exposes that location as `json-path`; omitted or empty `json` writes
-no JSON file. The JSON path must not already exist: its writer will not
-overwrite an existing file or final-component symlink. This is not part of
+and then exposes that location as `json-path` and the Action-computed digest
+of its exact file bytes as `json-sha256`; omitted or empty `json` writes no JSON
+file and emits neither output. Comparing the digest with the file detects a
+post-Action change; it is not a signed CI attestation. The JSON path must not
+already exist: its writer will not overwrite an existing file or final-component
+symlink. This is not part of
 the tagged `v0.6.2` release. The JSON includes finding IDs, agent usages,
 call chains, diagnostics, and `analysis_complete`; SARIF is still written
 separately. The JSON is a local file, not an

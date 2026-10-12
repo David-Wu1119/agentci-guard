@@ -59,6 +59,7 @@ const requiredOutputs = [
   "low",
   "sarif-path",
   "json-path",
+  "json-sha256",
   "diagnostics",
   "analysis-complete",
 ];

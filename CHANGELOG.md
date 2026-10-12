@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Opt-in Action JSON now emits `json-sha256`, the Action-computed hash of its
+  exact JSON file bytes. The synthetic reusable-workflow CI check compares
+  that step output with the file before projecting findings. This detects a
+  post-Action JSON swap, not a signed or complete E4 provenance seal.
+
 ### Changed
 
 - Clarified that the 160-unit candidate pilot is pinned to `38a3272` and
