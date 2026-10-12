@@ -142,6 +142,18 @@ jobs:
           node -e 'const r = JSON.parse(require("node:fs").readFileSync(process.env.OUTPUT_JSON_PATH, "utf8")); if (r.findings.length !== 0 || r.agent_usages.length !== 0 || r.analysis_complete !== true) process.exit(1)'
           test "$ANALYSIS_COMPLETE" = "true"
 
+      - name: Action smoke - reusable caller chain
+        uses: ./
+        with:
+          path: corpus/adversarial/cases/local-reusable
+          sarif: artifacts/reusable.sarif
+          json: artifacts/reusable.json
+          fail-on: none
+
+      - name: Verify reusable caller chain in Action JSON
+        run: |
+          node -e 'const assert = require("node:assert/strict"); const r = JSON.parse(require("node:fs").readFileSync("artifacts/reusable.json", "utf8")); assert.deepEqual(r.agent_usages[0]?.call_chain, [".github/workflows/caller.yml#agent", ".github/workflows/bridge.yml#agent"]); assert(r.findings.some((f) => f.call_chain?.[0] === ".github/workflows/caller.yml#agent"))'
+
       - name: Action smoke - JSON omitted
         id: no-json
         uses: ./
