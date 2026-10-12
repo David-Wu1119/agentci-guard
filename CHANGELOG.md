@@ -18,11 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   path with unresolved implicit ingestion, tool fetch, or CLI input flow.
   Synthetic tests and adversarial fixtures pin these boundaries; accuracy on
   human labels is not yet measured.
-  Against clean `5ad017c` on the fixed 152-workflow development corpus, 51
-  case signatures changed: critical findings 32→4, high 36→36, medium
-  180→180, and complete scans 57→48. The candidate added 52
-  implicit-ingestion-unknown diagnostics. This is a coverage/behavior change,
-  not evidence that the removed alerts were false positives.
+  The earlier `f1cdf51` candidate versus clean `5ad017c` changed 51 case
+  signatures under the then-current comparison. A fresh schema-v2 comparison
+  of published `4369c9e` versus `52d43cc` on the same 152-workflow manifest
+  records 90 cases with changed finding/diagnostic identity or completeness;
+  the legacy narrower signature reports 54. Schema v2 additionally tracks
+  step index, line, severity, and duplicate counts, so these totals must not
+  be treated as interchangeable detection counts. Critical findings are
+  32→4, high 36→36, medium 180→180, and complete scans 57→48. This is
+  coverage/behavior evidence, not proof that removed alerts were false
+  positives.
 
 ### Fixed
 
