@@ -10983,12 +10983,11 @@ async function runAction(environment = process.env, io = DEFAULT_IO) {
     if (jsonPath) {
       const resolvedJson = path3.resolve(jsonPath);
       await fs3.mkdir(path3.dirname(resolvedJson), { recursive: true });
-      await fs3.writeFile(
-        resolvedJson,
-        `${JSON.stringify(result, null, 2)}
-`,
-        "utf8"
-      );
+      await fs3.writeFile(resolvedJson, `${JSON.stringify(result, null, 2)}
+`, {
+        encoding: "utf8",
+        flag: "wx"
+      });
     }
     io.log(renderTextReport(result));
     if (!result.analysis_complete) {

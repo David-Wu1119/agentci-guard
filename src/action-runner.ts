@@ -74,11 +74,10 @@ export async function runAction(
     if (jsonPath) {
       const resolvedJson = path.resolve(jsonPath);
       await fs.mkdir(path.dirname(resolvedJson), { recursive: true });
-      await fs.writeFile(
-        resolvedJson,
-        `${JSON.stringify(result, null, 2)}\n`,
-        "utf8",
-      );
+      await fs.writeFile(resolvedJson, `${JSON.stringify(result, null, 2)}\n`, {
+        encoding: "utf8",
+        flag: "wx",
+      });
     }
 
     io.log(renderTextReport(result));

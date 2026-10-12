@@ -14,7 +14,7 @@ inputs:
     required: false
     default: "agentci-results.sarif"
   json:
-    description: Optional complete machine-readable scan result output path. Omit to disable.
+    description: Optional complete machine-readable scan result output path. Must not already exist; omit to disable.
     required: false
   fail-on:
     description: Minimum severity that fails the action. One of none, low, medium, high, critical.

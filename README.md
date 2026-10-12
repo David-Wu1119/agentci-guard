@@ -144,13 +144,15 @@ The tagged `v0.6.2` Action sets `findings`, `critical`, `high`, `medium`, `low`,
 this source tree can additionally write the complete CLI-shaped scan result
 when given a `json` path (for example, `json: artifacts/agentci-results.json`)
 and then exposes that location as `json-path`; omitted or empty `json` writes
-no JSON file. This is not part of the tagged `v0.6.2` release. The JSON includes
-finding IDs, agent usages, call chains, diagnostics, and `analysis_complete`;
-SARIF is still written separately. The JSON is a local file, not an
+no JSON file. The JSON path must not already exist: its writer will not
+overwrite an existing file or final-component symlink. This is not part of
+the tagged `v0.6.2` release. The JSON includes finding IDs, agent usages,
+call chains, diagnostics, and `analysis_complete`; SARIF is still written
+separately. The JSON is a local file, not an
 automatically uploaded artifact, and may contain repository paths and workflow
-evidence. Choose a trusted output directory when scanning an untrusted checkout;
-the requested output path follows filesystem symlinks. When the analysis is
-incomplete, the Action also prints a
+evidence. Choose a trusted output directory for both outputs when scanning an
+untrusted checkout: parent directories and the SARIF path can still be
+symlinks. When the analysis is incomplete, the Action also prints a
 `::warning::` annotation naming the diagnostic codes and appends the same note
 to the step summary, so a step with zero findings cannot look clean when the
 analyzer did not finish:
