@@ -179,6 +179,15 @@ jobs:
     ).toContain("issues");
   });
 
+  it("recognizes only the documented review-comment body field", () => {
+    expect(
+      untrustedGitHubContextEvents("${{ github.event.comment.body }}"),
+    ).toContain("pull_request_review_comment");
+    expect(
+      untrustedGitHubContextEvents("${{ github.event.review_comment.body }}"),
+    ).toEqual([]);
+  });
+
   it("does not treat a fixed-format pull request SHA as prompt injection text", () => {
     const rules = rulesFor(`
 on: pull_request

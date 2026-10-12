@@ -46,6 +46,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `pull_request_review_comment` no longer treats nonexistent
+  `github.event.review_comment.body` as attacker text. The documented
+  `github.event.comment.body` route remains recognized; this is a narrow
+  false-positive fix, not a measured accuracy result.
 - AI inputs consuming unresolved prior step or cross-job outputs no longer
   report a complete clean analysis. They emit the path-scoped
   `analysis-output-provenance-unknown` diagnostic
