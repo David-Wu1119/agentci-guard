@@ -54,6 +54,7 @@ export type Diagnostic = {
   job?: string;
   /** Zero-based index when the uncertainty belongs to one step. */
   step_index?: number;
+  call_chain?: string[];
 };
 
 export type ScanOptions = {

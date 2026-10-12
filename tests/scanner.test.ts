@@ -220,4 +220,38 @@ jobs:
     ]);
     expect(result.analysis_complete).toBe(false);
   });
+
+  it("retains caller paths for a malformed reusable workflow", () => {
+    const root = "/repo";
+    const caller = parseWorkflowFile(
+      `${root}/.github/workflows/caller.yml`,
+      `on: issue_comment
+jobs:
+  first:
+    uses: ./.github/workflows/agent.yml
+  second:
+    uses: ./.github/workflows/agent.yml
+`,
+    );
+    const callee = parseWorkflowFile(
+      `${root}/.github/workflows/agent.yml`,
+      "on: workflow_call\njobs: [\n",
+    );
+    const result = scanWorkflowFiles([caller, callee], root, {
+      ignore: [],
+      ignorePaths: [],
+    });
+
+    const callChains = result.diagnostics
+      .filter((diagnostic) => diagnostic.code === "agentci/parse-error")
+      .map((diagnostic) => diagnostic.call_chain ?? []);
+    expect(callChains).toHaveLength(3);
+    expect(callChains).toEqual(
+      expect.arrayContaining([
+        [],
+        [".github/workflows/caller.yml#first"],
+        [".github/workflows/caller.yml#second"],
+      ]),
+    );
+  });
 });

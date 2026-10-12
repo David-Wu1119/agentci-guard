@@ -213,6 +213,60 @@ describe("JavaScript Action entrypoint", () => {
     ).toBe(true);
   });
 
+  it("keeps one incomplete-analysis diagnostic per reusable-workflow caller in Action JSON", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "agentci-callers-"));
+    const workflows = path.join(root, ".github", "workflows");
+    await fs.mkdir(workflows, { recursive: true });
+    await fs.writeFile(
+      path.join(workflows, "caller.yml"),
+      `on: issue_comment
+permissions:
+  contents: read
+jobs:
+  first:
+    uses: ./.github/workflows/agent.yml
+  second:
+    uses: ./.github/workflows/agent.yml
+`,
+    );
+    await fs.writeFile(
+      path.join(workflows, "agent.yml"),
+      `on: workflow_call
+jobs:
+  agent:
+    if: github.repository == 'owner/repo'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+`,
+    );
+
+    const temporary = await temporaryOutput();
+    const code = await runAction({
+      INPUT_PATH: root,
+      INPUT_SARIF: temporary.sarif,
+      INPUT_JSON: temporary.json,
+      "INPUT_FAIL-ON": "none",
+      GITHUB_OUTPUT: temporary.output,
+    });
+
+    expect(code).toBe(0);
+    const result = JSON.parse(await fs.readFile(temporary.json, "utf8"));
+    expect(result.analysis_complete).toBe(false);
+    expect(
+      result.diagnostics
+        .filter(
+          (diagnostic: { code: string }) =>
+            diagnostic.code === "agentci/analysis-event-condition",
+        )
+        .map((diagnostic: { call_chain?: string[] }) => diagnostic.call_chain)
+        .sort(),
+    ).toEqual([
+      [".github/workflows/caller.yml#first"],
+      [".github/workflows/caller.yml#second"],
+    ]);
+  });
+
   it("reports invalid inputs as an Action error", async () => {
     const io = captureIo();
     const code = await runAction(

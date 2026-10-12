@@ -302,6 +302,9 @@ function analyzeWorkflow(
           file,
           message: workflow.parse_error.message,
           line: workflow.parse_error.line,
+          ...(context.callChain.length > 0
+            ? { call_chain: context.callChain }
+            : {}),
         },
       ],
     };
@@ -1656,6 +1659,11 @@ function analyzeWorkflow(
   output.findings = ignores.all
     ? []
     : output.findings.filter((finding) => !ignores.rules.has(finding.rule_id));
+  if (context.callChain.length > 0) {
+    for (const diagnostic of output.diagnostics) {
+      diagnostic.call_chain ??= context.callChain;
+    }
+  }
   return output;
 }
 
@@ -2222,7 +2230,15 @@ function dedupe(findings: Finding[]): Finding[] {
 function dedupeDiagnostics(diagnostics: Diagnostic[]): Diagnostic[] {
   const seen = new Set<string>();
   return diagnostics.filter((diagnostic) => {
-    const key = `${diagnostic.code}:${diagnostic.file}:${diagnostic.job ?? ""}:${diagnostic.step_index ?? ""}:${diagnostic.line ?? ""}:${diagnostic.message}`;
+    const key = JSON.stringify([
+      diagnostic.code,
+      diagnostic.file,
+      diagnostic.job ?? null,
+      diagnostic.step_index ?? null,
+      diagnostic.line ?? null,
+      diagnostic.message,
+      diagnostic.call_chain ?? [],
+    ]);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
