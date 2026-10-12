@@ -104,13 +104,14 @@ node scripts/benchmark/report-behavior.mjs --compare before/cases.json after/cas
 ```
 
 It scans exactly the manifest's cases, retains the numeric `agent_usages`
-count, and records per-use file/job/step/kind/event/call-chain identity along
-with finding and diagnostic identity (including job-local step index and line)
+count, and records per-use file/job/step/kind/event/call-chain identity and
+unresolved event paths, along with finding and diagnostic identity (including
+job-local step index and line)
 and completeness per case with stable ordering. It splits cases four ways
 (complete/incomplete × findings/none) and lists changes to those recorded
-fields between two runs. Schema v3 requires regenerating both reports before
+fields between two runs. Schema v4 requires regenerating both reports before
 comparison; both reports must also contain the same manifest SHA-256. Older
-schema-v2 counts are not directly interchangeable. A failure
+schema-v2/v3 counts are not directly interchangeable. A failure
 to load a case is an explicit failed row, never a dropped one. This does not
 compare message or evidence wording and is not an accuracy measurement. The
 manual pattern it replaces:

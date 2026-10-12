@@ -451,6 +451,10 @@ function analyzeWorkflow(
             (event) => event === "discussion" || event === "discussion_comment",
           )
         : [];
+      const vendorUnknownEvents: string[] =
+        pinnedAnthropicRef === ANTHROPIC_ACTION_WITHOUT_DISCUSSION
+          ? []
+          : discussionEvents;
       if (discussionEvents.length > 0) {
         const knownUnsupported =
           pinnedAnthropicRef === ANTHROPIC_ACTION_WITHOUT_DISCUSSION;
@@ -552,7 +556,8 @@ function analyzeWorkflow(
       const stepUncertainEvents = stepReachability.events.filter(
         (event) =>
           jobUncertainEvents.includes(event) ||
-          stepReachability.unknownEvents.includes(event),
+          stepReachability.unknownEvents.includes(event) ||
+          vendorUnknownEvents.includes(event),
       );
 
       const effectiveEnvironment = mergeEnvironment(

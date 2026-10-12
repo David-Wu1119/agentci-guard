@@ -40,6 +40,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Unverified Anthropic Action discussion-event support now marks matching agent
+  uses and findings as possible paths, not confirmed execution. The development
+  scorer also keeps that diagnostic from making unrelated step rules unknown.
+  Synthetic regressions cover both; the schema-v4 behavioral comparison changed
+  0 of 152 public development workflows, with critical/high/medium counts
+  unchanged at 4/36/180. This is not a human-label accuracy result.
+- Local Action CI now expects the vulnerable fixture's documented incomplete
+  scan (one implicit-ingestion diagnostic) instead of incorrectly requiring
+  `analysis-complete=true`.
 - A vendor-verified unsupported Action event remains visible as a diagnostic but
   no longer makes the whole scan `analysis_complete: false`: that path is
   conclusively closed. Any unresolved diagnostic still marks the scan

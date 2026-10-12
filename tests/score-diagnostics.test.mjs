@@ -57,6 +57,69 @@ jobs:
     );
   });
 
+  it("does not treat unknown AI Action event support as unknown checkout protection", () => {
+    const scan = scanWorkflowFiles(
+      [
+        parseWorkflowFile(
+          file,
+          `on: discussion_comment
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+`,
+        ),
+      ],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(
+      scan.diagnostics.some(
+        (item) => item.code === "agentci/analysis-agent-event-unknown",
+      ),
+    ).toBe(true);
+    expect(
+      predict(
+        { ...stepAnnotation(0), rule_id: "agentci/unsafe-checkout" },
+        scan,
+        "agentci/agent-usage",
+      ),
+    ).toBe("negative");
+  });
+
+  it("does not turn absent step features into unknowns on an unverified Action event", () => {
+    const scan = scanWorkflowFiles(
+      [
+        parseWorkflowFile(
+          file,
+          `on: discussion_comment
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+`,
+        ),
+      ],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(predict(stepAnnotation(0), scan, "agentci/agent-usage")).toBe(
+      "unknown",
+    );
+    for (const rule_id of [
+      "agentci/ai-shell-access",
+      "agentci/untrusted-input-in-prompt",
+      "agentci/unpinned-ai-action",
+    ]) {
+      expect(
+        predict({ ...stepAnnotation(0), rule_id }, scan, "agentci/agent-usage"),
+        rule_id,
+      ).toBe("negative");
+    }
+  });
+
   it("keeps job-level uncertainty relevant to every step", () => {
     const scan = result([], [diagnostic("agentci/analysis-event-condition")]);
     expect(predict(stepAnnotation(0), scan, "agentci/agent-usage")).toBe(

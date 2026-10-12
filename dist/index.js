@@ -9467,6 +9467,7 @@ function analyzeWorkflow(workflow, repository, context) {
       const discussionEvents = isSelfGatingAgentAction(actionReference) ? stepReachability.events.filter(
         (event) => event === "discussion" || event === "discussion_comment"
       ) : [];
+      const vendorUnknownEvents = pinnedAnthropicRef === ANTHROPIC_ACTION_WITHOUT_DISCUSSION ? [] : discussionEvents;
       if (discussionEvents.length > 0) {
         const knownUnsupported = pinnedAnthropicRef === ANTHROPIC_ACTION_WITHOUT_DISCUSSION;
         output.diagnostics.push({
@@ -9544,7 +9545,7 @@ function analyzeWorkflow(workflow, repository, context) {
         }
       }
       const stepUncertainEvents = stepReachability.events.filter(
-        (event) => jobUncertainEvents.includes(event) || stepReachability.unknownEvents.includes(event)
+        (event) => jobUncertainEvents.includes(event) || stepReachability.unknownEvents.includes(event) || vendorUnknownEvents.includes(event)
       );
       const effectiveEnvironment = mergeEnvironment(
         jobEnvironment,

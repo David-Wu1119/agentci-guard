@@ -105,9 +105,17 @@ jobs:
           prompt: "Fix \${{ github.event.comment.body }}"
 `);
     expect(result.agent_usages).toHaveLength(1);
+    expect(result.agent_usages[0]?.uncertain_reachable_events).toEqual([
+      "discussion_comment",
+    ]);
     expect(result.findings.map((finding) => finding.rule_id)).toContain(
       "agentci/untrusted-ai-write-token",
     );
+    expect(
+      result.findings.find(
+        (finding) => finding.rule_id === "agentci/untrusted-ai-write-token",
+      )?.uncertain_reachable_events,
+    ).toEqual(["discussion_comment"]);
     expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
       "agentci/analysis-agent-event-unknown",
       "agentci/analysis-agent-implicit-ingestion-unknown",

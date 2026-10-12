@@ -97,6 +97,7 @@ jobs:
           EXPECT_LOW: ${{ steps.vulnerable.outputs.low }}
           OUTPUT_SARIF_PATH: ${{ steps.vulnerable.outputs.sarif-path }}
           ANALYSIS_COMPLETE: ${{ steps.vulnerable.outputs.analysis-complete }}
+          EXPECT_DIAGNOSTICS: ${{ steps.vulnerable.outputs.diagnostics }}
         run: |
           node scripts/verify-sarif-schema.mjs artifacts/vulnerable.sarif
           node scripts/verify-sarif.mjs artifacts/vulnerable.sarif
@@ -106,7 +107,8 @@ jobs:
           test "$EXPECT_MEDIUM" = "3"
           test "$EXPECT_LOW" = "0"
           test "$OUTPUT_SARIF_PATH" = "artifacts/vulnerable.sarif"
-          test "$ANALYSIS_COMPLETE" = "true"
+          test "$ANALYSIS_COMPLETE" = "false"
+          test "$EXPECT_DIAGNOSTICS" = "1"
 
       - name: Action smoke - hardened
         id: hardened

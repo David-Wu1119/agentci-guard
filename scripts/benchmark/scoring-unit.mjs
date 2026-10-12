@@ -36,6 +36,12 @@ export function relevantDiagnostics(annotation, result) {
       return false;
     }
     if (
+      diagnostic.code === "agentci/analysis-agent-event-unknown" &&
+      annotation.rule_id !== "agentci/agent-usage"
+    ) {
+      return false;
+    }
+    if (
       diagnostic.code === "agentci/analysis-permissions-unknown" &&
       !permissionDependent.includes(annotation.rule_id)
     ) {
