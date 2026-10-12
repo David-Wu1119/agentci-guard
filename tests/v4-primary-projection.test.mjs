@@ -121,7 +121,8 @@ function actionRun(result = scan()) {
   const snapshot =
     "on: issue_comment\njobs:\n  agent:\n    runs-on: ubuntu-latest\n";
   const bundle = "// synthetic Action bundle\n";
-  const json = JSON.stringify(result);
+  const boundResult = { ...result, root: inputRoot };
+  const json = JSON.stringify(boundResult);
   mkdirSync(path.dirname(snapshotPath), { recursive: true });
   mkdirSync(outputRoot);
   writeFileSync(snapshotPath, snapshot);
@@ -140,6 +141,7 @@ function actionRun(result = scan()) {
   };
   return {
     temporary,
+    result: boundResult,
     snapshotPath,
     actionBundlePath,
     jsonPath,
@@ -161,11 +163,11 @@ async function load(options) {
 }
 
 describe("synthetic E3 Action run binding", () => {
-  it("accepts a hash-bound complete Action JSON without trusting its root field", async () => {
+  it("accepts a hash-bound complete Action JSON with a consistent root", async () => {
     const fixture = actionRun();
     try {
       expect(await load(fixture.options)).toEqual({
-        result: scan(),
+        result: fixture.result,
         run_incomplete: false,
       });
     } finally {
@@ -187,6 +189,29 @@ describe("synthetic E3 Action run binding", () => {
           runReceipt: {
             ...fixture.options.runReceipt,
             source_path: ".github/workflows/other.yml",
+          },
+        }),
+      ).rejects.toThrow();
+    } finally {
+      rmSync(fixture.temporary, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects JSON from a different scan root with the same workflow count", async () => {
+    const fixture = actionRun();
+    try {
+      const otherRoot = path.join(fixture.temporary, "other-input");
+      const otherWorkflow = path.join(otherRoot, source);
+      mkdirSync(path.dirname(otherWorkflow), { recursive: true });
+      writeFileSync(otherWorkflow, "on: push\njobs: {}\n");
+      const otherJson = JSON.stringify(scan({ root: otherRoot }));
+      writeFileSync(fixture.jsonPath, otherJson);
+      await expect(
+        load({
+          ...fixture.options,
+          runReceipt: {
+            ...fixture.options.runReceipt,
+            output_sha256: sha256(otherJson),
           },
         }),
       ).rejects.toThrow();
@@ -240,7 +265,9 @@ describe("synthetic E3 Action run binding", () => {
       };
       writeFileSync(
         fixture.jsonPath,
-        JSON.stringify(scan({ workflow_count: 2 })),
+        JSON.stringify(
+          scan({ root: fixture.options.inputRoot, workflow_count: 2 }),
+        ),
       );
       withSibling.runReceipt.output_sha256 = sha256(
         readFileSync(fixture.jsonPath),
@@ -340,8 +367,14 @@ describe("synthetic E3 Action run binding", () => {
         ...fixture.options,
         runReceipt: { ...fixture.options.runReceipt, outcome: "failure" },
       };
-      expect(await load(options)).toEqual({ result, run_incomplete: true });
-      writeFileSync(fixture.jsonPath, JSON.stringify(scan()));
+      expect(await load(options)).toEqual({
+        result: fixture.result,
+        run_incomplete: true,
+      });
+      writeFileSync(
+        fixture.jsonPath,
+        JSON.stringify(scan({ root: fixture.options.inputRoot })),
+      );
       await expect(
         load({
           ...options,

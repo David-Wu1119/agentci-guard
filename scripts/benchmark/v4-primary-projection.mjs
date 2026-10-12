@@ -322,6 +322,12 @@ export async function loadActionRun(options) {
   );
   const result = JSON.parse(jsonBytes.toString("utf8"));
   validateResult(result);
+  // A matching root is necessary for an honest run, but E4 still must attest the invocation.
+  requireValue(
+    path.isAbsolute(result.root) &&
+      path.resolve(result.root) === path.resolve(inputRoot),
+    "Action JSON scan root differs from input root",
+  );
   requireValue(
     result.workflow_count ===
       actualInputs.filter((entry) =>
