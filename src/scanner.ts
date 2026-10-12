@@ -343,7 +343,7 @@ function analyzeWorkflow(
         job: jobName,
         line: jobLine,
         message:
-          "Could not fully interpret this job's github.event_name condition; event reachability was kept conservative.",
+          "Could not fully interpret this job's if condition; unresolved branches retain possible event paths, so findings in this job may depend on those paths.",
       });
     }
     if (jobReachability.events.length === 0) continue;
@@ -414,7 +414,7 @@ function analyzeWorkflow(
           step_index: index,
           line: stepLine,
           message:
-            "Could not fully interpret this step's github.event_name condition; event reachability was kept conservative.",
+            "Could not fully interpret this step's if condition; unresolved branches retain possible event paths, so findings at this step may depend on those paths.",
         });
       }
       if (stepReachability.events.length === 0) continue;

@@ -159,6 +159,39 @@ jobs:
     expect(result.agent_usages[0]?.evidence).toContain("codex exec hello");
   });
 
+  it("identifies findings on unresolved event conditions as possible paths", () => {
+    const raw = `on: [push, issue_comment]
+permissions:
+  contents: write
+jobs:
+  review:
+    if: github.event_name == 'issue_comment' && github.repository == 'owner/repo'
+    runs-on: ubuntu-latest
+    steps:
+      - if: steps.gate.outputs.ok
+        run: codex exec hello
+`;
+    const result = scanWorkflowFiles(
+      [parseWorkflowFile(".github/workflows/review.yml", raw)],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+
+    expect(result.findings.length).toBeGreaterThan(0);
+    expect(result.analysis_complete).toBe(false);
+    expect(
+      result.diagnostics
+        .filter(
+          (diagnostic) =>
+            diagnostic.code === "agentci/analysis-event-condition",
+        )
+        .map((diagnostic) => diagnostic.message),
+    ).toEqual([
+      "Could not fully interpret this job's if condition; unresolved branches retain possible event paths, so findings in this job may depend on those paths.",
+      "Could not fully interpret this step's if condition; unresolved branches retain possible event paths, so findings at this step may depend on those paths.",
+    ]);
+  });
+
   it("fails when an explicit config path is missing", async () => {
     await expect(
       scanRepository("tests/fixtures", {
