@@ -155,23 +155,33 @@ jobs:
           const source = '.github/workflows/caller.yml';
           const output = 'artifacts/reusable.json';
           assert(!existsSync(output), 'Action JSON must be absent before the Action runs');
+          const incompleteRoot = 'corpus/adversarial/cases/parse-error';
+          const incompleteSource = '.github/workflows/agent.yml';
+          assert(!existsSync('artifacts/incomplete.json'), 'Incomplete Action JSON must be absent before the Action runs');
           const hash = (file) => createHash('sha256').update(readFileSync(file)).digest('hex');
-          const workflows = readdirSync(path.join(root, '.github/workflows'), { withFileTypes: true })
-            .filter((entry) => entry.isFile() && /\.ya?ml$/.test(entry.name))
-            .map((entry) => `.github/workflows/${entry.name}`);
-          const configs = ['agentci.config.json', '.agentcirc.json']
-            .filter((file) => existsSync(path.join(root, file)));
-          const input_files = [...workflows, ...configs].sort()
-            .map((file) => ({ path: file, sha256: hash(path.join(root, file)) }));
+          const inventory = (caseRoot) => {
+            const workflows = readdirSync(path.join(caseRoot, '.github/workflows'), { withFileTypes: true })
+              .filter((entry) => entry.isFile() && /\.ya?ml$/.test(entry.name))
+              .map((entry) => `.github/workflows/${entry.name}`);
+            const configs = ['agentci.config.json', '.agentcirc.json']
+              .filter((file) => existsSync(path.join(caseRoot, file)));
+            return { workflows, configs, input_files: [...workflows, ...configs].sort()
+              .map((file) => ({ path: file, sha256: hash(path.join(caseRoot, file)) })) };
+          };
+          const { workflows, configs, input_files } = inventory(root);
+          const incomplete = inventory(incompleteRoot);
           assert.deepEqual(workflows.sort(), [
             '.github/workflows/bridge.yml',
             '.github/workflows/caller.yml',
             '.github/workflows/reusable.yml',
           ]);
           assert.equal(configs.length, 0);
+          assert.deepEqual(incomplete.workflows, [incompleteSource]);
+          assert.equal(incomplete.configs.length, 0);
           const actionCommit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
           for (const file of [
             ...input_files.map((entry) => path.join(root, entry.path)),
+            ...incomplete.input_files.map((entry) => path.join(incompleteRoot, entry.path)),
             'action.yml', 'dist/action.js', 'pnpm-lock.yaml',
           ]) {
             const committed = execFileSync('git', ['show', `${actionCommit}:${file}`]);
@@ -180,6 +190,14 @@ jobs:
           mkdirSync('artifacts', { recursive: true });
           writeFileSync('artifacts/e3-reusable-preflight.json', JSON.stringify({
             case_id: 'synthetic-reusable', source_path: source, input_files,
+            action_commit: actionCommit,
+            action_manifest_sha256: hash('action.yml'),
+            action_bundle_sha256: hash('dist/action.js'),
+            lockfile_sha256: hash('pnpm-lock.yaml'),
+          }));
+          writeFileSync('artifacts/e4-incomplete-preflight.json', JSON.stringify({
+            case_id: 'synthetic-parse-error', source_path: incompleteSource,
+            input_files: incomplete.input_files,
             action_commit: actionCommit,
             action_manifest_sha256: hash('action.yml'),
             action_bundle_sha256: hash('dist/action.js'),
@@ -325,6 +343,135 @@ jobs:
           }, null, 2) + '\n');
           NODE
 
+      - name: Action smoke - incomplete parse with valid JSON
+        id: incomplete
+        continue-on-error: true
+        uses: ./
+        with:
+          path: corpus/adversarial/cases/parse-error
+          sarif: artifacts/incomplete.sarif
+          json: artifacts/incomplete.json
+          fail-on: none
+
+      - name: Verify incomplete Action JSON and failure provenance
+        env:
+          E4_INCOMPLETE_OUTCOME: ${{ steps.incomplete.outcome }}
+          E4_INCOMPLETE_JSON_SHA256: ${{ steps.incomplete.outputs.json-sha256 }}
+          E4_INCOMPLETE_JSON_PATH: ${{ steps.incomplete.outputs.json-path }}
+          E4_INCOMPLETE_SARIF_PATH: ${{ steps.incomplete.outputs.sarif-path }}
+          E4_INCOMPLETE_ANALYSIS_COMPLETE: ${{ steps.incomplete.outputs.analysis-complete }}
+          E4_INCOMPLETE_DIAGNOSTICS: ${{ steps.incomplete.outputs.diagnostics }}
+          E4_INCOMPLETE_FINDINGS: ${{ steps.incomplete.outputs.findings }}
+          E4_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { execFileSync } from 'node:child_process';
+          import { createHash } from 'node:crypto';
+          import { readFileSync, writeFileSync } from 'node:fs';
+          import YAML from 'yaml';
+          import { RULES } from './dist/index.js';
+          import { loadActionRun, projectPrimary } from './scripts/benchmark/v4-primary-projection.mjs';
+
+          assert.equal(process.env.E4_INCOMPLETE_OUTCOME, 'failure');
+          assert.equal(process.env.E4_INCOMPLETE_ANALYSIS_COMPLETE, 'false');
+          assert.equal(process.env.E4_INCOMPLETE_DIAGNOSTICS, '1');
+          assert.equal(process.env.E4_INCOMPLETE_FINDINGS, '0');
+          const preflightPath = 'artifacts/e4-incomplete-preflight.json';
+          const preflight = JSON.parse(readFileSync(preflightPath, 'utf8'));
+          const source = preflight.source_path;
+          const inputRoot = 'corpus/adversarial/cases/parse-error';
+          const jsonPath = 'artifacts/incomplete.json';
+          const sarifPath = 'artifacts/incomplete.sarif';
+          assert.equal(process.env.E4_INCOMPLETE_JSON_PATH, jsonPath);
+          assert.equal(process.env.E4_INCOMPLETE_SARIF_PATH, sarifPath);
+          const outputSha256 = process.env.E4_INCOMPLETE_JSON_SHA256;
+          assert.match(outputSha256, /^[0-9a-f]{64}$/);
+          const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
+          assert.equal(hash(readFileSync(jsonPath)), outputSha256);
+          const successReceipt = JSON.parse(readFileSync('artifacts/e4-synthetic-receipt.json', 'utf8'));
+          const checkoutSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          assert.equal(checkoutSha, preflight.action_commit);
+          assert.equal(checkoutSha, successReceipt.checkout_sha);
+          assert.equal(checkoutSha, process.env.GITHUB_SHA);
+          assert.equal(successReceipt.provider.github_sha, process.env.GITHUB_SHA);
+          assert.equal(successReceipt.provider.run_id, process.env.GITHUB_RUN_ID);
+          assert.equal(successReceipt.provider.run_attempt, process.env.GITHUB_RUN_ATTEMPT);
+          assert.equal(successReceipt.provider.job, process.env.GITHUB_JOB);
+          assert.equal(successReceipt.provider.workflow_sha, process.env.E4_WORKFLOW_SHA);
+          const invocation = {
+            uses: './',
+            with: { path: inputRoot, sarif: sarifPath, json: jsonPath, 'fail-on': 'none' },
+            'continue-on-error': true,
+          };
+          const workflowBytes = execFileSync('git', ['show', `${process.env.E4_WORKFLOW_SHA}:.github/workflows/ci.yml`]);
+          const workflow = YAML.parse(workflowBytes.toString('utf8'));
+          const actionStep = workflow.jobs.verify.steps.find((step) => step.id === 'incomplete');
+          assert.deepEqual({ uses: actionStep?.uses, with: actionStep?.with,
+            'continue-on-error': actionStep?.['continue-on-error'] }, invocation);
+          const caseRecord = {
+            case_id: preflight.case_id, source_path: source,
+            sha256: preflight.input_files.find((file) => file.path === source).sha256,
+          };
+          const runReceipt = {
+            case_id: preflight.case_id, source_path: source,
+            action_commit: preflight.action_commit,
+            action_manifest_sha256: preflight.action_manifest_sha256,
+            lockfile_sha256: preflight.lockfile_sha256,
+            input_files: preflight.input_files,
+            output_sha256: outputSha256,
+            outcome: process.env.E4_INCOMPLETE_OUTCOME,
+            fail_on: 'none',
+          };
+          const { result, run_incomplete } = await loadActionRun({
+            caseRecord, inputRoot,
+            actionManifestPath: 'action.yml',
+            actionBundlePath: 'dist/action.js',
+            lockfilePath: 'pnpm-lock.yaml',
+            expectedManifestSha256: preflight.action_manifest_sha256,
+            expectedBundleSha256: preflight.action_bundle_sha256,
+            expectedLockfileSha256: preflight.lockfile_sha256,
+            expectedActionCommit: preflight.action_commit,
+            jsonPath, outputRoot: 'artifacts', runReceipt,
+          });
+          assert.equal(run_incomplete, true);
+          assert.equal(result.analysis_complete, false);
+          assert.deepEqual(result.findings, []);
+          assert.deepEqual(result.agent_usages, []);
+          assert.deepEqual(result.diagnostics.map(({ code, kind, severity, file }) =>
+            ({ code, kind, severity, file })), [
+            { code: 'agentci/parse-error', kind: 'parse', severity: 'error', file: source },
+          ]);
+          const registryRows = [{
+            unit_id: 'parse-gap', case_id: caseRecord.case_id, source_path: source,
+            scope: 'workflow', job_id: null, step_index: null, rule_id: 'agentci/agent-usage',
+          }];
+          const projected = projectPrimary({
+            caseRecord, registryRows, expectedUnitIds: ['parse-gap'],
+            registeredTaskIds: ['agentci/agent-usage', ...Object.keys(RULES)],
+            sourceBytes: readFileSync(`${inputRoot}/${source}`), result,
+          });
+          assert.deepEqual(projected.units, [{ unit_id: 'parse-gap', alert: false, matched_records: [] }]);
+          assert.deepEqual(projected.parse_gap_unit_ids, ['parse-gap']);
+          assert.deepEqual(projected.structural_gap_unit_ids, []);
+          assert.deepEqual(projected.out_of_scope_records, []);
+          writeFileSync('artifacts/e4-incomplete-receipt.json', JSON.stringify({
+            schema_version: 1,
+            provider: successReceipt.provider,
+            case_id: caseRecord.case_id,
+            source_path: source,
+            checkout_sha: checkoutSha,
+            invocation,
+            preflight_sha256: hash(readFileSync(preflightPath)),
+            successful_case_receipt_sha256: hash(readFileSync('artifacts/e4-synthetic-receipt.json')),
+            action_outcome: process.env.E4_INCOMPLETE_OUTCOME,
+            action_json_sha256: outputSha256,
+            action_sarif_sha256: hash(readFileSync(sarifPath)),
+            run_incomplete,
+            parse_gap_unit_ids: projected.parse_gap_unit_ids,
+          }, null, 2) + '\n');
+          NODE
+
       - name: Preserve synthetic Action evidence
         if: success()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -336,6 +483,10 @@ jobs:
             artifacts/reusable.json
             artifacts/reusable.sarif
             artifacts/e4-synthetic-receipt.json
+            artifacts/e4-incomplete-preflight.json
+            artifacts/incomplete.json
+            artifacts/incomplete.sarif
+            artifacts/e4-incomplete-receipt.json
 
       - name: Preserve failed synthetic Action diagnostics
         if: failure()
@@ -348,6 +499,10 @@ jobs:
             artifacts/reusable.json
             artifacts/reusable.sarif
             artifacts/e4-synthetic-receipt.json
+            artifacts/e4-incomplete-preflight.json
+            artifacts/incomplete.json
+            artifacts/incomplete.sarif
+            artifacts/e4-incomplete-receipt.json
 
       - name: Action smoke - JSON omitted
         id: no-json

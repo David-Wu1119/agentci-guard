@@ -49,6 +49,8 @@ describe("JavaScript Action entrypoint", () => {
             with?: Record<string, string>;
             env?: Record<string, string>;
             run?: string;
+            if?: string;
+            "continue-on-error"?: boolean;
           }>;
         };
       };
@@ -59,6 +61,10 @@ describe("JavaScript Action entrypoint", () => {
       "['show', `${actionCommit}:${file}`]",
     );
     expect(steps[actionIndex - 1].run).toContain("'dist/action.js'");
+    expect(steps[actionIndex - 1].run).toContain(
+      "artifacts/e4-incomplete-preflight.json",
+    );
+    expect(steps[actionIndex - 1].run).toContain("artifacts/incomplete.json");
     expect(steps[actionIndex]).toMatchObject({
       uses: "./",
       with: {
@@ -79,9 +85,40 @@ describe("JavaScript Action entrypoint", () => {
     expect(steps[actionIndex + 1].run).toContain(
       "['show', `${process.env.E4_WORKFLOW_SHA}:.github/workflows/ci.yml`]",
     );
+    expect(steps[actionIndex + 2]).toMatchObject({
+      id: "incomplete",
+      "continue-on-error": true,
+      uses: "./",
+      with: {
+        path: "corpus/adversarial/cases/parse-error",
+        sarif: "artifacts/incomplete.sarif",
+        json: "artifacts/incomplete.json",
+        "fail-on": "none",
+      },
+    });
+    expect(steps[actionIndex + 3]).toMatchObject({
+      env: {
+        E4_INCOMPLETE_OUTCOME: "${{ steps.incomplete.outcome }}",
+        E4_INCOMPLETE_JSON_SHA256:
+          "${{ steps.incomplete.outputs.json-sha256 }}",
+        E4_INCOMPLETE_JSON_PATH: "${{ steps.incomplete.outputs.json-path }}",
+      },
+    });
+    expect(steps[actionIndex + 3].run).toContain(
+      "assert.equal(process.env.E4_INCOMPLETE_OUTCOME, 'failure')",
+    );
+    expect(steps[actionIndex + 3].run).toContain("await loadActionRun({");
+    expect(steps[actionIndex + 3].run).toContain(
+      "assert.equal(run_incomplete, true)",
+    );
+    expect(steps[actionIndex + 3].run).toContain("agentci/parse-error");
+    expect(steps[actionIndex + 3].run).toContain(
+      "artifacts/e4-incomplete-receipt.json",
+    );
     for (const run of [
       steps[actionIndex - 1].run,
       steps[actionIndex + 1].run,
+      steps[actionIndex + 3].run,
     ]) {
       const script = run
         ?.split("node --input-type=module <<'NODE'\n")[1]
@@ -94,7 +131,7 @@ describe("JavaScript Action entrypoint", () => {
       );
       expect(syntax.status, syntax.stderr).toBe(0);
     }
-    expect(steps[actionIndex + 2]).toMatchObject({
+    expect(steps[actionIndex + 4]).toMatchObject({
       if: "success()",
       uses: "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
       with: {
@@ -107,10 +144,14 @@ describe("JavaScript Action entrypoint", () => {
       "artifacts/reusable.json",
       "artifacts/reusable.sarif",
       "artifacts/e4-synthetic-receipt.json",
+      "artifacts/e4-incomplete-preflight.json",
+      "artifacts/incomplete.json",
+      "artifacts/incomplete.sarif",
+      "artifacts/e4-incomplete-receipt.json",
     ]) {
-      expect(steps[actionIndex + 2].with?.path).toContain(file);
+      expect(steps[actionIndex + 4].with?.path).toContain(file);
     }
-    expect(steps[actionIndex + 3]).toMatchObject({
+    expect(steps[actionIndex + 5]).toMatchObject({
       if: "failure()",
       uses: "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
       with: {
@@ -118,6 +159,9 @@ describe("JavaScript Action entrypoint", () => {
         "if-no-files-found": "warn",
       },
     });
+    expect(steps[actionIndex + 5].with?.path).toContain(
+      "artifacts/e4-incomplete-receipt.json",
+    );
   });
 
   it("is wired through a dedicated JavaScript entrypoint", async () => {
