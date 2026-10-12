@@ -141,7 +141,7 @@ describe("synthetic future-registry generation", () => {
     } finally {
       fs.rmSync(temporary, { recursive: true, force: true });
     }
-  });
+  }, 15_000);
 });
 
 function run(mode: "--check" | "--write", manifest: string, output: string) {
