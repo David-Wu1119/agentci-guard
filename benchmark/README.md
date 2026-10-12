@@ -39,8 +39,11 @@ pnpm build
 pnpm benchmark:smoke
 ```
 
-`benchmark:verify` validates all hashes and provenance, regenerates both blank
-annotation registries, validates schemas, and checks any public label package.
+`benchmark:verify` validates local snapshot hashes and manifest consistency,
+including each claimed repository/commit/workflow URL. It does not independently
+fetch the upstream commit or prove the snapshot came from that repository.
+It also regenerates both blank annotation registries, validates schemas, and
+checks any public label package.
 `benchmark:smoke` runs the annotation and scoring toolchain using temporary
 synthetic labels only.
 

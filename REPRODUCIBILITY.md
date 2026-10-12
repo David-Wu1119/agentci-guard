@@ -92,8 +92,10 @@ pnpm benchmark:verify
 This command:
 
 - validates every snapshot byte count, SHA-256, and computed Git blob SHA;
-- verifies fixed commits, blob SHAs, exact workflow paths, unique repositories,
-  licenses, and attribution;
+- checks commit SHA format, local blob hashes, exact claimed GitHub
+  repository/commit/workflow URLs, unique repositories, licenses, and
+  attribution; it does not fetch upstream commits or independently establish
+  snapshot origin;
 - checks the archived v1/v2 provenance and v3 historical split correction;
 - regenerates the 7,056-unit blank annotation registry in memory and compares
   it byte-for-byte with the checked-in CSV;

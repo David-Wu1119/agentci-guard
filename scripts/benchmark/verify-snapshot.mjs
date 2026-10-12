@@ -59,10 +59,12 @@ for (const item of manifest.cases) {
     errors.push(`${item.case_id}: no redistributable SPDX license`);
   }
   if (
-    !item.source_url.includes(`/blob/${item.source_commit}/`) ||
-    !item.source_url.endsWith(`/${item.source_path}`)
+    item.source_url !==
+    `https://github.com/${item.repository}/blob/${item.source_commit}/${item.source_path}`
   ) {
-    errors.push(`${item.case_id}: source URL is not commit-pinned`);
+    errors.push(
+      `${item.case_id}: source URL does not match repository, commit, and workflow path`,
+    );
   }
   if (
     !new RegExp(`^\\|\\s*${escapeRegExp(item.case_id)}\\s*\\|`, "m").test(
