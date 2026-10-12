@@ -67,7 +67,7 @@ describe("JavaScript Action input handling", () => {
     expect(io.errors.join("\n")).toContain("sarif input must not be empty");
   });
 
-  it("rejects an empty JSON path", async () => {
+  it("rejects a whitespace-only JSON path", async () => {
     const io = captureIo();
     expect(
       await runAction(
@@ -98,6 +98,21 @@ describe("JavaScript Action input handling", () => {
     expect(io.errors.join("\n")).toContain(
       "json and sarif inputs must refer to different files",
     );
+  });
+
+  it("rejects a multi-line JSON path", async () => {
+    const io = captureIo();
+    expect(
+      await runAction(
+        {
+          INPUT_PATH: "examples/hardened",
+          INPUT_SARIF: await sarifPath(),
+          INPUT_JSON: "result.json\n::set-output name=x::y",
+        },
+        io,
+      ),
+    ).toBe(1);
+    expect(io.errors.join("\n")).toContain("single-line values");
   });
 
   it("rejects an empty path input", async () => {

@@ -10931,19 +10931,21 @@ async function runAction(environment = process.env, io = DEFAULT_IO) {
   try {
     const target = input(environment, "PATH", ".");
     const sarifPath = input(environment, "SARIF", "agentci-results.sarif");
-    const jsonPath = input(environment, "JSON", "agentci-results.json");
+    const jsonInput = environment.INPUT_JSON;
+    const jsonPath = jsonInput?.trim();
     const failOn = parseFailOn(
       input(environment, "FAIL-ON", "high").toLowerCase()
     );
     if (!target.trim()) throw new Error("path input must not be empty.");
     if (!sarifPath.trim()) throw new Error("sarif input must not be empty.");
-    if (!jsonPath.trim()) throw new Error("json input must not be empty.");
-    if (/[\r\n]/.test(target) || /[\r\n]/.test(sarifPath) || /[\r\n]/.test(jsonPath)) {
+    if (jsonInput && !jsonPath)
+      throw new Error("json input must not be empty.");
+    if (/[\r\n]/.test(target) || /[\r\n]/.test(sarifPath) || jsonInput && /[\r\n]/.test(jsonInput)) {
       throw new Error(
         "path, sarif and json inputs must be single-line values."
       );
     }
-    if (path3.resolve(jsonPath) === path3.resolve(sarifPath)) {
+    if (jsonPath && path3.resolve(jsonPath) === path3.resolve(sarifPath)) {
       throw new Error("json and sarif inputs must refer to different files.");
     }
     const targetStat = await fs3.stat(path3.resolve(target)).catch(() => null);
@@ -10959,14 +10961,16 @@ async function runAction(environment = process.env, io = DEFAULT_IO) {
 `,
       "utf8"
     );
-    const resolvedJson = path3.resolve(jsonPath);
-    await fs3.mkdir(path3.dirname(resolvedJson), { recursive: true });
-    await fs3.writeFile(
-      resolvedJson,
-      `${JSON.stringify(result, null, 2)}
+    if (jsonPath) {
+      const resolvedJson = path3.resolve(jsonPath);
+      await fs3.mkdir(path3.dirname(resolvedJson), { recursive: true });
+      await fs3.writeFile(
+        resolvedJson,
+        `${JSON.stringify(result, null, 2)}
 `,
-      "utf8"
-    );
+        "utf8"
+      );
+    }
     io.log(renderTextReport(result));
     if (!result.analysis_complete) {
       const codes = [
@@ -10987,8 +10991,8 @@ async function runAction(environment = process.env, io = DEFAULT_IO) {
     if (outputFile) {
       await fs3.appendFile(
         outputFile,
-        `${formatGithubOutputs(result, sarifPath)}json-path=${jsonPath}
-`,
+        `${formatGithubOutputs(result, sarifPath)}${jsonPath ? `json-path=${jsonPath}
+` : ""}`,
         "utf8"
       );
     }

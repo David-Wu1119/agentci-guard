@@ -142,6 +142,21 @@ jobs:
           node -e 'const r = JSON.parse(require("node:fs").readFileSync(process.env.OUTPUT_JSON_PATH, "utf8")); if (r.findings.length !== 0 || r.agent_usages.length !== 0 || r.analysis_complete !== true) process.exit(1)'
           test "$ANALYSIS_COMPLETE" = "true"
 
+      - name: Action smoke - JSON omitted
+        id: no-json
+        uses: ./
+        with:
+          path: examples/hardened
+          sarif: artifacts/no-json.sarif
+          fail-on: none
+
+      - name: Verify omitted JSON stays unwritten
+        env:
+          OMITTED_JSON_PATH: ${{ steps.no-json.outputs.json-path }}
+        run: |
+          test -z "$OMITTED_JSON_PATH"
+          test ! -e agentci-results.json
+
       - name: Action smoke - threshold failure
         id: threshold
         continue-on-error: true

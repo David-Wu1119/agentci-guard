@@ -34,24 +34,27 @@ export async function runAction(
   try {
     const target = input(environment, "PATH", ".");
     const sarifPath = input(environment, "SARIF", "agentci-results.sarif");
-    const jsonPath = input(environment, "JSON", "agentci-results.json");
+    // The runner passes an omitted optional input as an empty environment value.
+    const jsonInput = environment.INPUT_JSON;
+    const jsonPath = jsonInput?.trim();
     const failOn = parseFailOn(
       input(environment, "FAIL-ON", "high").toLowerCase(),
     );
 
     if (!target.trim()) throw new Error("path input must not be empty.");
     if (!sarifPath.trim()) throw new Error("sarif input must not be empty.");
-    if (!jsonPath.trim()) throw new Error("json input must not be empty.");
+    if (jsonInput && !jsonPath)
+      throw new Error("json input must not be empty.");
     if (
       /[\r\n]/.test(target) ||
       /[\r\n]/.test(sarifPath) ||
-      /[\r\n]/.test(jsonPath)
+      (jsonInput && /[\r\n]/.test(jsonInput))
     ) {
       throw new Error(
         "path, sarif and json inputs must be single-line values.",
       );
     }
-    if (path.resolve(jsonPath) === path.resolve(sarifPath)) {
+    if (jsonPath && path.resolve(jsonPath) === path.resolve(sarifPath)) {
       throw new Error("json and sarif inputs must refer to different files.");
     }
 
@@ -68,13 +71,15 @@ export async function runAction(
       `${JSON.stringify(toSarif(result), null, 2)}\n`,
       "utf8",
     );
-    const resolvedJson = path.resolve(jsonPath);
-    await fs.mkdir(path.dirname(resolvedJson), { recursive: true });
-    await fs.writeFile(
-      resolvedJson,
-      `${JSON.stringify(result, null, 2)}\n`,
-      "utf8",
-    );
+    if (jsonPath) {
+      const resolvedJson = path.resolve(jsonPath);
+      await fs.mkdir(path.dirname(resolvedJson), { recursive: true });
+      await fs.writeFile(
+        resolvedJson,
+        `${JSON.stringify(result, null, 2)}\n`,
+        "utf8",
+      );
+    }
 
     io.log(renderTextReport(result));
 
@@ -99,7 +104,7 @@ export async function runAction(
     if (outputFile) {
       await fs.appendFile(
         outputFile,
-        `${formatGithubOutputs(result, sarifPath)}json-path=${jsonPath}\n`,
+        `${formatGithubOutputs(result, sarifPath)}${jsonPath ? `json-path=${jsonPath}\n` : ""}`,
         "utf8",
       );
     }

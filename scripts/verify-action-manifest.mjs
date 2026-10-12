@@ -48,6 +48,9 @@ const requiredInputs = ["path", "sarif", "json", "fail-on"];
 for (const name of requiredInputs) {
   if (!manifest?.inputs?.[name]) errors.push(`missing input ${name}`);
 }
+if (manifest?.inputs?.json && "default" in manifest.inputs.json) {
+  errors.push("json input must remain opt-in without a default");
+}
 const requiredOutputs = [
   "findings",
   "critical",

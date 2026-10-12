@@ -121,6 +121,29 @@ try {
     );
   }
 
+  const noJsonOutput = path.join(temporary, "github-output-no-json");
+  const noJsonAction = spawnSync(process.execPath, ["dist/action.js"], {
+    cwd: packageRoot,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      INPUT_PATH: "examples/hardened",
+      INPUT_SARIF: path.join(temporary, "hardened.sarif"),
+      INPUT_JSON: "",
+      "INPUT_FAIL-ON": "none",
+      GITHUB_OUTPUT: noJsonOutput,
+    },
+  });
+  if (
+    noJsonAction.status !== 0 ||
+    fs.existsSync(path.join(packageRoot, "agentci-results.json")) ||
+    fs.readFileSync(noJsonOutput, "utf8").includes("json-path=")
+  ) {
+    throw new Error(
+      "Packed Action wrote JSON when the optional input was omitted.",
+    );
+  }
+
   const cliOutput = execFileSync(
     process.execPath,
     ["dist/cli.js", "scan", "examples/hardened", "--json", "--fail-on", "none"],

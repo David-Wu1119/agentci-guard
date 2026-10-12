@@ -108,7 +108,7 @@ describe("JavaScript Action entrypoint", () => {
       inputs: Record<string, { default?: string }>;
       outputs: Record<string, unknown>;
     };
-    expect(manifest.inputs.json.default).toBe("agentci-results.json");
+    expect(manifest.inputs.json.default).toBeUndefined();
     expect(manifest.outputs["json-path"]).toBeDefined();
 
     const temporary = await temporaryOutput();
@@ -144,6 +144,31 @@ describe("JavaScript Action entrypoint", () => {
     expect(await fs.readFile(temporary.output, "utf8")).toContain(
       `json-path=${temporary.json}`,
     );
+  });
+
+  it("does not write or report JSON when the optional input is omitted or empty", async () => {
+    const defaultJson = path.resolve("agentci-results.json");
+    expect(await fs.stat(defaultJson).catch(() => null)).toBeNull();
+
+    for (const jsonInput of [undefined, ""]) {
+      const temporary = await temporaryOutput();
+      const code = await runAction(
+        {
+          INPUT_PATH: "examples/hardened",
+          INPUT_SARIF: temporary.sarif,
+          INPUT_JSON: jsonInput,
+          "INPUT_FAIL-ON": "none",
+          GITHUB_OUTPUT: temporary.output,
+        },
+        captureIo(),
+      );
+
+      expect(code).toBe(0);
+      expect(await fs.stat(defaultJson).catch(() => null)).toBeNull();
+      expect(await fs.readFile(temporary.output, "utf8")).not.toContain(
+        "json-path=",
+      );
+    }
   });
 
   it("writes outputs before returning a threshold failure", async () => {
