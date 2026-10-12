@@ -35,6 +35,14 @@ function browserPage(hasScanner = true, scanResult = {}) {
     "load-example",
   ];
   const elements = new Map(ids.map((id) => [id, makeElement()]));
+  for (const id of [
+    "workflow-yaml",
+    "workflow-file",
+    "scan-button",
+    "load-example",
+  ]) {
+    elements.get(id).disabled = true;
+  }
   const file = elements.get("workflow-file");
   let fileValue = "";
   Object.defineProperty(file, "value", {
@@ -98,6 +106,40 @@ function browserPage(hasScanner = true, scanResult = {}) {
 }
 
 describe("browser workflow input", () => {
+  it("enables scan controls only when the scanner and renderer load", () => {
+    const ready = browserPage();
+    for (const id of [
+      "workflow-yaml",
+      "workflow-file",
+      "scan-button",
+      "load-example",
+    ]) {
+      expect(ready.elements.get(id).disabled).toBe(false);
+    }
+    expect(ready.elements.get("scan-results-heading").textContent).toBe(
+      "Ready to scan",
+    );
+    expect(ready.elements.get("scan-status").textContent).toMatch(
+      /Load the sample or paste a workflow/,
+    );
+
+    const missingScanner = browserPage(false);
+    for (const id of [
+      "workflow-yaml",
+      "workflow-file",
+      "scan-button",
+      "load-example",
+    ]) {
+      expect(missingScanner.elements.get(id).disabled).toBe(true);
+    }
+    expect(
+      missingScanner.elements.get("scan-results-heading").textContent,
+    ).toBe("Scan not completed");
+    expect(missingScanner.elements.get("scan-error").textContent).toMatch(
+      /scanner did not load.*Refresh the page/i,
+    );
+  });
+
   it("separates possible event paths from paths with resolved conditions", () => {
     const file = ".github/workflows/input.yml";
     const page = browserPage(true, {

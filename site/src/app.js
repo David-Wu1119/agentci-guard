@@ -13,6 +13,7 @@ const agentUsages = document.getElementById('scan-agent-usages');
 const findings = document.getElementById('scan-findings');
 const diagnostics = document.getElementById('scan-diagnostics');
 const scanButton = document.getElementById('scan-button');
+const loadExampleButton = document.getElementById('load-example');
 let inputRevision = 0;
 let sourceLabel = 'pasted YAML';
 
@@ -148,7 +149,7 @@ yaml.addEventListener('input', () => {
   resetResults('Input changed. Scan again to see current results.');
 });
 
-document.getElementById('load-example').addEventListener('click', () => {
+loadExampleButton.addEventListener('click', () => {
   const sample = document.querySelector('#research pre code').textContent;
   const hasDifferentInput = (yaml.value.trim() && yaml.value !== sample) || fileInput.files?.length;
   if (hasDifferentInput && !window.confirm('Replace the current workflow or selected file with the published sample?')) return;
@@ -224,4 +225,13 @@ for (const button of document.querySelectorAll('[data-case]')) {
     document.getElementById('case-title').textContent = example[1];
     document.getElementById('case-copy').textContent = example[2];
   });
+  button.disabled = false;
+}
+if (typeof scanWorkflow === 'function') {
+  heading.textContent = 'Ready to scan';
+  yaml.disabled = false;
+  fileInput.disabled = false;
+  loadExampleButton.disabled = false;
+  scanButton.disabled = false;
+  status.textContent = 'Load the sample or paste a workflow, then run the scanner.';
 }

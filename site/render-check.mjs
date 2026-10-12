@@ -149,6 +149,20 @@ const scanner = await evaluate(
 );
 assert.equal(scanner.ready, true);
 assert.equal(scanner.maxChars, 250000);
+assert.deepEqual(
+  await evaluate(
+    '({controls:["workflow-yaml","workflow-file","load-example","scan-button"].map(id=>document.getElementById(id).disabled),examples:Array.from(document.querySelectorAll("[data-case]")).map(button=>button.disabled),status:document.getElementById("scan-status").textContent})',
+  ),
+  {
+    controls: [false, false, false, false],
+    examples: [false, false, false],
+    status: "Load the sample or paste a workflow, then run the scanner.",
+  },
+);
+assert.equal(
+  await evaluate('document.getElementById("scan-results-heading").textContent'),
+  "Ready to scan",
+);
 for (const name of ["styles.css"])
   assert.ok(
     requests.includes(new URL(`${name}?v=${manifest[name]}`, siteUrl).href),
@@ -575,6 +589,10 @@ assert.ok(
   "Tampered scanner must be served over HTTP for the SRI check",
 );
 assert.equal(await evaluate("typeof window.agentciScanWorkflow"), "undefined");
+assert.equal(
+  await evaluate('document.getElementById("scan-button").disabled'),
+  true,
+);
 assert.match(
   await evaluate('document.getElementById("scan-error").textContent'),
   /scanner did not load.*Refresh the page/i,
@@ -599,6 +617,16 @@ assert.ok(
   "Tampered renderer must be served over HTTP for the SRI check",
 );
 assert.equal(await evaluate("typeof window.agentciScanWorkflow"), "function");
+assert.deepEqual(
+  await evaluate(
+    '({controls:["workflow-yaml","workflow-file","load-example","scan-button"].map(id=>document.getElementById(id).disabled),examples:Array.from(document.querySelectorAll("[data-case]")).map(button=>button.disabled)})',
+  ),
+  { controls: [true, true, true, true], examples: [true, true, true] },
+);
+assert.equal(
+  await evaluate('document.getElementById("scan-results-heading").textContent'),
+  "Preparing scanner",
+);
 await evaluate('document.getElementById("scan-button").click()');
 assert.equal(
   await evaluate('document.getElementById("scan-output").hidden'),
@@ -606,7 +634,7 @@ assert.equal(
 );
 assert.match(
   await evaluate('document.getElementById("scan-status").textContent'),
-  /Load the sample or paste a workflow/,
+  /Preparing the browser scanner.*refresh the page/i,
 );
 console.log(
   "PASS: browser rejected a tampered renderer with SRI; no scan ran.",
