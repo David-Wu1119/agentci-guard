@@ -192,12 +192,18 @@ jobs:
         env:
           E3_ACTION_OUTCOME: ${{ steps.reusable.outcome }}
           E3_ACTION_JSON_SHA256: ${{ steps.reusable.outputs.json-sha256 }}
+          E4_ACTION_JSON_PATH: ${{ steps.reusable.outputs.json-path }}
+          E4_ACTION_SARIF_PATH: ${{ steps.reusable.outputs.sarif-path }}
+          E4_WORKFLOW_REF: ${{ github.workflow_ref }}
+          E4_WORKFLOW_SHA: ${{ github.workflow_sha }}
         run: |
           node -e 'const assert = require("node:assert/strict"); const r = JSON.parse(require("node:fs").readFileSync("artifacts/reusable.json", "utf8")); assert.deepEqual(r.agent_usages[0]?.call_chain, [".github/workflows/caller.yml#agent", ".github/workflows/bridge.yml#agent"]); assert(r.findings.some((f) => f.call_chain?.[0] === ".github/workflows/caller.yml#agent"))'
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
+          import { execFileSync } from 'node:child_process';
           import { createHash } from 'node:crypto';
-          import { readFileSync } from 'node:fs';
+          import { readFileSync, writeFileSync } from 'node:fs';
+          import YAML from 'yaml';
           import { RULES } from './dist/index.js';
           import { loadActionRun, projectPrimary } from './scripts/benchmark/v4-primary-projection.mjs';
 
@@ -208,6 +214,21 @@ jobs:
             sha256: preflight.input_files.find((file) => file.path === source).sha256,
           };
           const jsonPath = 'artifacts/reusable.json';
+          const sarifPath = 'artifacts/reusable.sarif';
+          const invocation = {
+            uses: './',
+            with: {
+              path: 'corpus/adversarial/cases/local-reusable',
+              sarif: sarifPath,
+              json: jsonPath,
+              'fail-on': 'none',
+            },
+          };
+          const workflow = YAML.parse(readFileSync('.github/workflows/ci.yml', 'utf8'));
+          const actionStep = workflow.jobs.verify.steps.find((step) => step.id === 'reusable');
+          assert.deepEqual({ uses: actionStep?.uses, with: actionStep?.with }, invocation);
+          assert.equal(process.env.E4_ACTION_JSON_PATH, jsonPath);
+          assert.equal(process.env.E4_ACTION_SARIF_PATH, sarifPath);
           const outputSha256 = process.env.E3_ACTION_JSON_SHA256;
           assert.match(outputSha256, /^[0-9a-f]{64}$/, 'Action must emit its JSON SHA-256');
           assert.equal(createHash('sha256').update(readFileSync(jsonPath)).digest('hex'), outputSha256);
@@ -262,7 +283,62 @@ jobs:
             ['gated-write', true, [{ kind: 'finding', index: 2, id: 'agentci/gated-ai-write-token:.github/workflows/reusable.yml:agent::.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],
             ['broad-write', true, [{ kind: 'finding', index: 3, id: 'agentci/broad-write-permissions:.github/workflows/reusable.yml:agent::.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],
           ]);
+          const checkoutSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          assert.equal(checkoutSha, preflight.action_commit);
+          assert.equal(checkoutSha, process.env.GITHUB_SHA);
+          assert.match(process.env.GITHUB_RUN_ID ?? '', /^[0-9]+$/);
+          assert.match(process.env.GITHUB_RUN_ATTEMPT ?? '', /^[0-9]+$/);
+          assert.match(process.env.GITHUB_REPOSITORY ?? '', /^[^/]+\/[^/]+$/);
+          assert.equal(process.env.GITHUB_JOB, 'verify');
+          assert.match(process.env.E4_WORKFLOW_SHA ?? '', /^[0-9a-f]{40}$/);
+          assert.match(process.env.E4_WORKFLOW_REF ?? '', /\/\.github\/workflows\/ci\.yml@/);
+          const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
+          writeFileSync('artifacts/e4-synthetic-receipt.json', JSON.stringify({
+            schema_version: 1,
+            provider: {
+              repository: process.env.GITHUB_REPOSITORY,
+              run_id: process.env.GITHUB_RUN_ID,
+              run_attempt: process.env.GITHUB_RUN_ATTEMPT,
+              job: process.env.GITHUB_JOB,
+              workflow_ref: process.env.E4_WORKFLOW_REF,
+              workflow_sha: process.env.E4_WORKFLOW_SHA,
+              github_sha: process.env.GITHUB_SHA,
+            },
+            case_id: caseRecord.case_id,
+            source_path: source,
+            checkout_sha: checkoutSha,
+            invocation,
+            preflight_sha256: hash(readFileSync('artifacts/e3-reusable-preflight.json')),
+            action_outcome: process.env.E3_ACTION_OUTCOME,
+            action_json_sha256: outputSha256,
+            action_sarif_sha256: hash(readFileSync(sarifPath)),
+            projected_unit_ids: projected.units.map((unit) => unit.unit_id),
+          }, null, 2) + '\n');
           NODE
+
+      - name: Preserve synthetic Action evidence
+        if: success()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e4-synthetic-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          path: |
+            artifacts/e3-reusable-preflight.json
+            artifacts/reusable.json
+            artifacts/reusable.sarif
+            artifacts/e4-synthetic-receipt.json
+
+      - name: Preserve failed synthetic Action diagnostics
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e4-synthetic-debug-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: warn
+          path: |
+            artifacts/e3-reusable-preflight.json
+            artifacts/reusable.json
+            artifacts/reusable.sarif
+            artifacts/e4-synthetic-receipt.json
 
       - name: Action smoke - JSON omitted
         id: no-json

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -35,6 +36,81 @@ function captureIo(): ActionIo & { logs: string[]; errors: string[] } {
 }
 
 describe("JavaScript Action entrypoint", () => {
+  it("keeps the synthetic Action receipt and raw evidence in the same CI job", async () => {
+    const ci = YAML.parse(
+      await fs.readFile(".github/workflows/ci.yml", "utf8"),
+    ) as {
+      jobs: {
+        verify: {
+          steps: Array<{
+            id?: string;
+            name?: string;
+            uses?: string;
+            with?: Record<string, string>;
+            env?: Record<string, string>;
+            run?: string;
+          }>;
+        };
+      };
+    };
+    const steps = ci.jobs.verify.steps;
+    const actionIndex = steps.findIndex((step) => step.id === "reusable");
+    expect(steps[actionIndex]).toMatchObject({
+      uses: "./",
+      with: {
+        path: "corpus/adversarial/cases/local-reusable",
+        json: "artifacts/reusable.json",
+        "fail-on": "none",
+      },
+    });
+    expect(steps[actionIndex + 1]).toMatchObject({
+      env: {
+        E4_ACTION_JSON_PATH: "${{ steps.reusable.outputs.json-path }}",
+        E4_WORKFLOW_SHA: "${{ github.workflow_sha }}",
+      },
+    });
+    expect(steps[actionIndex + 1].run).toContain(
+      "artifacts/e4-synthetic-receipt.json",
+    );
+    const verifier = steps[actionIndex + 1].run
+      ?.split("node --input-type=module <<'NODE'\n")[1]
+      ?.split("\nNODE")[0];
+    expect(verifier).toBeTruthy();
+    const syntax = spawnSync(
+      process.execPath,
+      ["--input-type=module", "--check"],
+      {
+        input: verifier,
+        encoding: "utf8",
+      },
+    );
+    expect(syntax.status, syntax.stderr).toBe(0);
+    expect(steps[actionIndex + 2]).toMatchObject({
+      if: "success()",
+      uses: "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+      with: {
+        name: "e4-synthetic-${{ github.run_id }}-${{ github.run_attempt }}",
+        "if-no-files-found": "error",
+      },
+    });
+    for (const file of [
+      "artifacts/e3-reusable-preflight.json",
+      "artifacts/reusable.json",
+      "artifacts/reusable.sarif",
+      "artifacts/e4-synthetic-receipt.json",
+    ]) {
+      expect(steps[actionIndex + 2].with?.path).toContain(file);
+    }
+    expect(steps[actionIndex + 3]).toMatchObject({
+      if: "failure()",
+      uses: "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+      with: {
+        name: "e4-synthetic-debug-${{ github.run_id }}-${{ github.run_attempt }}",
+        "if-no-files-found": "warn",
+      },
+    });
+  });
+
   it("is wired through a dedicated JavaScript entrypoint", async () => {
     const manifest = YAML.parse(await fs.readFile("action.yml", "utf8")) as {
       runs: { using: string; main: string; args?: unknown };
