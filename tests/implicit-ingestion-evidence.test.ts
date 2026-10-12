@@ -92,6 +92,39 @@ jobs:
     );
   });
 
+  it("does not call a job gated when a hosted agent also ingests the same comment", () => {
+    const raw = `
+on: issue_comment
+permissions:
+  contents: write
+env:
+  BODY: \${{ github.event.comment.body }}
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@${VERIFIED}
+        with:
+          prompt: "Reply to \${{ github.event.comment.body }}"
+      - run: curl -X POST https://api.cursor.com/v1/agents -d "$BODY"
+`;
+    const result = scanWorkflowFiles(
+      [parseWorkflowFile(".github/workflows/review.yml", raw)],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    expect(result.agent_usages.map((usage) => usage.kind)).toEqual([
+      "action",
+      "http",
+    ]);
+    expect(rules(result)).not.toContain("agentci/gated-ai-write-token");
+    expect(rules(result)).not.toContain("agentci/untrusted-ai-write-token");
+    expect(diagnostics(result)).toContain(
+      "agentci/analysis-remote-agent-capability-unknown",
+    );
+    expect(result.analysis_complete).toBe(false);
+  });
+
   it.each([
     [
       "an unverified Action",

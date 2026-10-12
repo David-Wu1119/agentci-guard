@@ -1552,7 +1552,8 @@ function analyzeWorkflow(
           aiSteps.some(
             (step) =>
               (step.implicitIngestionUnknown && step.events.includes(event)) ||
-              step.toolFetchUnknownEvents.includes(event),
+              step.toolFetchUnknownEvents.includes(event) ||
+              (step.remoteHttp && step.ingestionEvents.includes(event)),
           ) ||
           runDataflowUnknownEvents.some((events) => events.includes(event)),
       );
