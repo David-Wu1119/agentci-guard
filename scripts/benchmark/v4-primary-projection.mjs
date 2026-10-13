@@ -23,6 +23,12 @@ function validHash(value) {
   return typeof value === "string" && /^[0-9a-f]{64}$/.test(value);
 }
 
+function stringArray(value) {
+  return (
+    Array.isArray(value) && value.every((item) => typeof item === "string")
+  );
+}
+
 function relativeFile(value) {
   requireValue(typeof value === "string" && value.length > 0, "missing path");
   const normalized = value.replaceAll("\\", "/");
@@ -170,6 +176,12 @@ function validateResult(result) {
           typeof record.rule_id === "string" && record.rule_id,
           "missing finding rule_id",
         );
+        for (const field of ["title", "message", "why", "evidence"])
+          requireValue(
+            typeof record[field] === "string",
+            `invalid finding ${field}`,
+          );
+        requireValue(stringArray(record.fix), "invalid finding fix");
       } else {
         requireValue(
           typeof record.job === "string" && record.job,
@@ -179,7 +191,32 @@ function validateResult(result) {
           Number.isSafeInteger(record.step_index) && record.step_index >= 0,
           "invalid agent usage step_index",
         );
+        requireValue(
+          ["action", "cli", "http", "other"].includes(record.kind),
+          "invalid agent usage kind",
+        );
+        requireValue(
+          typeof record.evidence === "string",
+          "invalid agent usage evidence",
+        );
       }
+      if (record.step !== undefined || kind === "agent usage")
+        requireValue(typeof record.step === "string", `invalid ${kind} step`);
+      if (record.line !== undefined || kind === "agent usage")
+        requireValue(
+          Number.isSafeInteger(record.line) && record.line > 0,
+          `invalid ${kind} line`,
+        );
+      if (record.reachable_events !== undefined || kind === "agent usage")
+        requireValue(
+          stringArray(record.reachable_events),
+          `invalid ${kind} reachable_events`,
+        );
+      if (record.uncertain_reachable_events !== undefined)
+        requireValue(
+          stringArray(record.uncertain_reachable_events),
+          `invalid ${kind} uncertain_reachable_events`,
+        );
       if (record.job !== undefined) {
         requireValue(
           typeof record.job === "string" && record.job,
@@ -208,6 +245,26 @@ function validateResult(result) {
       ["error", "warning"].includes(diagnostic.severity),
       "invalid diagnostic severity",
     );
+    requireValue(
+      typeof diagnostic.message === "string",
+      "invalid diagnostic message",
+    );
+    if (diagnostic.line !== undefined)
+      requireValue(
+        Number.isSafeInteger(diagnostic.line) && diagnostic.line > 0,
+        "invalid diagnostic line",
+      );
+    if (diagnostic.job !== undefined)
+      requireValue(
+        typeof diagnostic.job === "string",
+        "invalid diagnostic job",
+      );
+    if (diagnostic.step_index !== undefined)
+      requireValue(
+        Number.isSafeInteger(diagnostic.step_index) &&
+          diagnostic.step_index >= 0,
+        "invalid diagnostic step_index",
+      );
     referencedWorkflowFiles(diagnostic);
   }
   requireValue(

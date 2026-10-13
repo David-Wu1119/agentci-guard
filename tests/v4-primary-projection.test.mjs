@@ -110,7 +110,10 @@ function usage(id, options = {}) {
   };
 }
 
-function actionRun(result = scan()) {
+function actionRun(
+  result = scan(),
+  snapshot = "on: issue_comment\njobs:\n  agent:\n    runs-on: ubuntu-latest\n",
+) {
   const temporary = mkdtempSync(
     path.join(os.tmpdir(), "agentci-e3-synthetic-"),
   );
@@ -121,8 +124,6 @@ function actionRun(result = scan()) {
   const actionBundlePath = path.join(temporary, "action", "dist", "action.js");
   const lockfilePath = path.join(temporary, "action", "pnpm-lock.yaml");
   const jsonPath = path.join(outputRoot, "scan.json");
-  const snapshot =
-    "on: issue_comment\njobs:\n  agent:\n    runs-on: ubuntu-latest\n";
   const bundle = "// synthetic Action bundle\n";
   const manifest = "runs:\n  using: node24\n  main: dist/action.js\n";
   const lockfile = "lockfileVersion: '9.0'\n";
@@ -186,6 +187,19 @@ describe("synthetic E3 Action run binding", () => {
         result: fixture.result,
         run_incomplete: false,
       });
+    } finally {
+      rmSync(fixture.temporary, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a hash-matched agent usage with an invalid kind", async () => {
+    const fixture = actionRun(
+      scan({ agent_usages: [usage("invalid-kind", { kind: "unknown-kind" })] }),
+    );
+    try {
+      await expect(load(fixture.options)).rejects.toThrow(
+        /invalid agent usage kind/,
+      );
     } finally {
       rmSync(fixture.temporary, { recursive: true, force: true });
     }
@@ -469,6 +483,99 @@ describe("synthetic E3 Action run binding", () => {
     });
     try {
       await expect(load(fixture.options)).rejects.toThrow();
+    } finally {
+      rmSync(fixture.temporary, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    ["findings", "title"],
+    ["findings", "message"],
+    ["findings", "why"],
+    ["findings", "fix"],
+    ["findings", "evidence"],
+    ["findings", "fix", [1]],
+    ["findings", "step", 1],
+    ["findings", "line", 0],
+    ["findings", "reachable_events", "push"],
+    ["findings", "uncertain_reachable_events", [1]],
+    ["agent_usages", "step"],
+    ["agent_usages", "kind"],
+    ["agent_usages", "kind", "unsupported"],
+    ["agent_usages", "evidence"],
+    ["agent_usages", "line"],
+    ["agent_usages", "line", 0],
+    ["agent_usages", "reachable_events"],
+    ["agent_usages", "reachable_events", [1]],
+    ["agent_usages", "uncertain_reachable_events", "push"],
+    ["diagnostics", "message"],
+    ["diagnostics", "line", 0],
+    ["diagnostics", "job", 1],
+    ["diagnostics", "step_index", -1],
+  ])(
+    "rejects digest-matched Action JSON with invalid %s.%s",
+    async (kind, field, invalidValue) => {
+      const fixture = actionRun(
+        scan({
+          findings: [finding("synthetic-finding", jobRule)],
+          agent_usages: [usage("synthetic-usage")],
+          analysis_complete: false,
+          diagnostics: [
+            {
+              code: "agentci/analysis-event-condition",
+              kind: "analysis",
+              severity: "warning",
+              file: source,
+              message: "Synthetic only",
+            },
+          ],
+        }),
+      );
+      try {
+        await expect(load(fixture.options)).resolves.toMatchObject({
+          run_incomplete: true,
+        });
+        if (invalidValue === undefined) delete fixture.result[kind][0][field];
+        else fixture.result[kind][0][field] = invalidValue;
+        const json = JSON.stringify(fixture.result);
+        writeFileSync(fixture.jsonPath, json);
+        await expect(
+          load({
+            ...fixture.options,
+            runReceipt: {
+              ...fixture.options.runReceipt,
+              output_sha256: sha256(json),
+            },
+          }),
+        ).rejects.toThrow();
+      } finally {
+        rmSync(fixture.temporary, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it("accepts the scanner's diagnostic for an empty job ID", async () => {
+    const snapshot =
+      'on: issue_comment\njobs:\n  "":\n    if: ${{ unknown() }}\n    runs-on: ubuntu-latest\n';
+    const workflow = parseWorkflowFile(
+      path.join("/synthetic", source),
+      snapshot,
+    );
+    const result = scanWorkflowFiles([workflow], "/synthetic", {
+      ignore: [],
+      ignorePaths: [],
+    });
+    expect(result.diagnostics).toEqual([
+      expect.objectContaining({
+        job: "",
+        code: "agentci/analysis-event-condition",
+      }),
+    ]);
+    const fixture = actionRun(result, snapshot);
+    try {
+      await expect(load(fixture.options)).resolves.toMatchObject({
+        run_incomplete: true,
+      });
     } finally {
       rmSync(fixture.temporary, { recursive: true, force: true });
     }
