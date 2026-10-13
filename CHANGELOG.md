@@ -326,10 +326,13 @@ install -g` bin entry is a symlink, so `agentci --version` and `agentci scan`
   the diagnostic code as descriptor, its severity as level, and its file and
   line as location), plus `agentci/analysisComplete` and
   `agentci/diagnosticCount` run properties. The CLI (`scan` and `org`) and the
-  Action write this form. A consumer that only counts `results` can therefore
-  no longer mistake an incomplete zero-finding scan for a clean one. Both forms
-  validate against the vendored OASIS SARIF 2.1.0 schema. A bare findings
-  array is still accepted and then makes no claim about completeness.
+  Action write this form. **Correction (2026-10-12):** An earlier version of
+  this note incorrectly said that counting only `results` prevents an
+  incomplete zero-finding scan from appearing clean. Such a run has an empty
+  `results` array; consumers must inspect `invocations` or the
+  `agentci/analysisComplete` run property. Both forms validate against the
+  vendored OASIS SARIF 2.1.0 schema. A bare findings array is still accepted
+  and then makes no claim about completeness.
 - The Action prints a `::warning::` annotation and appends a note to the step
   summary when the analysis is incomplete, naming the diagnostic codes. Exit
   codes are unchanged: warnings do not fail the step; error diagnostics still

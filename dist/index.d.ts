@@ -376,9 +376,10 @@ declare const SEVERITY_ORDER: Severity[];
  *
  * Given a whole scan, the run also carries an `invocation` whose
  * `executionSuccessful` is the scan's `analysis_complete` and whose
- * `toolExecutionNotifications` are the diagnostics, so a consumer that only
- * counts `results` cannot mistake an incomplete zero-finding scan for a clean
- * one. Given a bare findings array, the run makes no claim about completeness.
+ * `toolExecutionNotifications` are the diagnostics. A consumer must inspect
+ * run completeness; counting only `results` can mistake an incomplete
+ * zero-finding scan for a clean one. Given a bare findings array, the run
+ * makes no claim about completeness.
  */
 declare function toSarif(input: Finding[] | SarifScanInput): SarifLog;
 

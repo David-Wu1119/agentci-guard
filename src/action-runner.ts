@@ -84,8 +84,7 @@ export async function runAction(
     io.log(renderTextReport(result));
 
     if (!result.analysis_complete) {
-      // A workflow command on stdout: GitHub renders it as an annotation, so a
-      // zero-finding step cannot look clean when the analysis did not finish.
+      // The warning is an annotation, but it does not fail a zero-finding step.
       const codes = [
         ...new Set(result.diagnostics.map((diagnostic) => diagnostic.code)),
       ].join(", ");
