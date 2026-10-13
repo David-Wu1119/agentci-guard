@@ -38,6 +38,21 @@ function relativeFile(value) {
   return value;
 }
 
+function referencedWorkflowFiles(record) {
+  const files = [relativeFile(record.file)];
+  if (record.call_chain === undefined) return files;
+  requireValue(
+    Array.isArray(record.call_chain) &&
+      record.call_chain.every(
+        (entry) => typeof entry === "string" && /^[^#]+#[^#]+$/.test(entry),
+      ),
+    "invalid call_chain",
+  );
+  for (const entry of record.call_chain)
+    files.push(relativeFile(entry.slice(0, entry.indexOf("#"))));
+  return files;
+}
+
 function inside(root, file) {
   const absolute = path.resolve(file);
   const relative = path.relative(root, absolute);
@@ -149,7 +164,7 @@ function validateResult(result) {
         typeof record.id === "string" && record.id,
         `missing ${kind} id`,
       );
-      relativeFile(record.file);
+      referencedWorkflowFiles(record);
       if (kind === "finding") {
         requireValue(
           typeof record.rule_id === "string" && record.rule_id,
@@ -177,18 +192,6 @@ function validateResult(result) {
           `invalid ${kind} step_index`,
         );
       }
-      if (record.call_chain !== undefined) {
-        requireValue(
-          Array.isArray(record.call_chain) &&
-            record.call_chain.every(
-              (entry) =>
-                typeof entry === "string" && /^[^#]+#[^#]+$/.test(entry),
-            ),
-          `invalid ${kind} call_chain`,
-        );
-        for (const entry of record.call_chain)
-          relativeFile(entry.slice(0, entry.indexOf("#")));
-      }
     }
   }
   for (const diagnostic of result.diagnostics) {
@@ -205,7 +208,7 @@ function validateResult(result) {
       ["error", "warning"].includes(diagnostic.severity),
       "invalid diagnostic severity",
     );
-    relativeFile(diagnostic.file);
+    referencedWorkflowFiles(diagnostic);
   }
   requireValue(
     result.analysis_complete ===
@@ -356,6 +359,22 @@ export async function loadActionRun(options) {
   );
   const result = JSON.parse(jsonBytes.toString("utf8"));
   validateResult(result);
+  const workflowPaths = new Set(
+    actualInputs
+      .filter((entry) => entry.path.startsWith(".github/workflows/"))
+      .map((entry) => entry.path),
+  );
+  for (const record of [
+    ...result.findings,
+    ...result.agent_usages,
+    ...result.diagnostics,
+  ]) {
+    for (const file of referencedWorkflowFiles(record))
+      requireValue(
+        workflowPaths.has(file),
+        `record references workflow absent from input inventory: ${file}`,
+      );
+  }
   // A matching root is necessary for an honest run, but E4 still must attest the invocation.
   requireValue(
     path.isAbsolute(result.root) &&
@@ -363,10 +382,7 @@ export async function loadActionRun(options) {
     "Action JSON scan root differs from input root",
   );
   requireValue(
-    result.workflow_count ===
-      actualInputs.filter((entry) =>
-        entry.path.startsWith(".github/workflows/"),
-      ).length,
+    result.workflow_count === workflowPaths.size,
     "workflow count contradicts input inventory",
   );
   const hasError = result.diagnostics.some(

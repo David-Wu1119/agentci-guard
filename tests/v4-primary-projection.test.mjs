@@ -191,6 +191,97 @@ describe("synthetic E3 Action run binding", () => {
     }
   });
 
+  it.each([
+    [
+      "finding",
+      scan({
+        findings: [
+          finding("ghost", jobRule, { file: ".github/workflows/ghost.yml" }),
+        ],
+      }),
+    ],
+    [
+      "agent usage",
+      scan({
+        agent_usages: [usage("ghost", { file: ".github/workflows/ghost.yml" })],
+      }),
+    ],
+    [
+      "diagnostic",
+      scan({
+        analysis_complete: false,
+        diagnostics: [
+          {
+            code: "agentci/analysis-event-condition",
+            kind: "analysis",
+            severity: "warning",
+            file: ".github/workflows/ghost.yml",
+            message: "Synthetic only",
+          },
+        ],
+      }),
+    ],
+    [
+      "caller chain",
+      scan({
+        findings: [
+          finding("ghost-chain", jobRule, {
+            call_chain: [".github/workflows/ghost.yml#agent"],
+          }),
+        ],
+      }),
+    ],
+    [
+      "diagnostic caller chain",
+      scan({
+        analysis_complete: false,
+        diagnostics: [
+          {
+            code: "agentci/analysis-event-condition",
+            kind: "analysis",
+            severity: "warning",
+            file: source,
+            call_chain: [".github/workflows/ghost.yml#agent"],
+            message: "Synthetic only",
+          },
+        ],
+      }),
+    ],
+  ])(
+    "rejects a %s from a workflow missing in the input inventory",
+    async (_kind, result) => {
+      const fixture = actionRun(result);
+      try {
+        await expect(load(fixture.options)).rejects.toThrow(/workflow/);
+      } finally {
+        rmSync(fixture.temporary, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it("rejects a malformed diagnostic caller chain", async () => {
+    const fixture = actionRun(
+      scan({
+        analysis_complete: false,
+        diagnostics: [
+          {
+            code: "agentci/analysis-event-condition",
+            kind: "analysis",
+            severity: "warning",
+            file: source,
+            call_chain: "",
+            message: "Synthetic only",
+          },
+        ],
+      }),
+    );
+    try {
+      await expect(load(fixture.options)).rejects.toThrow(/call_chain/);
+    } finally {
+      rmSync(fixture.temporary, { recursive: true, force: true });
+    }
+  });
+
   it("rejects a swapped case receipt even when the source bytes and JSON match", async () => {
     const fixture = actionRun();
     try {
@@ -308,13 +399,17 @@ describe("synthetic E3 Action run binding", () => {
       writeFileSync(
         fixture.jsonPath,
         JSON.stringify(
-          scan({ root: fixture.options.inputRoot, workflow_count: 2 }),
+          scan({
+            root: fixture.options.inputRoot,
+            workflow_count: 2,
+            findings: [finding("auxiliary", jobRule, { file: sibling })],
+          }),
         ),
       );
       withSibling.runReceipt.output_sha256 = sha256(
         readFileSync(fixture.jsonPath),
       );
-      expect((await load(withSibling)).run_incomplete).toBe(false);
+      expect((await load(withSibling)).result.findings[0].file).toBe(sibling);
       const configPath = path.join(
         fixture.options.inputRoot,
         "agentci.config.json",
