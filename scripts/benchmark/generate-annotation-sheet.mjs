@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
 import { renderCsv } from "./csv.mjs";
+import { unitId } from "./unit-id.mjs";
 
 const repositoryRoot = path.resolve(
   path.dirname(new URL(import.meta.url).pathname),
@@ -259,12 +260,6 @@ function annotationRow(
     "",
     "",
   ];
-}
-
-function unitId(caseId, scope, jobId, stepIndex, task) {
-  return [caseId, scope, jobId ?? "-", stepIndex ?? "-", task]
-    .map((part) => encodeURIComponent(String(part)))
-    .join("|");
 }
 
 function normalizeTriggers(value) {

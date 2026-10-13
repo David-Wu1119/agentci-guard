@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import YAML from "yaml";
+import { unitId } from "./unit-id.mjs";
 
 const AGENT_TASK = "agentci/agent-usage";
 const CONFIG_FILES = ["agentci.config.json", ".agentcirc.json"];
@@ -477,6 +478,10 @@ export function projectPrimary({
     requireValue(
       row.scope !== "step" || step !== null,
       "missing registry step index",
+    );
+    requireValue(
+      row.unit_id === unitId(row.case_id, row.scope, job, step, row.rule_id),
+      `unit ID does not match registry identity: ${row.unit_id}`,
     );
     const key = registryKey(
       row.case_id,

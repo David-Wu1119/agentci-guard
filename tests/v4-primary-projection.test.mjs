@@ -11,6 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseWorkflowFile, scanWorkflowFiles } from "../src/scanner.ts";
+import { unitId } from "../scripts/benchmark/unit-id.mjs";
 import {
   loadActionRun,
   projectPrimary as projectPrimaryWithTasks,
@@ -63,9 +64,9 @@ function scan(overrides = {}) {
   };
 }
 
-function unit(unit_id, scope, job_id, step_index, rule_id) {
+function unit(scope, job_id, step_index, rule_id) {
   return {
-    unit_id,
+    unit_id: unitId(caseRecord.case_id, scope, job_id, step_index, rule_id),
     case_id: caseRecord.case_id,
     source_path: source,
     scope,
@@ -432,12 +433,39 @@ describe("synthetic E3 Action run binding", () => {
 });
 
 describe("synthetic E3 primary unit projection", () => {
+  it("uses the generator's canonical encoded unit ID contract", () => {
+    expect(unit("job", "agent", null, jobRule).unit_id).toBe(
+      "synthetic-001|job|agent|-|agentci%2Fbroad-write-permissions",
+    );
+    expect(unit("step", "agent", 0, agentTask).unit_id).toBe(
+      "synthetic-001|step|agent|0|agentci%2Fagent-usage",
+    );
+  });
+
+  it("rejects swapped unit IDs even when the frozen ID set still matches", () => {
+    const agent = unit("job", "agent", null, jobRule);
+    const other = unit("job", "other", null, jobRule);
+    const registryRows = [
+      { ...agent, unit_id: other.unit_id },
+      { ...other, unit_id: agent.unit_id },
+    ];
+
+    expect(() =>
+      projectPrimary({
+        caseRecord,
+        registryRows,
+        expectedUnitIds: [agent.unit_id, other.unit_id],
+        result: scan({ findings: [finding("agent-write", jobRule)] }),
+      }),
+    ).toThrow(/unit ID does not match registry identity/);
+  });
+
   it("maps direct job and zero-based step records by exact structure, not step name", () => {
     const registryRows = [
-      unit("job", "job", "agent", null, jobRule),
-      unit("step-0", "step", "agent", 0, stepRule),
-      unit("step-1", "step", "agent", 1, stepRule),
-      unit("usage-0", "step", "agent", 0, agentTask),
+      unit("job", "agent", null, jobRule),
+      unit("step", "agent", 0, stepRule),
+      unit("step", "agent", 1, stepRule),
+      unit("step", "agent", 0, agentTask),
     ];
     const result = scan({
       findings: [
@@ -453,24 +481,24 @@ describe("synthetic E3 primary unit projection", () => {
       projectPrimary({
         caseRecord,
         registryRows,
-        expectedUnitIds: ["job", "step-0", "step-1", "usage-0"],
+        expectedUnitIds: registryRows.map((row) => row.unit_id),
         result,
       }),
     ).toEqual({
       units: [
         {
-          unit_id: "job",
+          unit_id: registryRows[0].unit_id,
           alert: true,
           matched_records: [{ kind: "finding", index: 0, id: "job-finding" }],
         },
-        { unit_id: "step-0", alert: false, matched_records: [] },
+        { unit_id: registryRows[1].unit_id, alert: false, matched_records: [] },
         {
-          unit_id: "step-1",
+          unit_id: registryRows[2].unit_id,
           alert: true,
           matched_records: [{ kind: "finding", index: 1, id: "step-finding" }],
         },
         {
-          unit_id: "usage-0",
+          unit_id: registryRows[3].unit_id,
           alert: true,
           matched_records: [
             { kind: "agent_usage", index: 0, id: "agent-record" },
@@ -485,10 +513,10 @@ describe("synthetic E3 primary unit projection", () => {
 
   it("keeps two callers of the same callee in distinct job and reusable-call units", () => {
     const registryRows = [
-      unit("first-job", "job", "first", null, jobRule),
-      unit("second-job", "job", "second", null, jobRule),
-      unit("first-call", "reusable-call", "first", null, agentTask),
-      unit("second-call", "reusable-call", "second", null, agentTask),
+      unit("job", "first", null, jobRule),
+      unit("job", "second", null, jobRule),
+      unit("reusable-call", "first", null, agentTask),
+      unit("reusable-call", "second", null, agentTask),
     ];
     const result = scan({
       findings: [
@@ -513,35 +541,30 @@ describe("synthetic E3 primary unit projection", () => {
       projectPrimary({
         caseRecord,
         registryRows,
-        expectedUnitIds: [
-          "first-job",
-          "second-job",
-          "first-call",
-          "second-call",
-        ],
+        expectedUnitIds: registryRows.map((row) => row.unit_id),
         result,
       }),
     ).toEqual({
       units: [
         {
-          unit_id: "first-job",
+          unit_id: registryRows[0].unit_id,
           alert: true,
           matched_records: [{ kind: "finding", index: 0, id: "first-write" }],
         },
         {
-          unit_id: "second-job",
+          unit_id: registryRows[1].unit_id,
           alert: true,
           matched_records: [{ kind: "finding", index: 1, id: "second-write" }],
         },
         {
-          unit_id: "first-call",
+          unit_id: registryRows[2].unit_id,
           alert: true,
           matched_records: [
             { kind: "agent_usage", index: 0, id: "first-agent" },
           ],
         },
         {
-          unit_id: "second-call",
+          unit_id: registryRows[3].unit_id,
           alert: true,
           matched_records: [
             { kind: "agent_usage", index: 1, id: "second-agent" },
@@ -555,9 +578,7 @@ describe("synthetic E3 primary unit projection", () => {
   });
 
   it("uses only the first ordered caller in a nested chain", () => {
-    const registryRows = [
-      unit("top-call", "reusable-call", "top", null, agentTask),
-    ];
+    const registryRows = [unit("reusable-call", "top", null, agentTask)];
     const result = scan({
       agent_usages: [
         usage("nested-agent", {
@@ -574,13 +595,13 @@ describe("synthetic E3 primary unit projection", () => {
       projectPrimary({
         caseRecord,
         registryRows,
-        expectedUnitIds: ["top-call"],
+        expectedUnitIds: [registryRows[0].unit_id],
         result,
       }),
     ).toEqual({
       units: [
         {
-          unit_id: "top-call",
+          unit_id: registryRows[0].unit_id,
           alert: true,
           matched_records: [
             { kind: "agent_usage", index: 0, id: "nested-agent" },
@@ -596,14 +617,12 @@ describe("synthetic E3 primary unit projection", () => {
   });
 
   it("rejects an in-scope nested record whose first caller is not the selected source", () => {
-    const registryRows = [
-      unit("top-call", "reusable-call", "top", null, agentTask),
-    ];
+    const registryRows = [unit("reusable-call", "top", null, agentTask)];
     expect(() =>
       projectPrimary({
         caseRecord,
         registryRows,
-        expectedUnitIds: ["top-call"],
+        expectedUnitIds: [registryRows[0].unit_id],
         result: scan({
           agent_usages: [
             usage("wrong-order", {
@@ -617,14 +636,12 @@ describe("synthetic E3 primary unit projection", () => {
   });
 
   it("rejects malformed caller-chain shape instead of guessing a mapping", () => {
-    const registryRows = [
-      unit("top-call", "reusable-call", "top", null, agentTask),
-    ];
+    const registryRows = [unit("reusable-call", "top", null, agentTask)];
     expect(() =>
       projectPrimary({
         caseRecord,
         registryRows,
-        expectedUnitIds: ["top-call"],
+        expectedUnitIds: [registryRows[0].unit_id],
         result: scan({
           agent_usages: [
             usage("bad-chain", {
@@ -639,8 +656,8 @@ describe("synthetic E3 primary unit projection", () => {
 
   it("ORs raw multiplicity within one unit without collapsing distinct rules", () => {
     const registryRows = [
-      unit("write", "job", "agent", null, "agentci/untrusted-ai-write-token"),
-      unit("gated", "job", "agent", null, "agentci/gated-ai-write-token"),
+      unit("job", "agent", null, "agentci/untrusted-ai-write-token"),
+      unit("job", "agent", null, "agentci/gated-ai-write-token"),
     ];
     const result = scan({
       findings: [
@@ -653,13 +670,13 @@ describe("synthetic E3 primary unit projection", () => {
       projectPrimary({
         caseRecord,
         registryRows,
-        expectedUnitIds: ["write", "gated"],
+        expectedUnitIds: registryRows.map((row) => row.unit_id),
         result,
       }),
     ).toEqual({
       units: [
         {
-          unit_id: "write",
+          unit_id: registryRows[0].unit_id,
           alert: true,
           matched_records: [
             { kind: "finding", index: 0, id: "write-1" },
@@ -667,7 +684,7 @@ describe("synthetic E3 primary unit projection", () => {
           ],
         },
         {
-          unit_id: "gated",
+          unit_id: registryRows[1].unit_id,
           alert: true,
           matched_records: [{ kind: "finding", index: 2, id: "gated-1" }],
         },
@@ -679,12 +696,12 @@ describe("synthetic E3 primary unit projection", () => {
   });
 
   it("rejects an unmatched selected-source record and duplicate registry identity", () => {
-    const registryRows = [unit("known", "job", "agent", null, jobRule)];
+    const registryRows = [unit("job", "agent", null, jobRule)];
     expect(() =>
       projectPrimary({
         caseRecord,
         registryRows,
-        expectedUnitIds: ["known"],
+        expectedUnitIds: [registryRows[0].unit_id],
         result: scan({
           findings: [finding("other-job", jobRule, { job: "other" })],
         }),
@@ -694,19 +711,22 @@ describe("synthetic E3 primary unit projection", () => {
       projectPrimary({
         caseRecord,
         registryRows: [registryRows[0], { ...registryRows[0] }],
-        expectedUnitIds: ["known"],
+        expectedUnitIds: [registryRows[0].unit_id],
         result: scan(),
       }),
     ).toThrow();
   });
 
   it("rejects a missing registry unit instead of treating its finding as out of scope", () => {
-    const registryRows = [unit("known", "job", "agent", null, jobRule)];
+    const registryRows = [unit("job", "agent", null, jobRule)];
     expect(() =>
       projectPrimary({
         caseRecord,
         registryRows,
-        expectedUnitIds: ["known", "missing"],
+        expectedUnitIds: [
+          registryRows[0].unit_id,
+          unitId(caseRecord.case_id, "job", "other", null, jobRule),
+        ],
         result: scan({ findings: [finding("known-finding", jobRule)] }),
       }),
     ).toThrow();
@@ -714,18 +734,19 @@ describe("synthetic E3 primary unit projection", () => {
       projectPrimary({
         caseRecord,
         registryRows: [],
-        expectedUnitIds: ["known"],
+        expectedUnitIds: [registryRows[0].unit_id],
         result: scan({ findings: [finding("known-finding", jobRule)] }),
       }),
     ).toThrow();
   });
 
   it("rejects a selected-source finding for a registered task without a unit", () => {
+    const registryRow = unit("job", "agent", null, jobRule);
     expect(() =>
       projectPrimary({
         caseRecord,
-        registryRows: [unit("known", "job", "agent", null, jobRule)],
-        expectedUnitIds: ["known"],
+        registryRows: [registryRow],
+        expectedUnitIds: [registryRow.unit_id],
         registeredTaskIds: [jobRule, "agentci/ai-with-secrets"],
         result: scan({
           findings: [finding("missing-unit", "agentci/ai-with-secrets")],
@@ -735,17 +756,20 @@ describe("synthetic E3 primary unit projection", () => {
   });
 
   it("requires an independent task vocabulary and audits unregistered findings separately", () => {
+    const registryRow = unit("job", "agent", null, jobRule);
     const options = {
       caseRecord,
-      registryRows: [unit("known", "job", "agent", null, jobRule)],
-      expectedUnitIds: ["known"],
+      registryRows: [registryRow],
+      expectedUnitIds: [registryRow.unit_id],
       result: scan({
         findings: [finding("new-rule", "agentci/not-in-frozen-contract")],
       }),
     };
     expect(() => projectPrimaryWithTasks(options)).toThrow();
     expect(projectPrimary(options)).toEqual({
-      units: [{ unit_id: "known", alert: false, matched_records: [] }],
+      units: [
+        { unit_id: registryRow.unit_id, alert: false, matched_records: [] },
+      ],
       parse_gap_unit_ids: [],
       structural_gap_unit_ids: [],
       out_of_scope_records: [{ kind: "finding", index: 0, id: "new-rule" }],
@@ -753,11 +777,12 @@ describe("synthetic E3 primary unit projection", () => {
   });
 
   it("rejects a job unit without a concrete job ID", () => {
+    const registryRow = unit("job", null, null, jobRule);
     expect(() =>
       projectPrimary({
         caseRecord,
-        registryRows: [unit("missing-job", "job", null, null, jobRule)],
-        expectedUnitIds: ["missing-job"],
+        registryRows: [registryRow],
+        expectedUnitIds: [registryRow.unit_id],
         result: scan({
           findings: [finding("jobless", jobRule, { job: undefined })],
         }),
@@ -766,7 +791,7 @@ describe("synthetic E3 primary unit projection", () => {
   });
 
   it("marks workflow parse-gap units no-alert and separately incomplete", () => {
-    const registryRows = [unit("parse-gap", "workflow", null, null, agentTask)];
+    const registryRows = [unit("workflow", null, null, agentTask)];
     const sourceBytes = Buffer.from("on: [\n");
     const result = scan({
       analysis_complete: false,
@@ -784,13 +809,15 @@ describe("synthetic E3 primary unit projection", () => {
       projectPrimary({
         caseRecord: { ...caseRecord, sha256: sha256(sourceBytes) },
         registryRows,
-        expectedUnitIds: ["parse-gap"],
+        expectedUnitIds: [registryRows[0].unit_id],
         sourceBytes,
         result,
       }),
     ).toEqual({
-      units: [{ unit_id: "parse-gap", alert: false, matched_records: [] }],
-      parse_gap_unit_ids: ["parse-gap"],
+      units: [
+        { unit_id: registryRows[0].unit_id, alert: false, matched_records: [] },
+      ],
+      parse_gap_unit_ids: [registryRows[0].unit_id],
       structural_gap_unit_ids: [],
       out_of_scope_records: [],
     });
@@ -809,18 +836,21 @@ describe("synthetic E3 primary unit projection", () => {
     });
     expect(result.analysis_complete).toBe(true);
     expect(result.diagnostics).toEqual([]);
+    const registryRow = unit("workflow", null, null, agentTask);
     expect(
       projectPrimary({
         caseRecord: { ...caseRecord, sha256: sha256(sourceBytes) },
-        registryRows: [unit("no-jobs", "workflow", null, null, agentTask)],
-        expectedUnitIds: ["no-jobs"],
+        registryRows: [registryRow],
+        expectedUnitIds: [registryRow.unit_id],
         sourceBytes,
         result,
       }),
     ).toEqual({
-      units: [{ unit_id: "no-jobs", alert: false, matched_records: [] }],
+      units: [
+        { unit_id: registryRow.unit_id, alert: false, matched_records: [] },
+      ],
       parse_gap_unit_ids: [],
-      structural_gap_unit_ids: ["no-jobs"],
+      structural_gap_unit_ids: [registryRow.unit_id],
       out_of_scope_records: [],
     });
   });
@@ -829,13 +859,12 @@ describe("synthetic E3 primary unit projection", () => {
     const sourceBytes = Buffer.from(
       "on: push\njobs:\n  agent:\n    runs-on: ubuntu-latest\n",
     );
+    const registryRow = unit("workflow", null, null, agentTask);
     expect(() =>
       projectPrimary({
         caseRecord: { ...caseRecord, sha256: sha256(sourceBytes) },
-        registryRows: [
-          unit("wrong-workflow", "workflow", null, null, agentTask),
-        ],
-        expectedUnitIds: ["wrong-workflow"],
+        registryRows: [registryRow],
+        expectedUnitIds: [registryRow.unit_id],
         sourceBytes,
         result: scan(),
       }),
@@ -849,9 +878,7 @@ describe("synthetic E3 primary unit projection", () => {
   ])(
     "keeps unresolved %s caller units no-alert without inventing a callee",
     (code, severity) => {
-      const registryRows = [
-        unit("call", "reusable-call", "agent", null, agentTask),
-      ];
+      const registryRows = [unit("reusable-call", "agent", null, agentTask)];
       const result = scan({
         analysis_complete: false,
         diagnostics: [
@@ -869,11 +896,17 @@ describe("synthetic E3 primary unit projection", () => {
         projectPrimary({
           caseRecord,
           registryRows,
-          expectedUnitIds: ["call"],
+          expectedUnitIds: [registryRows[0].unit_id],
           result,
         }),
       ).toEqual({
-        units: [{ unit_id: "call", alert: false, matched_records: [] }],
+        units: [
+          {
+            unit_id: registryRows[0].unit_id,
+            alert: false,
+            matched_records: [],
+          },
+        ],
         parse_gap_unit_ids: [],
         structural_gap_unit_ids: [],
         out_of_scope_records: [],

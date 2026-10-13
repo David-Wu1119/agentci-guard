@@ -266,6 +266,7 @@ jobs:
           import { readFileSync, writeFileSync } from 'node:fs';
           import YAML from 'yaml';
           import { RULES } from './dist/index.js';
+          import { unitId } from './scripts/benchmark/unit-id.mjs';
           import { loadActionRun, projectPrimary } from './scripts/benchmark/v4-primary-projection.mjs';
 
           const preflight = JSON.parse(readFileSync('artifacts/e3-reusable-preflight.json', 'utf8'));
@@ -322,18 +323,19 @@ jobs:
             runReceipt,
           });
           assert.equal(run_incomplete, false);
-          const row = (unit_id, scope, rule_id) => ({
-            unit_id, case_id: caseRecord.case_id, source_path: source,
+          const id = (scope, rule_id) => unitId(caseRecord.case_id, scope, 'agent', null, rule_id);
+          const row = (scope, rule_id) => ({
+            unit_id: id(scope, rule_id), case_id: caseRecord.case_id, source_path: source,
             scope, job_id: 'agent', step_index: null, rule_id,
           });
           const registryRows = [
-            row('agent-usage', 'reusable-call', 'agentci/agent-usage'),
-            row('prompt', 'reusable-call', 'agentci/untrusted-input-in-prompt'),
-            row('shell', 'reusable-call', 'agentci/ai-shell-access'),
-            row('gated-write', 'job', 'agentci/gated-ai-write-token'),
-            row('broad-write', 'job', 'agentci/broad-write-permissions'),
+            row('reusable-call', 'agentci/agent-usage'),
+            row('reusable-call', 'agentci/untrusted-input-in-prompt'),
+            row('reusable-call', 'agentci/ai-shell-access'),
+            row('job', 'agentci/gated-ai-write-token'),
+            row('job', 'agentci/broad-write-permissions'),
           ];
-          const expectedUnitIds = ['agent-usage', 'prompt', 'shell', 'gated-write', 'broad-write'];
+          const expectedUnitIds = registryRows.map((row) => row.unit_id);
           // Synthetic smoke only; formal scoring must use the frozen manifest vocabulary.
           const registeredTaskIds = ['agentci/agent-usage', ...Object.keys(RULES)];
           const projected = projectPrimary({ caseRecord, registryRows, expectedUnitIds, registeredTaskIds, result });
@@ -341,11 +343,11 @@ jobs:
           assert.deepEqual(projected.structural_gap_unit_ids, []);
           assert.deepEqual(projected.out_of_scope_records, []);
           assert.deepEqual(projected.units.map((unit) => [unit.unit_id, unit.alert, unit.matched_records]), [
-            ['agent-usage', true, [{ kind: 'agent_usage', index: 0, id: '.github/workflows/reusable.yml:agent:0:.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],
-            ['prompt', true, [{ kind: 'finding', index: 0, id: 'agentci/untrusted-input-in-prompt:.github/workflows/reusable.yml:agent:0:.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],
-            ['shell', true, [{ kind: 'finding', index: 1, id: 'agentci/ai-shell-access:.github/workflows/reusable.yml:agent:0:.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],
-            ['gated-write', true, [{ kind: 'finding', index: 2, id: 'agentci/gated-ai-write-token:.github/workflows/reusable.yml:agent::.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],
-            ['broad-write', true, [{ kind: 'finding', index: 3, id: 'agentci/broad-write-permissions:.github/workflows/reusable.yml:agent::.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],
+            [expectedUnitIds[0], true, [{ kind: 'agent_usage', index: 0, id: '.github/workflows/reusable.yml:agent:0:.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],
+            [expectedUnitIds[1], true, [{ kind: 'finding', index: 0, id: 'agentci/untrusted-input-in-prompt:.github/workflows/reusable.yml:agent:0:.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],
+            [expectedUnitIds[2], true, [{ kind: 'finding', index: 1, id: 'agentci/ai-shell-access:.github/workflows/reusable.yml:agent:0:.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],
+            [expectedUnitIds[3], true, [{ kind: 'finding', index: 2, id: 'agentci/gated-ai-write-token:.github/workflows/reusable.yml:agent::.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],
+            [expectedUnitIds[4], true, [{ kind: 'finding', index: 3, id: 'agentci/broad-write-permissions:.github/workflows/reusable.yml:agent::.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],
           ]);
           const checkoutSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
           assert.equal(checkoutSha, preflight.action_commit);
@@ -406,6 +408,7 @@ jobs:
           import { readFileSync, writeFileSync } from 'node:fs';
           import YAML from 'yaml';
           import { RULES } from './dist/index.js';
+          import { unitId } from './scripts/benchmark/unit-id.mjs';
           import { loadActionRun, projectPrimary } from './scripts/benchmark/v4-primary-projection.mjs';
 
           assert.equal(process.env.E4_INCOMPLETE_OUTCOME, 'failure');
@@ -477,17 +480,18 @@ jobs:
             ({ code, kind, severity, file })), [
             { code: 'agentci/parse-error', kind: 'parse', severity: 'error', file: source },
           ]);
+          const gapUnitId = unitId(caseRecord.case_id, 'workflow', null, null, 'agentci/agent-usage');
           const registryRows = [{
-            unit_id: 'parse-gap', case_id: caseRecord.case_id, source_path: source,
+            unit_id: gapUnitId, case_id: caseRecord.case_id, source_path: source,
             scope: 'workflow', job_id: null, step_index: null, rule_id: 'agentci/agent-usage',
           }];
           const projected = projectPrimary({
-            caseRecord, registryRows, expectedUnitIds: ['parse-gap'],
+            caseRecord, registryRows, expectedUnitIds: [gapUnitId],
             registeredTaskIds: ['agentci/agent-usage', ...Object.keys(RULES)],
             sourceBytes: readFileSync(`${inputRoot}/${source}`), result,
           });
-          assert.deepEqual(projected.units, [{ unit_id: 'parse-gap', alert: false, matched_records: [] }]);
-          assert.deepEqual(projected.parse_gap_unit_ids, ['parse-gap']);
+          assert.deepEqual(projected.units, [{ unit_id: gapUnitId, alert: false, matched_records: [] }]);
+          assert.deepEqual(projected.parse_gap_unit_ids, [gapUnitId]);
           assert.deepEqual(projected.structural_gap_unit_ids, []);
           assert.deepEqual(projected.out_of_scope_records, []);
           writeFileSync('artifacts/e4-incomplete-receipt.json', JSON.stringify({

@@ -102,6 +102,9 @@ describe("JavaScript Action entrypoint", () => {
       "artifacts/e4-synthetic-receipt.json",
     );
     expect(steps[actionIndex + 1].run).toContain(
+      "unitId(caseRecord.case_id, scope, 'agent', null, rule_id)",
+    );
+    expect(steps[actionIndex + 1].run).toContain(
       "['show', `${process.env.E4_WORKFLOW_SHA}:.github/workflows/ci.yml`]",
     );
     expect(steps[actionIndex + 2]).toMatchObject({
@@ -131,6 +134,9 @@ describe("JavaScript Action entrypoint", () => {
       "assert.equal(run_incomplete, true)",
     );
     expect(steps[actionIndex + 3].run).toContain("agentci/parse-error");
+    expect(steps[actionIndex + 3].run).toContain(
+      "unitId(caseRecord.case_id, 'workflow', null, null, 'agentci/agent-usage')",
+    );
     expect(steps[actionIndex + 3].run).toContain(
       "artifacts/e4-incomplete-receipt.json",
     );
