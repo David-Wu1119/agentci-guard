@@ -779,6 +779,60 @@ describe("synthetic E3 primary unit projection", () => {
     });
   });
 
+  it.each(["agent_usages", "findings"])(
+    "rejects selected reusable-workflow %s reached through an external caller",
+    (collection) => {
+      const root = "/synthetic-e3-selected-callee";
+      const workflows = [
+        parseWorkflowFile(
+          path.join(root, bridge),
+          [
+            "on: issue_comment",
+            "permissions:",
+            "  contents: write",
+            "jobs:",
+            "  invoke:",
+            `    uses: ./${source}`,
+          ].join("\n"),
+        ),
+        parseWorkflowFile(
+          path.join(root, source),
+          [
+            "on: workflow_call",
+            "jobs:",
+            "  agent:",
+            "    runs-on: ubuntu-latest",
+            "    steps:",
+            '      - run: claude -p "Synthetic only"',
+          ].join("\n"),
+        ),
+      ];
+      const result = scanWorkflowFiles(workflows, root, {
+        ignore: [],
+        ignorePaths: [],
+      });
+      const records = result[collection].filter(
+        (record) =>
+          record.file === source &&
+          record.call_chain?.[0] === `${bridge}#invoke` &&
+          (collection === "agent_usages" || record.rule_id === jobRule),
+      );
+      expect(records).not.toHaveLength(0);
+      const registryRow =
+        collection === "agent_usages"
+          ? unit("step", "agent", 0, agentTask)
+          : unit("job", "agent", null, jobRule);
+      expect(() =>
+        projectPrimary({
+          caseRecord,
+          registryRows: [registryRow],
+          expectedUnitIds: [registryRow.unit_id],
+          result: scan({ [collection]: records }),
+        }),
+      ).toThrow(/selected-source record has an external caller/);
+    },
+  );
+
   it("uses only the first ordered caller in a nested chain", () => {
     const registryRows = [unit("reusable-call", "top", null, agentTask)];
     const result = scan({
@@ -790,6 +844,10 @@ describe("synthetic E3 primary unit projection", () => {
         usage("auxiliary-agent", {
           file: callee,
           call_chain: [],
+        }),
+        usage("unrelated-external-agent", {
+          file: callee,
+          call_chain: [`${bridge}#middle`],
         }),
       ],
     });
@@ -814,6 +872,7 @@ describe("synthetic E3 primary unit projection", () => {
       structural_gap_unit_ids: [],
       out_of_scope_records: [
         { kind: "agent_usage", index: 1, id: "auxiliary-agent" },
+        { kind: "agent_usage", index: 2, id: "unrelated-external-agent" },
       ],
     });
   });
@@ -1056,6 +1115,44 @@ describe("synthetic E3 primary unit projection", () => {
       out_of_scope_records: [],
     });
   });
+
+  it.each(
+    ["job", "step", "reusable-call"].flatMap((scope) => [
+      ["parse gap", scope, "on: [\n", true],
+      ["structural no-jobs gap", scope, "on: push\nname: Synthetic\n", false],
+    ]),
+  )(
+    "rejects a %s registry mixing workflow and %s rows",
+    (_name, scope, raw, hasParseGap) => {
+      const sourceBytes = Buffer.from(raw);
+      const registryRows = [
+        unit("workflow", null, null, agentTask),
+        unit(scope, "ghost", scope === "step" ? 0 : null, agentTask),
+      ];
+      expect(() =>
+        projectPrimary({
+          caseRecord: { ...caseRecord, sha256: sha256(sourceBytes) },
+          registryRows,
+          expectedUnitIds: registryRows.map((row) => row.unit_id),
+          sourceBytes,
+          result: scan({
+            analysis_complete: !hasParseGap,
+            diagnostics: hasParseGap
+              ? [
+                  {
+                    code: "agentci/parse-error",
+                    kind: "parse",
+                    severity: "error",
+                    file: source,
+                    message: "Synthetic YAML parse failure",
+                  },
+                ]
+              : [],
+          }),
+        }),
+      ).toThrow(/workflow gap rows cannot mix with non-workflow rows/);
+    },
+  );
 
   it("rejects a workflow row for a hash-bound source that has jobs", () => {
     const sourceBytes = Buffer.from(

@@ -615,6 +615,11 @@ export function projectPrimary({
           `selected caller is not first: ${record.id}`,
         );
         if (!first.startsWith(prefix)) {
+          // A selected callee needs its own mapping contract, not a no-alert.
+          requireValue(
+            record.file !== caseRecord.source_path,
+            `selected-source record has an external caller: ${record.id}`,
+          );
           outOfScope.push(reference);
           continue;
         }
@@ -652,6 +657,10 @@ export function projectPrimary({
     "selected parse diagnostic lacks workflow units",
   );
   if (workflowGapIds.length > 0) {
+    requireValue(
+      registryRows.every((row) => row.scope === "workflow"),
+      "workflow gap rows cannot mix with non-workflow rows",
+    );
     requireValue(
       Buffer.isBuffer(sourceBytes) &&
         validHash(caseRecord.sha256) &&
