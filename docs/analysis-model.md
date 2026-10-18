@@ -65,7 +65,9 @@ monitoring of the runner observes this layer; a workflow reader cannot.
 ## Conservative handling of uninterpretable conditions
 
 In the v3 development sample, 94 of 152 workflows had an event-condition
-diagnostic. Auditing those snapshots, the dominant constructs are runtime
+diagnostic at v0.6.0 (recorded 2026-09-05 in `docs/REVIEW_READY.md`, commit
+`de1eb2e`). This is a historical count, not a measurement of the current
+scanner. Auditing those snapshots, the dominant constructs are runtime
 values: step outputs (`steps.*`), job outputs (`needs.*`), and `env.*`,
 `inputs.*`, `matrix.*`, and `vars.*` references, which this workflow-only
 reader cannot resolve without runtime state or external files.

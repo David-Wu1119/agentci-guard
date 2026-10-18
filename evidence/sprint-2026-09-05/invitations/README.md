@@ -6,7 +6,7 @@ Update this file when each invitation is sent (date), answered (date, yes/no/no 
 
 ## Selection rationale
 
-Five people who already run an AI coding agent in GitHub Actions and whose workflows are in the frozen benchmark, chosen because they are **well-configured** — they are evaluators, not disclosure targets. The one genuine exposure in the benchmark (DIYgod/RSSHub) is handled as a private security note and is deliberately **not** on this list, so that a disclosure is never mixed with an evaluation ask.
+Five people who already run an AI coding agent in GitHub Actions and whose workflows are in the frozen benchmark, chosen because their benchmark snapshots looked **well-configured** during development review — they are evaluators, not disclosure targets. Repositories whose snapshots raised a possible security question during that review are deliberately **not** on this list, so that an evaluation ask is never mixed with a security conversation. That review was a development-time hand-read of frozen snapshots, not a human-labeled result. The table below describes each repository's frozen benchmark snapshot, not its current workflow.
 
 | # | Repository | Why this person | What they'd test |
 |---|---|---|---|
