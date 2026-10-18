@@ -65,7 +65,13 @@ GitHub Actions_](https://arxiv.org/abs/2605.07135). Its TaintAWI models
 untrusted event data reaching agents and AI-derived output reaching later
 scripts; it analyzed 13,392 workflows and judged 496 of 519 reviewed alerts
 exploitable under its threat model. Those are not 496 demonstrated attacks.
-AgentCI Guard has not demonstrated a novel detector or comparative advantage.
+
+[GitInject](https://arxiv.org/abs/2606.09935v1) also studies prompt injection
+through agent instruction files supplied by an untrusted PR branch, such as
+`CLAUDE.md`, `AGENTS.md`, and `GEMINI.md`. AgentCI Guard does not inspect
+those files or trace whether an agent loads them; neither a clean scan nor
+`analysis_complete=true` excludes that route. AgentCI Guard has not
+demonstrated a novel detector or comparative advantage.
 
 ## What it detects
 

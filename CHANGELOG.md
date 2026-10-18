@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Documented the instruction-file ingestion blind spot, including the limits
+  of `unsafe-checkout` and `analysis_complete=true`. This adds no detection
+  or exploit-prevention claim.
 - Clarified that the 160-unit candidate pilot is pinned to `38a3272` and
   cannot validate the current scanner's rule semantics. Its frozen contract
   and packet are unchanged; no human labels were created.
