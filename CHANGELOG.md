@@ -85,6 +85,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   invalid or repeated command options instead of accepting an unreliable result.
 - Candidate-pilot test-retest reports retain the frozen source-manifest,
   contract, scanner-commit, source-tree and bundle pins without changing labels.
+- Browser empty, oversized, non-workflow, and step-limit YAML errors plus
+  file-size/read errors now identify the affected input to assistive technology;
+  the error state clears when input changes or a scan succeeds.
 - A standalone `toJSON(github.event)` from `issue_comment` now counts as both
   comment and parent Issue/PR text when passed to a local AI CLI, or to a
   verified Anthropic Action's direct prompt or bare environment reference. An unused Action

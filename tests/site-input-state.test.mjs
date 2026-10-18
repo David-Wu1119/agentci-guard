@@ -8,6 +8,16 @@ function browserPage(hasScanner = true, scanResult = {}) {
     textContent: "",
     children: [],
     listeners: {},
+    attributes: new Map(),
+    setAttribute(name, value) {
+      this.attributes.set(name, String(value));
+    },
+    getAttribute(name) {
+      return this.attributes.get(name) ?? null;
+    },
+    removeAttribute(name) {
+      this.attributes.delete(name);
+    },
     addEventListener(event, listener) {
       this.listeners[event] = listener;
     },
@@ -271,6 +281,17 @@ describe("browser workflow input", () => {
     get("workflow-yaml").value = "on: push\n";
     get("scan-button").listeners.click();
     expect(get("scan-output").hidden).toBe(true);
+  });
+
+  it("does not mark YAML invalid for an unclassified scanner result error", () => {
+    const page = browserPage(true, { analysis_complete: "invalid" });
+    const get = (id) => page.elements.get(id);
+    const yaml = get("workflow-yaml");
+    yaml.value = "on: push\n";
+    get("scan-button").listeners.click();
+    expect(get("scan-error").textContent).toMatch(/invalid result/);
+    expect(yaml.getAttribute("aria-invalid")).toBeNull();
+    expect(yaml.getAttribute("aria-describedby")).toBe("scan-scope");
   });
 
   it("keeps an existing draft until replacement is confirmed and clears stale file selection on edit", async () => {
