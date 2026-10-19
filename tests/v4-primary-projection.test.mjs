@@ -12,6 +12,8 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseWorkflowFile, scanWorkflowFiles } from "../src/scanner.ts";
 import { unitId } from "../scripts/benchmark/unit-id.mjs";
+import { renderCsv } from "../scripts/benchmark/csv.mjs";
+import * as primaryProjection from "../scripts/benchmark/v4-primary-projection.mjs";
 import {
   loadActionRun,
   projectPrimary as projectPrimaryWithTasks,
@@ -32,6 +34,124 @@ const registeredTaskIds = [
   "agentci/gated-ai-write-token",
   "agentci/ai-with-secrets",
 ];
+
+describe("synthetic E3 registry CSV boundary", () => {
+  const header = [
+    "unit_id",
+    "case_id",
+    "source_path",
+    "scope",
+    "job_id",
+    "step_index",
+    "rule_id",
+  ];
+  const csv = (rows, extra = []) =>
+    renderCsv([
+      [...header, ...extra],
+      ...rows.map((row) => [...header, ...extra].map((column) => row[column])),
+    ]);
+  const fromCsv = (text) => primaryProjection.registryRowsFromCsv(text);
+
+  it("normalizes only blank identities and canonical decimal indices", () => {
+    const rows = [
+      unit("workflow", null, null, agentTask),
+      unit("job", "agent", null, jobRule),
+      unit("step", "agent", 0, stepRule),
+      unit("reusable-call", "agent", null, agentTask),
+    ];
+    expect(fromCsv(`\uFEFF${csv(rows).replaceAll("\n", "\r\n")}`)).toEqual(
+      rows,
+    );
+  });
+
+  it("drops annotation cells without altering exact projection identities", () => {
+    const row = unit("step", "agent", 0, stepRule);
+    const registryRows = fromCsv(
+      csv(
+        [{ ...row, ground_truth: "Synthetic only; not a human label." }],
+        ["ground_truth"],
+      ),
+    );
+    expect(registryRows).toEqual([row]);
+    expect(
+      projectPrimary({
+        caseRecord,
+        registryRows,
+        expectedUnitIds: [row.unit_id],
+        result: scan({
+          findings: [finding("direct", stepRule, { step_index: 0 })],
+        }),
+      }).units,
+    ).toEqual([
+      {
+        unit_id: row.unit_id,
+        alert: true,
+        matched_records: [{ kind: "finding", index: 0, id: "direct" }],
+      },
+    ]);
+  });
+
+  it("does not upgrade legacy alias unit IDs into structural IDs", () => {
+    const row = { ...unit("step", "agent", 0, stepRule), unit_id: "step" };
+    const registryRows = fromCsv(csv([row]));
+    expect(registryRows[0].unit_id).toBe("step");
+    expect(() =>
+      projectPrimary({
+        caseRecord,
+        registryRows,
+        expectedUnitIds: ["step"],
+        result: scan(),
+      }),
+    ).toThrow(/unit ID does not match registry identity/);
+  });
+
+  it("rejects missing or duplicate headers, malformed rows and empty identities", () => {
+    expect(() => fromCsv("unit_id,case_id\nrow,case\n")).toThrow(
+      /missing registry column/,
+    );
+    expect(() => fromCsv(`${header.join(",")}\nrow,case\n`)).toThrow(
+      /cells; expected/,
+    );
+    expect(() =>
+      fromCsv(csv([{ ...unit("job", "agent", null, jobRule), unit_id: "" }])),
+    ).toThrow(/empty registry cell/);
+    expect(() =>
+      fromCsv(`${header.join(",")},case_id\na,b,c,d,e,f,g,h\n`),
+    ).toThrow(/Duplicate CSV header/);
+    expect(() => fromCsv(header.join(",") + "\n")).toThrow(
+      /missing registry CSV rows/,
+    );
+    expect(() => fromCsv('"unterminated')).toThrow(
+      /ends inside a quoted field/,
+    );
+  });
+
+  it.each(["-1", "01", "1.0", "1e2", "9007199254740992", " 0", "NaN"])(
+    "rejects non-canonical or unsafe step index %s",
+    (stepIndex) => {
+      expect(() =>
+        fromCsv(
+          csv([
+            { ...unit("step", "agent", 0, stepRule), step_index: stepIndex },
+          ]),
+        ),
+      ).toThrow(/invalid registry step_index/);
+    },
+  );
+
+  it("does not erase a contradictory non-step index", () => {
+    const row = { ...unit("job", "agent", null, jobRule), step_index: 0 };
+    const registryRows = fromCsv(csv([row]));
+    expect(() =>
+      projectPrimary({
+        caseRecord,
+        registryRows,
+        expectedUnitIds: [row.unit_id],
+        result: scan(),
+      }),
+    ).toThrow(/non-step row has a step index/);
+  });
+});
 
 function projectPrimary(options) {
   return projectPrimaryWithTasks({

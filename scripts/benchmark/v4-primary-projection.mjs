@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import YAML from "yaml";
+import { csvObjects } from "./csv.mjs";
 import { unitId } from "./unit-id.mjs";
 
 const AGENT_TASK = "agentci/agent-usage";
@@ -454,6 +455,47 @@ export async function loadActionRun(options) {
 
 function registryKey(caseId, file, scope, job, step, rule) {
   return JSON.stringify([caseId, file, scope, job, step, rule]);
+}
+
+export function registryRowsFromCsv(text) {
+  requireValue(typeof text === "string", "registry CSV must be text");
+  const rows = csvObjects(text);
+  requireValue(rows.length > 0, "missing registry CSV rows");
+  const required = [
+    "unit_id",
+    "case_id",
+    "source_path",
+    "scope",
+    "job_id",
+    "step_index",
+    "rule_id",
+  ];
+  for (const column of required)
+    requireValue(
+      Object.hasOwn(rows[0], column),
+      `missing registry column: ${column}`,
+    );
+  return rows.map((row) => {
+    for (const column of required.filter(
+      (name) => name !== "job_id" && name !== "step_index",
+    ))
+      requireValue(row[column] !== "", `empty registry cell: ${column}`);
+    const step = row.step_index;
+    requireValue(
+      step === "" ||
+        (/^(0|[1-9][0-9]*)$/.test(step) && Number.isSafeInteger(Number(step))),
+      `invalid registry step_index: ${step}`,
+    );
+    return {
+      unit_id: row.unit_id,
+      case_id: row.case_id,
+      source_path: row.source_path,
+      scope: row.scope,
+      job_id: row.job_id === "" ? null : row.job_id,
+      step_index: step === "" ? null : Number(step),
+      rule_id: row.rule_id,
+    };
+  });
 }
 
 // Use the frozen task vocabulary; deriving it from one case's rows can hide a missing unit.
