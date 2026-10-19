@@ -183,6 +183,11 @@ for (const [unitId, first] of labels[0].recordsByUnit) {
 const report = {
   schema_version: 1,
   pilot_id: context.manifest.pilot_id,
+  source_manifest_sha256: context.manifest.source_manifest_sha256,
+  contract_sha256: context.manifest.contract_sha256,
+  candidate_scanner_commit: context.manifest.candidate_scanner_commit,
+  candidate_scanner_source_tree: context.manifest.candidate_scanner_source_tree,
+  candidate_bundle_sha256: context.manifest.candidate_bundle_sha256,
   status: "development-test-retest-only",
   accuracy_estimate: null,
   packet_checksums_sha256: sha256(expectedChecksums),
