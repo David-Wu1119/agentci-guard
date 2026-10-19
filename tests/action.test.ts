@@ -75,6 +75,10 @@ describe("JavaScript Action entrypoint", () => {
     expect(steps[eventIndex + 1].run).toContain(
       "agentci/untrusted-ai-write-token",
     );
+    expect(steps[eventIndex + 1].run).toContain(
+      "registryRowsFromCsv(renderCsv(",
+    );
+    expect(steps[eventIndex + 1].run).toContain("projected.units");
     const actionIndex = steps.findIndex((step) => step.id === "reusable");
     expect(steps[actionIndex - 1].run).toContain(
       "['show', `${actionCommit}:${file}`]",
@@ -166,6 +170,8 @@ describe("JavaScript Action entrypoint", () => {
       },
     });
     for (const file of [
+      "artifacts/event-json.json",
+      "artifacts/event-json.sarif",
       "artifacts/e3-reusable-preflight.json",
       "artifacts/reusable.json",
       "artifacts/reusable.sarif",

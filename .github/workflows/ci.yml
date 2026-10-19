@@ -160,13 +160,19 @@ jobs:
           node scripts/verify-sarif-schema.mjs artifacts/event-json.sarif
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
+          import { execFileSync } from 'node:child_process';
           import { createHash } from 'node:crypto';
           import { readFileSync } from 'node:fs';
+          import { RULES } from './dist/index.js';
+          import { renderCsv } from './scripts/benchmark/csv.mjs';
+          import { unitId } from './scripts/benchmark/unit-id.mjs';
+          import { projectPrimary, registryRowsFromCsv } from './scripts/benchmark/v4-primary-projection.mjs';
 
           assert.equal(process.env.OUTPUT_JSON_PATH, 'artifacts/event-json.json');
           assert.equal(process.env.ANALYSIS_COMPLETE, 'true');
           const bytes = readFileSync(process.env.OUTPUT_JSON_PATH);
-          assert.equal(createHash('sha256').update(bytes).digest('hex'), process.env.OUTPUT_JSON_SHA256);
+          const sha256 = (value) => createHash('sha256').update(value).digest('hex');
+          assert.equal(sha256(bytes), process.env.OUTPUT_JSON_SHA256);
           const result = JSON.parse(bytes.toString('utf8'));
           assert.equal(result.analysis_complete, true);
           assert.equal(result.diagnostics.length, 0);
@@ -175,6 +181,48 @@ jobs:
           const rules = new Set(result.findings.map((finding) => finding.rule_id));
           assert(rules.has('agentci/untrusted-input-in-prompt'));
           assert(rules.has('agentci/untrusted-ai-write-token'));
+
+          const source = '.github/workflows/agent.yml';
+          const fixturePath = `corpus/adversarial/cases/issue-comment-event-json/${source}`;
+          const sourceBytes = readFileSync(fixturePath);
+          assert.equal(sha256(sourceBytes), sha256(execFileSync('git', ['show', `HEAD:${fixturePath}`])));
+          const caseRecord = {
+            case_id: 'synthetic-issue-comment-event-json',
+            source_path: source,
+            sha256: sha256(sourceBytes),
+          };
+          const expected = [
+            ['step', 0, 'agentci/untrusted-input-in-prompt', 'finding', 0,
+              'agentci/untrusted-input-in-prompt:.github/workflows/agent.yml:triage:0:'],
+            ['step', 0, 'agentci/ai-shell-access', 'finding', 1,
+              'agentci/ai-shell-access:.github/workflows/agent.yml:triage:0:'],
+            ['job', null, 'agentci/untrusted-ai-write-token', 'finding', 2,
+              'agentci/untrusted-ai-write-token:.github/workflows/agent.yml:triage::'],
+            ['job', null, 'agentci/broad-write-permissions', 'finding', 3,
+              'agentci/broad-write-permissions:.github/workflows/agent.yml:triage::'],
+            ['step', 0, 'agentci/agent-usage', 'agent_usage', 0,
+              '.github/workflows/agent.yml:triage:0:'],
+          ];
+          const expectedUnitIds = expected.map(([scope, stepIndex, rule]) =>
+            unitId(caseRecord.case_id, scope, 'triage', stepIndex, rule));
+          const registryRows = registryRowsFromCsv(renderCsv([
+            ['unit_id', 'case_id', 'source_path', 'scope', 'job_id', 'step_index', 'rule_id'],
+            ...expected.map(([scope, stepIndex, rule], index) => [
+              expectedUnitIds[index], caseRecord.case_id, source, scope, 'triage',
+              stepIndex === null ? '' : String(stepIndex), rule,
+            ]),
+          ]));
+          const projected = projectPrimary({
+            caseRecord, registryRows, expectedUnitIds,
+            registeredTaskIds: ['agentci/agent-usage', ...Object.keys(RULES)], result,
+          });
+          assert.deepEqual(projected.units, expected.map(([, , , kind, index, id], rowIndex) => ({
+            unit_id: expectedUnitIds[rowIndex], alert: true,
+            matched_records: [{ kind, index, id }],
+          })));
+          assert.deepEqual(projected.parse_gap_unit_ids, []);
+          assert.deepEqual(projected.structural_gap_unit_ids, []);
+          assert.deepEqual(projected.out_of_scope_records, []);
           NODE
 
       - name: Capture synthetic E3 Action inputs
@@ -518,6 +566,8 @@ jobs:
           name: e4-synthetic-${{ github.run_id }}-${{ github.run_attempt }}
           if-no-files-found: error
           path: |
+            artifacts/event-json.json
+            artifacts/event-json.sarif
             artifacts/e3-reusable-preflight.json
             artifacts/reusable.json
             artifacts/reusable.sarif
@@ -534,6 +584,8 @@ jobs:
           name: e4-synthetic-debug-${{ github.run_id }}-${{ github.run_attempt }}
           if-no-files-found: warn
           path: |
+            artifacts/event-json.json
+            artifacts/event-json.sarif
             artifacts/e3-reusable-preflight.json
             artifacts/reusable.json
             artifacts/reusable.sarif
