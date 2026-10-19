@@ -103,6 +103,33 @@ try {
     }
     fs.writeFileSync(timing, renderCsv([timingHeader, ...timingRows]));
   }
+  const sheetA = path.join(a, "annotation-sheet.csv");
+  const goodCsv = fs.readFileSync(sheetA, "utf8");
+  const firstUnitId = parseCsv(goodCsv)[1][0];
+  const malformed = goodCsv.replace(
+    `\n${firstUnitId},`,
+    `\n${firstUnitId.slice(0, 1)}"${firstUnitId.slice(1)}",`,
+  );
+  if (malformed === goodCsv)
+    throw new Error("Synthetic CSV mutation did not apply.");
+  fs.writeFileSync(sheetA, malformed);
+  const malformedOutput = path.join(temporary, "malformed-quote.jsonl");
+  failure(
+    "Invalid CSV",
+    "import-annotation-csv.mjs",
+    sheetA,
+    "synthetic-smoke",
+    malformedOutput,
+    "--coverage",
+    "candidate-pilot",
+    "--review-mode",
+    "test-retest",
+    "--pass",
+    "1",
+  );
+  if (fs.existsSync(malformedOutput))
+    throw new Error("Malformed CSV created label output.");
+  fs.writeFileSync(sheetA, goodCsv);
   importPass(a, labelsA, "1");
   importPass(b, labelsB, "2");
   failure(

@@ -4,6 +4,7 @@ export function parseCsv(text) {
   let row = [];
   let cell = "";
   let quoted = false;
+  let closed = false;
   for (let index = 0; index < text.length; index++) {
     const character = text[index];
     if (quoted) {
@@ -12,26 +13,39 @@ export function parseCsv(text) {
         index++;
       } else if (character === '"') {
         quoted = false;
+        closed = true;
       } else {
         cell += character;
       }
     } else if (character === '"') {
+      if (cell !== "" || closed) {
+        throw new Error("Invalid CSV quote inside an unquoted field.");
+      }
       quoted = true;
     } else if (character === ",") {
       row.push(cell);
       cell = "";
-    } else if (character === "\n") {
-      row.push(cell.replace(/\r$/, ""));
+      closed = false;
+    } else if (
+      character === "\n" ||
+      (character === "\r" && text[index + 1] === "\n")
+    ) {
+      if (character === "\r") index++;
+      row.push(cell);
       if (row.some((value) => value !== "")) rows.push(row);
       row = [];
       cell = "";
+      closed = false;
     } else {
+      if (closed) {
+        throw new Error("Invalid CSV content after a closing quote.");
+      }
       cell += character;
     }
   }
   if (quoted) throw new Error("CSV ends inside a quoted field.");
   if (cell || row.length > 0) {
-    row.push(cell.replace(/\r$/, ""));
+    row.push(cell);
     if (row.some((value) => value !== "")) rows.push(row);
   }
   return rows;
@@ -63,5 +77,5 @@ export function renderCsv(rows) {
 
 function csvCell(value) {
   const text = String(value ?? "");
-  return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+  return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }

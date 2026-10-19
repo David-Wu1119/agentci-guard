@@ -58,6 +58,13 @@ dated result and limits.
 
 ## Human workflow
 
+CSV import uses LF or CRLF record endings and preserves quoted field contents,
+including embedded newlines and carriage returns. Quotes inside a field must
+be doubled, and a quoted field must end at its delimiter or record boundary.
+Malformed quoting is rejected, not silently repaired into a different value.
+The shared renderer quotes carriage returns. This is CSV syntax handling, not
+a change to the label contract or its field-normalization rules.
+
 For repeatability under its frozen contract, follow the `38a3272`-pinned
 development-only [`candidate-pilot/README.md`](candidate-pilot/README.md)
 procedure for the nine-rule, 160-unit packet. Use only its standalone

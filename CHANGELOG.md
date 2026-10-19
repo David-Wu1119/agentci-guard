@@ -53,6 +53,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Synthetic E3 projection rejects malformed registry CSV quoting and preserves
+  quoted carriage returns instead of silently repairing an invalid identity.
+
 - A standalone `toJSON(github.event)` from `issue_comment` now counts as both
   comment and parent Issue/PR text when passed to a local AI CLI, or to a
   verified Anthropic Action's direct prompt or bare environment reference. An unused Action

@@ -105,6 +105,33 @@ describe("synthetic E3 registry CSV boundary", () => {
     ).toThrow(/unit ID does not match registry identity/);
   });
 
+  it.each(["unit_id", "case_id", "rule_id"])(
+    "rejects malformed quoting instead of repairing %s",
+    (column) => {
+      const row = unit("step", "agent", 0, stepRule);
+      const cells = header.map((name) => row[name] ?? "");
+      const value = row[column];
+      cells[header.indexOf(column)] = `${value.slice(0, 1)}"${value.slice(1)}"`;
+      const malformed = `${header.join(",")}\n${cells.join(",")}\n`;
+      expect(() => fromCsv(malformed)).toThrow(/Invalid CSV/);
+    },
+  );
+
+  it("does not strip a quoted carriage return into a registered rule", () => {
+    const row = unit("step", "agent", 0, stepRule);
+    const text = csv([row]).replace(`${stepRule}\n`, `"${stepRule}\r"\n`);
+    const registryRows = fromCsv(text);
+    expect(() =>
+      projectPrimary({
+        caseRecord,
+        registryRows,
+        expectedUnitIds: [row.unit_id],
+        result: scan(),
+      }),
+    ).toThrow(/unregistered registry rule/);
+    expect(registryRows[0].rule_id).toBe(`${stepRule}\r`);
+  });
+
   it("rejects missing or duplicate headers, malformed rows and empty identities", () => {
     expect(() => fromCsv("unit_id,case_id\nrow,case\n")).toThrow(
       /missing registry column/,
