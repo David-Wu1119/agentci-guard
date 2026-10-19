@@ -82,6 +82,9 @@ node scripts/benchmark/generate-annotation-sheet.mjs --write \
 ```
 
 The custom path requires exact parity with the bundled scanner's current rule
-IDs and refuses to overwrite existing files. This only prepares blank structural
+IDs and refuses to overwrite existing files. Relative `snapshot_path` values in
+custom manifests resolve from the manifest's directory; the frozen v3 manifest
+continues to use repository-root-relative paths. Empty manifests and any case
+that would silently produce zero units are rejected before writing a CSV. This only prepares blank structural
 units; it does not collect or seal v4 repositories, validate their provenance,
 replace the human protocol, or produce accuracy evidence.
