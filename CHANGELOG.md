@@ -55,6 +55,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Synthetic E3 projection rejects malformed registry CSV quoting and preserves
   quoted carriage returns instead of silently repairing an invalid identity.
+- Benchmark tools resolve checkout paths containing spaces, Unicode, `%` or
+  `#` without mistaking URL-encoded characters for filesystem names. Frozen
+  registries, snapshots and scanner behavior are unchanged.
 
 - A standalone `toJSON(github.event)` from `issue_comment` now counts as both
   comment and parent Issue/PR text when passed to a local AI CLI, or to a

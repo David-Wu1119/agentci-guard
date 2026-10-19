@@ -48,6 +48,11 @@ checks any public label package.
 `benchmark:smoke` runs the annotation and scoring toolchain using temporary
 synthetic labels only.
 
+The local tools resolve their checkout from a file URL, including directory
+names containing spaces, Unicode, `%` or `#`; they do not require an ASCII-only
+checkout path. The blank-sheet generators also resolve snapshots from that
+checkout when invoked from another working directory.
+
 For an optional, network-dependent origin check, run
 `pnpm benchmark:verify-upstream` with GitHub CLI access. It checks each v3
 snapshot against the workflow path at its pinned upstream commit and emits a
