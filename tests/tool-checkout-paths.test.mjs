@@ -7,6 +7,49 @@ import { describe, expect, it } from "vitest";
 const repositoryRoot = path.resolve(import.meta.dirname, "..");
 
 describe("top-level tool checkout paths", () => {
+  it("keeps render-check outputs in the real relocated site directory", () => {
+    const temporary = fs.mkdtempSync(
+      path.join(os.tmpdir(), "agentci-render-path-"),
+    );
+    try {
+      const site = path.join(
+        fs.realpathSync(temporary),
+        "中文 repo%20%2F#check",
+        "site",
+      );
+      fs.mkdirSync(site, { recursive: true });
+      const source = fs.readFileSync(
+        path.join(repositoryRoot, "site/render-check.mjs"),
+        "utf8",
+      );
+      const manifestStart = source.indexOf("const manifest =");
+      expect(manifestStart).toBeGreaterThan(0);
+      // Exercise the actual root initialization without starting Chrome or CDP.
+      const probe = path.join(site, "render-path-probe.mjs");
+      fs.writeFileSync(
+        probe,
+        source.slice(0, manifestStart) +
+          '\nawait fs.mkdir(root + "screenshots", { recursive: true });\n' +
+          'await fs.writeFile(root + "screenshots/desktop.png", "synthetic image");\n' +
+          'await fs.writeFile(root + "VISUAL_CHECKS.json", "{}\\n");\n',
+      );
+      const result = spawnSync(process.execPath, [probe], {
+        cwd: temporary,
+        encoding: "utf8",
+        timeout: 10_000,
+      });
+      expect(result.error).toBeUndefined();
+      expect(result.status, result.stderr).toBe(0);
+      expect(fs.existsSync(path.join(site, "VISUAL_CHECKS.json"))).toBe(true);
+      expect(
+        fs.readFileSync(path.join(site, "screenshots/desktop.png"), "utf8"),
+      ).toBe("synthetic image");
+      expect(fs.readdirSync(temporary)).toEqual(["中文 repo%20%2F#check"]);
+    } finally {
+      fs.rmSync(temporary, { recursive: true, force: true });
+    }
+  });
+
   it.each([
     "generate-third-party-licenses.mjs",
     "verify-action-manifest.mjs",

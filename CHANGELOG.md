@@ -53,6 +53,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The browser render check writes screenshots and its JSON report under the
+  actual site directory even when the checkout path contains URL-encoded
+  characters; it no longer creates an encoded sibling output directory.
 - Standalone package verification rejects malformed or repeated `--record`
   options before invoking npm instead of silently dropping or misreading them.
 - Recorded package verification preserves existing receipts and tarballs,
