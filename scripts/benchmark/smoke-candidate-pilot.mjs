@@ -34,12 +34,13 @@ try {
       "Candidate packet included unexpected source or bundle files.",
     );
   }
-  const scannerCommit = JSON.parse(
+  const pilotManifest = JSON.parse(
     fs.readFileSync(
       path.join(root, "benchmark/candidate-pilot/manifest.json"),
       "utf8",
     ),
-  ).candidate_scanner_commit;
+  );
+  const scannerCommit = pilotManifest.candidate_scanner_commit;
   for (const packet of [a, b]) {
     const text = ["README.md", "CONTRACT.md", "manifest.json", "SOURCES.md"]
       .map((name) => fs.readFileSync(path.join(packet, name), "utf8"))
@@ -164,6 +165,17 @@ try {
     result.accuracy_estimate !== null
   ) {
     throw new Error("Candidate report has wrong scope or counts.");
+  }
+  for (const field of [
+    "candidate_scanner_commit",
+    "candidate_scanner_source_tree",
+    "candidate_bundle_sha256",
+    "contract_sha256",
+    "source_manifest_sha256",
+  ]) {
+    if (result[field] !== pilotManifest[field]) {
+      throw new Error(`Candidate report lost pinned ${field}.`);
+    }
   }
   const comparison = run(
     "compare-annotations.mjs",
