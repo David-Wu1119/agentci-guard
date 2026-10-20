@@ -141,7 +141,16 @@ let sheetText;
 try {
   const tempManifest = path.join(temp, "manifest.json");
   const tempSheet = path.join(temp, "annotation-sheet.csv");
-  fs.writeFileSync(tempManifest, manifestText);
+  fs.writeFileSync(
+    tempManifest,
+    `${JSON.stringify({
+      ...manifest,
+      cases: cases.map((item) => ({
+        ...item,
+        snapshot_path: path.join(root, safePath(item.snapshot_path)),
+      })),
+    })}\n`,
+  );
   execFileSync(
     process.execPath,
     [
