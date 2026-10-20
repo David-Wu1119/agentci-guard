@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that step output with the file before projecting findings. This detects a
   post-Action JSON swap, not a signed or complete E4 provenance seal.
 
+### Fixed
+
+- Standalone package verification rejects malformed or repeated `--record`
+  options before invoking npm instead of silently dropping or misreading them.
+
 ### Changed
 
 - Clarified that the 160-unit candidate pilot is pinned to `38a3272` and

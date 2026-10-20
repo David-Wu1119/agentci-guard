@@ -81,6 +81,9 @@ the documented package version. The standalone smoke creates the actual
 tarball, extracts it outside the repository, confirms `node_modules` is absent,
 and executes both the Action and CLI from that extracted package. This catches
 external runtime imports that an in-repository smoke can hide.
+An optional `--record <file.json>` saves the package verification receipt and
+tarball beside it. Unknown, repeated, missing-value or extra arguments are
+rejected before packing; running without arguments still performs the smoke.
 `--foreground-scripts=false` keeps npm 10 lifecycle output out of the JSON
 stream when `prepare` still runs during `npm pack`.
 

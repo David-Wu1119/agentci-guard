@@ -11,8 +11,19 @@ import { fileURLToPath } from "node:url";
 // source commit) and every check performed, so a reviewer can tie a tarball to
 // the commit and behavior it was verified against.
 const recordPath = (() => {
-  const index = process.argv.indexOf("--record");
-  return index === -1 ? undefined : process.argv[index + 1];
+  const args = process.argv.slice(2);
+  if (args.length === 0) return undefined;
+  if (
+    args.length !== 2 ||
+    args[0] !== "--record" ||
+    !args[1].trim() ||
+    args[1].startsWith("--")
+  ) {
+    throw new Error(
+      "Usage: verify-standalone-package.mjs [--record <file.json>]",
+    );
+  }
+  return path.resolve(args[1]);
 })();
 const checks = [];
 const check = (name, ok, detail) => {
