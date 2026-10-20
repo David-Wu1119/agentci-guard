@@ -113,6 +113,7 @@ function summarize(parsed) {
 
 if (invokedAsScript) {
   if (
+    args.size * 2 !== process.argv.length - 2 ||
     [...args].some(
       ([key, value]) =>
         !["--level", "--attempts", "--wait", "--timeout"].includes(key) ||

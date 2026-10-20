@@ -15,6 +15,9 @@ const metadata = (high = 0) => ({
 });
 
 function run(cases, args = []) {
+  const commandArgs = [...args];
+  if (!args.includes("--attempts")) commandArgs.push("--attempts", "3");
+  if (!args.includes("--wait")) commandArgs.push("--wait", "0");
   const directory = fs.mkdtempSync(
     path.join(os.tmpdir(), "agentci-audit-command-"),
   );
@@ -44,20 +47,16 @@ if (item.delay) {
 `,
         { mode: 0o755 },
       );
-    const result = spawnSync(
-      process.execPath,
-      [script, "--attempts", "3", "--wait", "0", ...args],
-      {
-        encoding: "utf8",
-        timeout: 5000,
-        env: {
-          ...process.env,
-          PATH: directory,
-          AUDIT_TEST_CALLS: callsPath,
-          AUDIT_TEST_CASES: JSON.stringify(cases),
-        },
+    const result = spawnSync(process.execPath, [script, ...commandArgs], {
+      encoding: "utf8",
+      timeout: 5000,
+      env: {
+        ...process.env,
+        PATH: directory,
+        AUDIT_TEST_CALLS: callsPath,
+        AUDIT_TEST_CASES: JSON.stringify(cases),
       },
-    );
+    });
     expect(result.error).toBeUndefined();
     return {
       ...result,
@@ -123,6 +122,19 @@ describe("dependency audit command", () => {
     ["--level"],
   ])("rejects invalid arguments %j before launching pnpm", (...args) => {
     const result = run([{ output: metadata() }], args);
+    expect(result.status).toBe(1);
+    expect(result.calls).toHaveLength(0);
+    expect(result.stderr).toMatch(/invalid|usage/i);
+  });
+
+  it.each([
+    ["--level", "high", "--level", "critical"],
+    ["--level", "high", "--level", "high"],
+    ["--attempts", "3", "--attempts", "1"],
+    ["--wait", "0", "--wait", "1"],
+    ["--timeout", "1", "--timeout", "2"],
+  ])("rejects repeated options %j before launching pnpm", (...args) => {
+    const result = run([{ output: metadata(1) }], args);
     expect(result.status).toBe(1);
     expect(result.calls).toHaveLength(0);
     expect(result.stderr).toMatch(/invalid|usage/i);
