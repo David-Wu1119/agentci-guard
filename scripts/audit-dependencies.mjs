@@ -13,7 +13,7 @@
 // with no `metadata`. Only the second is retried. A sustained outage still
 // fails the step after the retry window; nothing here skips the audit.
 //
-// Usage: node scripts/audit-dependencies.mjs [--level high] [--attempts 8] [--wait 45]
+// Usage: node scripts/audit-dependencies.mjs [--level high] [--attempts 8] [--wait 45] [--timeout 90]
 
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -36,12 +36,12 @@ function realpathSafe(file) {
 
 const args = new Map();
 for (let index = 2; index < process.argv.length; index += 2) {
-  args.set(process.argv[index].replace(/^--/, ""), process.argv[index + 1]);
+  args.set(process.argv[index], process.argv[index + 1]);
 }
-const level = args.get("level") ?? "high";
-const attempts = Number(args.get("attempts") ?? 8);
-const waitSeconds = Number(args.get("wait") ?? 45);
-const perAttemptMs = Number(args.get("timeout") ?? 90) * 1000;
+const level = args.get("--level") ?? "high";
+const attempts = Number(args.get("--attempts") ?? 8);
+const waitSeconds = Number(args.get("--wait") ?? 45);
+const perAttemptMs = Number(args.get("--timeout") ?? 90) * 1000;
 
 const sleep = (seconds) =>
   new Promise((resolve) => setTimeout(resolve, seconds * 1000));
@@ -58,10 +58,18 @@ function runAudit() {
   } catch {
     parsed = null;
   }
-  return { status: result.status, parsed, stderr: result.stderr ?? "" };
+  return {
+    status: result.status,
+    error: result.error,
+    signal: result.signal,
+    parsed,
+    stderr: result.stderr ?? "",
+  };
 }
 
 const SEVERITY_ORDER = ["info", "low", "moderate", "high", "critical"];
+const isRecord = (value) =>
+  value !== null && typeof value === "object" && !Array.isArray(value);
 
 /**
  * Decide from the parsed JSON alone. pnpm's exit code cannot be trusted in
@@ -70,15 +78,25 @@ const SEVERITY_ORDER = ["info", "low", "moderate", "high", "critical"];
  * gate. Counts in metadata.vulnerabilities are authoritative.
  */
 export function decide(parsed, threshold) {
-  if (
-    parsed === null ||
-    parsed === undefined ||
-    parsed.metadata === undefined
-  ) {
+  const floor = SEVERITY_ORDER.indexOf(threshold);
+  if (floor < 0) throw new Error(`Invalid audit level: ${threshold}`);
+  if (parsed === null || parsed === undefined) return "unreachable";
+  if (!isRecord(parsed)) return "invalid";
+  if (parsed.metadata === undefined && isRecord(parsed.error)) {
     return "unreachable";
   }
-  const counts = parsed.metadata.vulnerabilities ?? {};
-  const floor = SEVERITY_ORDER.indexOf(threshold);
+  const counts = parsed.metadata?.vulnerabilities;
+  if (
+    parsed.error !== undefined ||
+    !isRecord(parsed.metadata) ||
+    !isRecord(counts) ||
+    SEVERITY_ORDER.some(
+      (severity) =>
+        !Number.isSafeInteger(counts[severity]) || counts[severity] < 0,
+    )
+  ) {
+    return "invalid";
+  }
   const above = SEVERITY_ORDER.slice(floor).some(
     (severity) => (counts[severity] ?? 0) > 0,
   );
@@ -94,9 +112,39 @@ function summarize(parsed) {
 }
 
 if (invokedAsScript) {
+  if (
+    args.size * 2 !== process.argv.length - 2 ||
+    [...args].some(
+      ([key, value]) =>
+        !["--level", "--attempts", "--wait", "--timeout"].includes(key) ||
+        value === undefined ||
+        value.trim() === "",
+    ) ||
+    !SEVERITY_ORDER.includes(level) ||
+    !Number.isSafeInteger(attempts) ||
+    attempts < 1 ||
+    !Number.isFinite(waitSeconds) ||
+    waitSeconds < 0 ||
+    waitSeconds * 1000 > 2 ** 31 - 1 ||
+    !Number.isSafeInteger(perAttemptMs) ||
+    perAttemptMs < 1 ||
+    perAttemptMs > 2 ** 31 - 1
+  ) {
+    console.error(
+      "::error::Invalid audit arguments. Usage: --level info|low|moderate|high|critical --attempts positive-integer --wait nonnegative-seconds --timeout positive-seconds",
+    );
+    process.exit(1);
+  }
   for (let attempt = 1; attempt <= attempts; attempt++) {
-    const { parsed, stderr } = runAudit();
-    const verdict = decide(parsed, level);
+    const { status, error, signal, parsed, stderr } = runAudit();
+    const timedOut = error?.code === "ETIMEDOUT";
+    if (!timedOut && (error || signal || ![0, 1].includes(status))) {
+      console.error(
+        `::error::Audit process failed (status ${status}, ${error?.code ?? signal ?? "unknown"}).`,
+      );
+      process.exit(1);
+    }
+    const verdict = timedOut ? "unreachable" : decide(parsed, level);
 
     if (verdict === "clean") {
       console.log(
@@ -116,6 +164,13 @@ if (invokedAsScript) {
         stdio: "inherit",
         timeout: perAttemptMs,
       });
+      process.exit(1);
+    }
+
+    if (verdict === "invalid") {
+      console.error(
+        "::error::Invalid advisory response; refusing to treat it as clean.",
+      );
       process.exit(1);
     }
 
