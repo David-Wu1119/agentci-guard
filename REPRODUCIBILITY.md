@@ -89,6 +89,9 @@ files or symlinks are never replaced, and the receipt cannot share the tarball's
 filename. Use a fresh output directory for another recorded run. The artifact
 is retained before the receipt is written; a failed run can leave an orphan
 tarball, which is not a successful verification receipt.
+The smoke clears inherited `INPUT_JSON`, `GITHUB_OUTPUT` and
+`GITHUB_STEP_SUMMARY` before running subprocesses. Its Action checks set their
+own temporary destinations; CLI scans do not append to the caller's outputs.
 `--foreground-scripts=false` keeps npm 10 lifecycle output out of the JSON
 stream when `prepare` still runs during `npm pack`.
 

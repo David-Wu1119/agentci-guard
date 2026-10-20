@@ -29,6 +29,10 @@ const recordPath = (() => {
   }
   return file;
 })();
+// Keep every smoke subprocess out of the caller's GitHub output files.
+delete process.env.INPUT_JSON;
+delete process.env.GITHUB_OUTPUT;
+delete process.env.GITHUB_STEP_SUMMARY;
 const checks = [];
 const check = (name, ok, detail) => {
   checks.push({ name, ok, ...(detail === undefined ? {} : { detail }) });

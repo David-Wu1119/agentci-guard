@@ -225,3 +225,36 @@ describe("standalone package evidence retention", () => {
     }
   }, 30_000);
 });
+
+describe("standalone package Action environment", () => {
+  it("does not create the parent INPUT_JSON destination", () => {
+    const f = fixture(true);
+    try {
+      const outer = path.join(f.directory, "parent.json");
+      const result = f.run([], { INPUT_JSON: outer });
+      expect(result.status, result.stderr).toBe(0);
+      expect(fs.existsSync(outer)).toBe(false);
+    } finally {
+      fs.rmSync(f.directory, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it("does not append to the parent summary or output files", () => {
+    const f = fixture(true);
+    try {
+      const summary = path.join(f.directory, "parent-summary.md");
+      const output = path.join(f.directory, "parent-output");
+      fs.writeFileSync(summary, "keep summary");
+      fs.writeFileSync(output, "keep outputs");
+      const result = f.run([], {
+        GITHUB_STEP_SUMMARY: summary,
+        GITHUB_OUTPUT: output,
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(fs.readFileSync(summary, "utf8")).toBe("keep summary");
+      expect(fs.readFileSync(output, "utf8")).toBe("keep outputs");
+    } finally {
+      fs.rmSync(f.directory, { recursive: true, force: true });
+    }
+  }, 30_000);
+});

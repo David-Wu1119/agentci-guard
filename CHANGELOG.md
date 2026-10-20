@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Recorded package verification preserves existing receipts and tarballs,
   including symlinks and same-name collisions, and retains the artifact before
   writing a new receipt exclusively.
+- Package-smoke Action and CLI runs no longer inherit parent JSON, GitHub
+  output or step-summary destinations, avoiding writes outside temporary outputs.
 
 ### Changed
 
