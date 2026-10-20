@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 // Usage: node scripts/verify-standalone-package.mjs [--record <file.json>]
 // --record writes the packed artifact's identity (filename, SHA-256, version,
@@ -23,7 +24,7 @@ const check = (name, ok, detail) => {
 };
 
 const repositoryRoot = path.resolve(
-  path.dirname(new URL(import.meta.url).pathname),
+  path.dirname(fileURLToPath(import.meta.url)),
   "..",
 );
 const temporary = fs.mkdtempSync(
