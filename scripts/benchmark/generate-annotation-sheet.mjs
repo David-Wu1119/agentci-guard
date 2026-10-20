@@ -139,10 +139,7 @@ if (!Array.isArray(manifest.cases) || manifest.cases.length === 0) {
 
 for (const item of manifest.cases) {
   const caseStart = rows.length;
-  const snapshot = path.resolve(
-    manifestArgument ? path.dirname(manifestPath) : repositoryRoot,
-    item.snapshot_path,
-  );
+  const snapshot = path.resolve(repositoryRoot, item.snapshot_path);
   const raw = fs.readFileSync(snapshot, "utf8");
   const document = YAML.parseDocument(raw, { prettyErrors: true });
   const parsed = document.errors.length === 0 ? document.toJS() : undefined;

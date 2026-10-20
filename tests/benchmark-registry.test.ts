@@ -204,13 +204,16 @@ describe("synthetic future-registry generation", () => {
     }
   }, 15_000);
 
-  it("resolves a custom manifest's relative snapshot path from its directory", () => {
+  it("preserves repository-root-relative snapshot paths with a custom manifest", () => {
     const temporary = fs.mkdtempSync(
-      path.join(os.tmpdir(), "agentci-registry-relative-"),
+      path.join(repositoryRoot, ".agentci-registry-synthetic-"),
     );
     try {
-      const snapshotPath = "snapshots/case-001/.github/workflows/agent.yml";
-      const snapshot = path.join(temporary, snapshotPath);
+      const snapshot = path.join(
+        temporary,
+        "snapshots/case-001/.github/workflows/agent.yml",
+      );
+      const snapshotPath = path.relative(repositoryRoot, snapshot);
       const manifestPath = path.join(temporary, "manifest.json");
       const outputPath = path.join(temporary, "annotation-sheet.csv");
       fs.mkdirSync(path.dirname(snapshot), { recursive: true });
