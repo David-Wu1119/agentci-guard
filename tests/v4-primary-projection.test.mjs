@@ -326,7 +326,90 @@ async function load(options) {
   return await loadActionRun(options);
 }
 
+describe.each([
+  [
+    "finding",
+    "identical",
+    scan({ findings: [finding("same", jobRule), finding("same", jobRule)] }),
+  ],
+  [
+    "finding",
+    "contradictory",
+    scan({
+      findings: [
+        finding("same", jobRule),
+        finding("same", jobRule, { job: "other" }),
+      ],
+    }),
+  ],
+  [
+    "agent usage",
+    "identical",
+    scan({ agent_usages: [usage("same"), usage("same")] }),
+  ],
+  [
+    "agent usage",
+    "contradictory",
+    scan({ agent_usages: [usage("same"), usage("same", { job: "other" })] }),
+  ],
+])("duplicate %s IDs (%s)", (kind, _variant, result) => {
+  it("invalidates the Action run even with matching hashes", async () => {
+    const fixture = actionRun(result);
+    try {
+      await expect(load(fixture.options)).rejects.toThrow(
+        `duplicate ${kind} id: same`,
+      );
+    } finally {
+      rmSync(fixture.temporary, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects projection instead of alerting multiple units", () => {
+    const registryRows = [
+      unit("job", "agent", null, jobRule),
+      unit("job", "other", null, jobRule),
+      unit("step", "agent", 0, agentTask),
+      unit("step", "other", 0, agentTask),
+    ];
+    expect(() =>
+      projectPrimary({
+        caseRecord,
+        registryRows,
+        expectedUnitIds: registryRows.map((row) => row.unit_id),
+        result,
+      }),
+    ).toThrow(`duplicate ${kind} id: same`);
+  });
+});
+
 describe("synthetic E3 Action run binding", () => {
+  it("allows the same ID in different record collections", async () => {
+    const result = scan({
+      findings: [finding("same", jobRule)],
+      agent_usages: [usage("same")],
+    });
+    const fixture = actionRun(result);
+    try {
+      await expect(load(fixture.options)).resolves.toMatchObject({
+        run_incomplete: false,
+      });
+      const registryRows = [
+        unit("job", "agent", null, jobRule),
+        unit("step", "agent", 0, agentTask),
+      ];
+      expect(
+        projectPrimary({
+          caseRecord,
+          registryRows,
+          expectedUnitIds: registryRows.map((row) => row.unit_id),
+          result,
+        }).units.map((row) => row.alert),
+      ).toEqual([true, true]);
+    } finally {
+      rmSync(fixture.temporary, { recursive: true, force: true });
+    }
+  });
+
   it("accepts a hash-bound complete Action JSON with a consistent root", async () => {
     const fixture = actionRun();
     try {

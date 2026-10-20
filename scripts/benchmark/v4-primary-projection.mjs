@@ -165,12 +165,15 @@ function validateResult(result) {
     ["finding", result.findings],
     ["agent usage", result.agent_usages],
   ]) {
+    const seen = new Set();
     for (const record of records) {
       requireValue(isRecord(record), `malformed ${kind}`);
       requireValue(
         typeof record.id === "string" && record.id,
         `missing ${kind} id`,
       );
+      requireValue(!seen.has(record.id), `duplicate ${kind} id: ${record.id}`);
+      seen.add(record.id);
       referencedWorkflowFiles(record);
       if (kind === "finding") {
         requireValue(
