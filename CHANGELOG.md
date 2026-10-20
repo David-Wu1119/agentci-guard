@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Standalone package verification rejects malformed or repeated `--record`
   options before invoking npm instead of silently dropping or misreading them.
+- Recorded package verification preserves existing receipts and tarballs,
+  including symlinks and same-name collisions, and retains the artifact before
+  writing a new receipt exclusively.
 
 ### Changed
 

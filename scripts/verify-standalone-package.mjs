@@ -23,7 +23,11 @@ const recordPath = (() => {
       "Usage: verify-standalone-package.mjs [--record <file.json>]",
     );
   }
-  return path.resolve(args[1]);
+  const file = path.resolve(args[1]);
+  if (fs.lstatSync(file, { throwIfNoEntry: false })) {
+    throw new Error(`Refusing to overwrite existing package record: ${file}`);
+  }
+  return file;
 })();
 const checks = [];
 const check = (name, ok, detail) => {
@@ -369,13 +373,15 @@ jobs:
       node: process.version,
       checks,
     };
-    fs.mkdirSync(path.dirname(path.resolve(recordPath)), { recursive: true });
-    fs.writeFileSync(recordPath, JSON.stringify(record, null, 2) + "\n");
-    // Keep the verified tarball beside the record so the hash can be re-checked.
-    fs.copyFileSync(
-      tarballPath,
-      path.join(path.dirname(path.resolve(recordPath)), filename),
-    );
+    const retainedTarball = path.join(path.dirname(recordPath), filename);
+    if (recordPath === retainedTarball)
+      throw new Error("Package receipt path collides with retained tarball.");
+    fs.mkdirSync(path.dirname(recordPath), { recursive: true });
+    // Retain the artifact before publishing its receipt; never replace evidence.
+    fs.copyFileSync(tarballPath, retainedTarball, fs.constants.COPYFILE_EXCL);
+    fs.writeFileSync(recordPath, JSON.stringify(record, null, 2) + "\n", {
+      flag: "wx",
+    });
   }
 
   console.log(

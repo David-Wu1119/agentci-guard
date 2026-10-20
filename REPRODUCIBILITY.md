@@ -84,6 +84,11 @@ external runtime imports that an in-repository smoke can hide.
 An optional `--record <file.json>` saves the package verification receipt and
 tarball beside it. Unknown, repeated, missing-value or extra arguments are
 rejected before packing; running without arguments still performs the smoke.
+Recorded receipts and retained tarballs must both use new paths. Existing
+files or symlinks are never replaced, and the receipt cannot share the tarball's
+filename. Use a fresh output directory for another recorded run. The artifact
+is retained before the receipt is written; a failed run can leave an orphan
+tarball, which is not a successful verification receipt.
 `--foreground-scripts=false` keeps npm 10 lifecycle output out of the JSON
 stream when `prepare` still runs during `npm pack`.
 
