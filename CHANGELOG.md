@@ -53,6 +53,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- CI pins npm 11.16.0 for script-isolated packaging verification instead of
+  relying on Node 22's bundled npm 10, which runs `prepare` despite
+  `--ignore-scripts`. Existing package tests and Node runtime choices remain.
 - The browser render check writes screenshots and its JSON report under the
   actual site directory even when the checkout path contains URL-encoded
   characters; it no longer creates an encoded sibling output directory.

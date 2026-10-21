@@ -36,6 +36,27 @@ function captureIo(): ActionIo & { logs: string[]; errors: string[] } {
 }
 
 describe("JavaScript Action entrypoint", () => {
+  it("pins script-safe npm before dependency installation and packaging tests", async () => {
+    const ci = YAML.parse(
+      await fs.readFile(".github/workflows/ci.yml", "utf8"),
+    );
+    const steps = ci.jobs.verify.steps;
+    const npmIndex = steps.findIndex(
+      (step: { name?: string }) => step.name === "Setup packaging npm",
+    );
+    const installIndex = steps.findIndex(
+      (step: { name?: string }) => step.name === "Install dependencies",
+    );
+    expect(npmIndex).toBeGreaterThan(-1);
+    expect(npmIndex).toBeLessThan(installIndex);
+    expect(steps[npmIndex].run).toContain(
+      "npm install --global npm@11.16.0 --ignore-scripts --no-audit --no-fund",
+    );
+    expect(steps[npmIndex].run).toContain(
+      'test "$(npm --version)" = "11.16.0"',
+    );
+  });
+
   it("keeps synthetic Action regressions and raw evidence in the same CI job", async () => {
     const ci = YAML.parse(
       await fs.readFile(".github/workflows/ci.yml", "utf8"),

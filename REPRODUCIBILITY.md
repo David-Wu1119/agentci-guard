@@ -68,7 +68,14 @@ node scripts/verify-sarif.mjs "$tmp_dir/result.sarif"
 
 ## Package verification
 
+Use **npm 11.16.0** for these maintainer checks. CI installs that exact
+packaging-tool version with lifecycle scripts disabled and verifies it before
+running tests. This does not change the product's Node support declaration.
+npm 10.9.9's bundled pacote runs `prepare` despite `--ignore-scripts`; it is
+not a script-isolated packaging environment for these checks.
+
 ```bash
+test "$(npm --version)" = "11.16.0"
 tmp_dir="$(mktemp -d)"
 npm pack --json --dry-run --ignore-scripts --foreground-scripts=false \
   > "$tmp_dir/pack.json"
@@ -92,8 +99,8 @@ tarball, which is not a successful verification receipt.
 The smoke clears inherited `INPUT_JSON`, `GITHUB_OUTPUT` and
 `GITHUB_STEP_SUMMARY` before running subprocesses. Its Action checks set their
 own temporary destinations; CLI scans do not append to the caller's outputs.
-`--foreground-scripts=false` keeps npm 10 lifecycle output out of the JSON
-stream when `prepare` still runs during `npm pack`.
+`--foreground-scripts=false` keeps npm's JSON stream undecorated; it is not
+a substitute for the script-suppression behavior of the pinned npm version.
 
 ## Benchmark integrity
 
