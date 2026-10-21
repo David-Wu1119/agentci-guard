@@ -53,6 +53,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The development toolchain pins Vite 8.1.6 to address GHSA-587h-7wmj-h5pm;
+  the high-severity dependency audit remains enforced.
 - CI pins npm 11.16.0 for script-isolated packaging verification instead of
   relying on Node 22's bundled npm 10, which runs `prepare` despite
   `--ignore-scripts`. Existing package tests and Node runtime choices remain.

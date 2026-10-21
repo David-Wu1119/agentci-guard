@@ -14838,7 +14838,7 @@ var package_default = {
       "fast-uri": "^3.1.8",
       postcss: "8.5.26",
       "source-map-js": "1.2.2",
-      vite: "8.1.5"
+      vite: "8.1.6"
     }
   },
   dependencies: {
@@ -14858,7 +14858,7 @@ var package_default = {
     tsup: "^8.5.1",
     tsx: "^4.21.0",
     typescript: "^5.9.3",
-    vite: "8.1.5",
+    vite: "8.1.6",
     vitest: "^4.1.11"
   }
 };
