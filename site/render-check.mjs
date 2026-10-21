@@ -1,7 +1,8 @@
 import fs from "node:fs/promises";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-const root = new URL("./", import.meta.url).pathname;
+import { fileURLToPath } from "node:url";
+const root = fileURLToPath(new URL("./", import.meta.url));
 const manifest = JSON.parse(
   await fs.readFile(new URL("./BUILD_MANIFEST.json", import.meta.url), "utf8"),
 );

@@ -2,12 +2,10 @@
 import fs from "node:fs";
 import { isBuiltin } from "node:module";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 
-const root = path.resolve(
-  path.dirname(new URL(import.meta.url).pathname),
-  "..",
-);
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const manifestPath = path.join(root, "action.yml");
 const manifest = YAML.parse(fs.readFileSync(manifestPath, "utf8"));
 const packageMetadata = JSON.parse(

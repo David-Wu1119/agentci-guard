@@ -1,0 +1,16 @@
+name: e3-two-callers-bridge
+on:
+  workflow_call:
+    inputs:
+      request:
+        required: true
+        type: string
+      tools:
+        required: true
+        type: string
+jobs:
+  agent:
+    uses: ./.github/workflows/reusable.yml
+    with:
+      request: ${{ inputs.request }}
+      tools: ${{ inputs.tools }}

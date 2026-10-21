@@ -48,6 +48,11 @@ checks any public label package.
 `benchmark:smoke` runs the annotation and scoring toolchain using temporary
 synthetic labels only.
 
+The local tools resolve their checkout from a file URL, including directory
+names containing spaces, Unicode, `%` or `#`; they do not require an ASCII-only
+checkout path. The blank-sheet generators also resolve snapshots from that
+checkout when invoked from another working directory.
+
 For an optional, network-dependent origin check, run
 `pnpm benchmark:verify-upstream` with GitHub CLI access. It checks each v3
 snapshot against the workflow path at its pinned upstream commit and emits a
@@ -57,6 +62,13 @@ routine CI because upstream repositories can become unavailable. See
 dated result and limits.
 
 ## Human workflow
+
+CSV import uses LF or CRLF record endings and preserves quoted field contents,
+including embedded newlines and carriage returns. Quotes inside a field must
+be doubled, and a quoted field must end at its delimiter or record boundary.
+Malformed quoting is rejected, not silently repaired into a different value.
+The shared renderer quotes carriage returns. This is CSV syntax handling, not
+a change to the label contract or its field-normalization rules.
 
 For repeatability under its frozen contract, follow the `38a3272`-pinned
 development-only [`candidate-pilot/README.md`](candidate-pilot/README.md)
@@ -82,6 +94,9 @@ node scripts/benchmark/generate-annotation-sheet.mjs --write \
 ```
 
 The custom path requires exact parity with the bundled scanner's current rule
-IDs and refuses to overwrite existing files. This only prepares blank structural
+IDs and refuses to overwrite existing files. Relative `snapshot_path` values
+resolve from the repository root for every manifest; absolute paths are also
+accepted. Empty manifests and any case
+that would silently produce zero units are rejected before writing a CSV. This only prepares blank structural
 units; it does not collect or seal v4 repositories, validate their provenance,
 replace the human protocol, or produce accuracy evidence.

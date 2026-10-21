@@ -68,7 +68,14 @@ node scripts/verify-sarif.mjs "$tmp_dir/result.sarif"
 
 ## Package verification
 
+Use **npm 11.16.0** for these maintainer checks. CI installs that exact
+packaging-tool version with lifecycle scripts disabled and verifies it before
+running tests. This does not change the product's Node support declaration.
+npm 10.9.9's bundled pacote runs `prepare` despite `--ignore-scripts`; it is
+not a script-isolated packaging environment for these checks.
+
 ```bash
+test "$(npm --version)" = "11.16.0"
 tmp_dir="$(mktemp -d)"
 npm pack --json --dry-run --ignore-scripts --foreground-scripts=false \
   > "$tmp_dir/pack.json"
@@ -81,8 +88,19 @@ the documented package version. The standalone smoke creates the actual
 tarball, extracts it outside the repository, confirms `node_modules` is absent,
 and executes both the Action and CLI from that extracted package. This catches
 external runtime imports that an in-repository smoke can hide.
-`--foreground-scripts=false` keeps npm 10 lifecycle output out of the JSON
-stream when `prepare` still runs during `npm pack`.
+An optional `--record <file.json>` saves the package verification receipt and
+tarball beside it. Unknown, repeated, missing-value or extra arguments are
+rejected before packing; running without arguments still performs the smoke.
+Recorded receipts and retained tarballs must both use new paths. Existing
+files or symlinks are never replaced, and the receipt cannot share the tarball's
+filename. Use a fresh output directory for another recorded run. The artifact
+is retained before the receipt is written; a failed run can leave an orphan
+tarball, which is not a successful verification receipt.
+The smoke clears inherited `INPUT_JSON`, `GITHUB_OUTPUT` and
+`GITHUB_STEP_SUMMARY` before running subprocesses. Its Action checks set their
+own temporary destinations; CLI scans do not append to the caller's outputs.
+`--foreground-scripts=false` keeps npm's JSON stream undecorated; it is not
+a substitute for the script-suppression behavior of the pinned npm version.
 
 ## Benchmark integrity
 

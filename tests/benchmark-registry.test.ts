@@ -25,6 +25,67 @@ const stepRules = [
 ];
 
 describe("synthetic future-registry generation", () => {
+  it("rejects a zero-unit case after a valid case and an empty manifest", () => {
+    const temporary = fs.mkdtempSync(
+      path.join(os.tmpdir(), "agentci-registry-zero-units-"),
+    );
+    try {
+      const snapshot = path.join(temporary, "empty-jobs.yml");
+      const validSnapshot = path.join(temporary, "valid.yml");
+      const manifestPath = path.join(temporary, "manifest.json");
+      const outputPath = path.join(temporary, "annotation-sheet.csv");
+      fs.writeFileSync(snapshot, "on: push\njobs: {}\n");
+      fs.writeFileSync(
+        validSnapshot,
+        "on: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ready\n",
+      );
+      const manifest = {
+        benchmark_id: "synthetic-zero-units",
+        agent_detection_task: "agentci/agent-usage",
+        rules: Object.keys(RULES),
+        task_granularity: Object.fromEntries([
+          ["agentci/agent-usage", "step"],
+          ...jobRules.map((rule) => [rule, "job"]),
+          ...stepRules.map((rule) => [rule, "step"]),
+        ]),
+        cases: [
+          {
+            case_id: "synthetic-valid",
+            split: "dev",
+            stratum: "synthetic",
+            repository: "example/synthetic",
+            source_commit: "0".repeat(40),
+            source_path: ".github/workflows/valid.yml",
+            snapshot_path: validSnapshot,
+          },
+          {
+            case_id: "synthetic-empty-jobs",
+            split: "dev",
+            stratum: "synthetic",
+            repository: "example/synthetic",
+            source_commit: "0".repeat(40),
+            source_path: ".github/workflows/empty-jobs.yml",
+            snapshot_path: snapshot,
+          },
+        ],
+      };
+      fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+      expect(() => run("--write", manifestPath, outputPath)).toThrow(
+        /zero annotation units/i,
+      );
+      expect(fs.existsSync(outputPath)).toBe(false);
+
+      manifest.cases = [];
+      fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+      expect(() => run("--write", manifestPath, outputPath)).toThrow(
+        /zero annotation units/i,
+      );
+      expect(fs.existsSync(outputPath)).toBe(false);
+    } finally {
+      fs.rmSync(temporary, { recursive: true, force: true });
+    }
+  });
+
   it("emits blank units for every current rule without changing frozen v3", () => {
     const temporary = fs.mkdtempSync(
       path.join(os.tmpdir(), "agentci-registry-synthetic-"),
@@ -142,6 +203,61 @@ describe("synthetic future-registry generation", () => {
       fs.rmSync(temporary, { recursive: true, force: true });
     }
   }, 15_000);
+
+  it("preserves repository-root-relative snapshot paths with a custom manifest", () => {
+    const temporary = fs.mkdtempSync(
+      path.join(repositoryRoot, ".agentci-registry-synthetic-"),
+    );
+    try {
+      const snapshot = path.join(
+        temporary,
+        "snapshots/case-001/.github/workflows/agent.yml",
+      );
+      const snapshotPath = path.relative(repositoryRoot, snapshot);
+      const manifestPath = path.join(temporary, "manifest.json");
+      const outputPath = path.join(temporary, "annotation-sheet.csv");
+      fs.mkdirSync(path.dirname(snapshot), { recursive: true });
+      fs.writeFileSync(
+        snapshot,
+        "on: issue_comment\njobs:\n  triage:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Run agent\n        uses: anthropics/claude-code-action@v1\n",
+      );
+      fs.writeFileSync(
+        manifestPath,
+        JSON.stringify({
+          benchmark_id: "synthetic-relative-snapshot",
+          agent_detection_task: "agentci/agent-usage",
+          rules: Object.keys(RULES),
+          task_granularity: Object.fromEntries([
+            ["agentci/agent-usage", "step"],
+            ...jobRules.map((rule) => [rule, "job"]),
+            ...stepRules.map((rule) => [rule, "step"]),
+          ]),
+          cases: [
+            {
+              case_id: "case-001",
+              split: "dev",
+              stratum: "synthetic",
+              repository: "example/synthetic",
+              source_commit: "0".repeat(40),
+              source_path: ".github/workflows/agent.yml",
+              snapshot_path: snapshotPath,
+            },
+          ],
+        }),
+      );
+
+      run("--write", manifestPath, outputPath);
+      expect(fs.readFileSync(outputPath, "utf8")).toContain("case-001");
+      run("--check", manifestPath, outputPath);
+      const secondOutput = path.join(temporary, "second.csv");
+      run("--write", manifestPath, secondOutput);
+      expect(fs.readFileSync(secondOutput)).toEqual(
+        fs.readFileSync(outputPath),
+      );
+    } finally {
+      fs.rmSync(temporary, { recursive: true, force: true });
+    }
+  });
 });
 
 function run(mode: "--check" | "--write", manifest: string, output: string) {

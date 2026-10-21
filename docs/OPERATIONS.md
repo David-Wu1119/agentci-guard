@@ -71,7 +71,7 @@ corepack enable
 pnpm install --frozen-lockfile
 pnpm check            # format, typecheck, tests with coverage floor, build,
                       # bundled licenses, v0.1.0 baseline, benchmark snapshot
-pnpm audit --audit-level high
+node scripts/audit-dependencies.mjs --level high
 pnpm benchmark:smoke  # annotation toolchain round-trip
 pnpm package:smoke    # packed Action and CLI run outside the repo, no node_modules
 node scripts/verify-action-manifest.mjs
@@ -81,6 +81,13 @@ node scripts/verify-action-manifest.mjs
 and 80% branches. These are a ratchet, not a target: raise them when coverage
 rises, never lower them to make a change pass. If a change genuinely needs a
 lower floor, that is a signal the change needs tests.
+
+The audit gate validates every severity count before accepting a response.
+Malformed metadata, invalid options, process signals and unexpected exit codes
+fail closed. Only a missing response, endpoint error or timeout is retried;
+exhausting retries fails the gate. A valid pnpm exit 1 with only lower-severity
+advisories does not fail the high-severity gate. These checks do not establish
+that dependencies are free of unknown vulnerabilities or reachable exploits.
 
 Two example repositories are the fastest sanity check. They must not drift:
 

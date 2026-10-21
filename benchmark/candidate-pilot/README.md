@@ -92,7 +92,8 @@ node scripts/benchmark/compare-annotations.mjs \
 The pair checker verifies matching blank packet checksums, static packet
 integrity, matching filled CSV/JSONL records, the same pseudonym, plausible
 per-case timing, and a seven-day washout. Its report contains per-rule
-positive/negative/indeterminate counts and disagreement counts, not accuracy.
+positive/negative/indeterminate counts, disagreement counts, and the frozen
+scanner, contract, and source pins, not accuracy.
 The separate disagreement CSV is for human review after pass 2; its pooled
 agreement printout must not be interpreted without the per-rule distributions.
 Do **not** run the historical `summarize-pilot.mjs`, two-human adjudicator, or

@@ -31,6 +31,12 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Setup packaging npm
+        # npm 10's pacote runs prepare even with --ignore-scripts.
+        run: |
+          npm install --global npm@11.16.0 --ignore-scripts --no-audit --no-fund
+          test "$(npm --version)" = "11.16.0"
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -160,13 +166,19 @@ jobs:
           node scripts/verify-sarif-schema.mjs artifacts/event-json.sarif
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
+          import { execFileSync } from 'node:child_process';
           import { createHash } from 'node:crypto';
           import { readFileSync } from 'node:fs';
+          import { RULES } from './dist/index.js';
+          import { renderCsv } from './scripts/benchmark/csv.mjs';
+          import { unitId } from './scripts/benchmark/unit-id.mjs';
+          import { projectPrimary, registryRowsFromCsv } from './scripts/benchmark/v4-primary-projection.mjs';
 
           assert.equal(process.env.OUTPUT_JSON_PATH, 'artifacts/event-json.json');
           assert.equal(process.env.ANALYSIS_COMPLETE, 'true');
           const bytes = readFileSync(process.env.OUTPUT_JSON_PATH);
-          assert.equal(createHash('sha256').update(bytes).digest('hex'), process.env.OUTPUT_JSON_SHA256);
+          const sha256 = (value) => createHash('sha256').update(value).digest('hex');
+          assert.equal(sha256(bytes), process.env.OUTPUT_JSON_SHA256);
           const result = JSON.parse(bytes.toString('utf8'));
           assert.equal(result.analysis_complete, true);
           assert.equal(result.diagnostics.length, 0);
@@ -175,6 +187,48 @@ jobs:
           const rules = new Set(result.findings.map((finding) => finding.rule_id));
           assert(rules.has('agentci/untrusted-input-in-prompt'));
           assert(rules.has('agentci/untrusted-ai-write-token'));
+
+          const source = '.github/workflows/agent.yml';
+          const fixturePath = `corpus/adversarial/cases/issue-comment-event-json/${source}`;
+          const sourceBytes = readFileSync(fixturePath);
+          assert.equal(sha256(sourceBytes), sha256(execFileSync('git', ['show', `HEAD:${fixturePath}`])));
+          const caseRecord = {
+            case_id: 'synthetic-issue-comment-event-json',
+            source_path: source,
+            sha256: sha256(sourceBytes),
+          };
+          const expected = [
+            ['step', 0, 'agentci/untrusted-input-in-prompt', 'finding', 0,
+              'agentci/untrusted-input-in-prompt:.github/workflows/agent.yml:triage:0:'],
+            ['step', 0, 'agentci/ai-shell-access', 'finding', 1,
+              'agentci/ai-shell-access:.github/workflows/agent.yml:triage:0:'],
+            ['job', null, 'agentci/untrusted-ai-write-token', 'finding', 2,
+              'agentci/untrusted-ai-write-token:.github/workflows/agent.yml:triage::'],
+            ['job', null, 'agentci/broad-write-permissions', 'finding', 3,
+              'agentci/broad-write-permissions:.github/workflows/agent.yml:triage::'],
+            ['step', 0, 'agentci/agent-usage', 'agent_usage', 0,
+              '.github/workflows/agent.yml:triage:0:'],
+          ];
+          const expectedUnitIds = expected.map(([scope, stepIndex, rule]) =>
+            unitId(caseRecord.case_id, scope, 'triage', stepIndex, rule));
+          const registryRows = registryRowsFromCsv(renderCsv([
+            ['unit_id', 'case_id', 'source_path', 'scope', 'job_id', 'step_index', 'rule_id'],
+            ...expected.map(([scope, stepIndex, rule], index) => [
+              expectedUnitIds[index], caseRecord.case_id, source, scope, 'triage',
+              stepIndex === null ? '' : String(stepIndex), rule,
+            ]),
+          ]));
+          const projected = projectPrimary({
+            caseRecord, registryRows, expectedUnitIds,
+            registeredTaskIds: ['agentci/agent-usage', ...Object.keys(RULES)], result,
+          });
+          assert.deepEqual(projected.units, expected.map(([, , , kind, index, id], rowIndex) => ({
+            unit_id: expectedUnitIds[rowIndex], alert: true,
+            matched_records: [{ kind, index, id }],
+          })));
+          assert.deepEqual(projected.parse_gap_unit_ids, []);
+          assert.deepEqual(projected.structural_gap_unit_ids, []);
+          assert.deepEqual(projected.out_of_scope_records, []);
           NODE
 
       - name: Capture synthetic E3 Action inputs
@@ -186,7 +240,7 @@ jobs:
           import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
           import path from 'node:path';
 
-          const root = 'corpus/adversarial/cases/local-reusable';
+          const root = 'tests/fixtures/e3-two-callers';
           const source = '.github/workflows/caller.yml';
           const output = 'artifacts/reusable.json';
           assert(!existsSync(output), 'Action JSON must be absent before the Action runs');
@@ -224,7 +278,7 @@ jobs:
           }
           mkdirSync('artifacts', { recursive: true });
           writeFileSync('artifacts/e3-reusable-preflight.json', JSON.stringify({
-            case_id: 'synthetic-reusable', source_path: source, input_files,
+            case_id: 'synthetic-two-callers', source_path: source, input_files,
             action_commit: actionCommit,
             action_manifest_sha256: hash('action.yml'),
             action_bundle_sha256: hash('dist/action.js'),
@@ -240,16 +294,16 @@ jobs:
           }));
           NODE
 
-      - name: Action smoke - reusable caller chain
+      - name: Action smoke - two reusable callers
         id: reusable
         uses: ./
         with:
-          path: corpus/adversarial/cases/local-reusable
+          path: tests/fixtures/e3-two-callers
           sarif: artifacts/reusable.sarif
           json: artifacts/reusable.json
           fail-on: none
 
-      - name: Verify reusable caller chain in Action JSON
+      - name: Verify two reusable caller chains in Action JSON
         env:
           E3_ACTION_OUTCOME: ${{ steps.reusable.outcome }}
           E3_ACTION_JSON_SHA256: ${{ steps.reusable.outputs.json-sha256 }}
@@ -258,7 +312,6 @@ jobs:
           E4_WORKFLOW_REF: ${{ github.workflow_ref }}
           E4_WORKFLOW_SHA: ${{ github.workflow_sha }}
         run: |
-          node -e 'const assert = require("node:assert/strict"); const r = JSON.parse(require("node:fs").readFileSync("artifacts/reusable.json", "utf8")); assert.deepEqual(r.agent_usages[0]?.call_chain, [".github/workflows/caller.yml#agent", ".github/workflows/bridge.yml#agent"]); assert(r.findings.some((f) => f.call_chain?.[0] === ".github/workflows/caller.yml#agent"))'
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           import { execFileSync } from 'node:child_process';
@@ -266,6 +319,7 @@ jobs:
           import { readFileSync, writeFileSync } from 'node:fs';
           import YAML from 'yaml';
           import { RULES } from './dist/index.js';
+          import { unitId } from './scripts/benchmark/unit-id.mjs';
           import { loadActionRun, projectPrimary } from './scripts/benchmark/v4-primary-projection.mjs';
 
           const preflight = JSON.parse(readFileSync('artifacts/e3-reusable-preflight.json', 'utf8'));
@@ -279,7 +333,7 @@ jobs:
           const invocation = {
             uses: './',
             with: {
-              path: 'corpus/adversarial/cases/local-reusable',
+              path: 'tests/fixtures/e3-two-callers',
               sarif: sarifPath,
               json: jsonPath,
               'fail-on': 'none',
@@ -309,7 +363,7 @@ jobs:
           };
           const { result, run_incomplete } = await loadActionRun({
             caseRecord,
-            inputRoot: 'corpus/adversarial/cases/local-reusable',
+            inputRoot: 'tests/fixtures/e3-two-callers',
             actionManifestPath: 'action.yml',
             actionBundlePath: 'dist/action.js',
             lockfilePath: 'pnpm-lock.yaml',
@@ -322,18 +376,27 @@ jobs:
             runReceipt,
           });
           assert.equal(run_incomplete, false);
-          const row = (unit_id, scope, rule_id) => ({
-            unit_id, case_id: caseRecord.case_id, source_path: source,
-            scope, job_id: 'agent', step_index: null, rule_id,
+          const callers = ['agent', 'second'];
+          assert.deepEqual(result.agent_usages.map((usage) => usage.call_chain), callers.map((job) =>
+            [`${source}#${job}`, '.github/workflows/bridge.yml#agent']));
+          const rules = ['agentci/untrusted-input-in-prompt', 'agentci/ai-shell-access',
+            'agentci/gated-ai-write-token', 'agentci/broad-write-permissions'];
+          assert.deepEqual(result.findings.map((finding) => [finding.rule_id, finding.call_chain]),
+            callers.flatMap((job) => rules.map((rule) =>
+              [rule, [`${source}#${job}`, '.github/workflows/bridge.yml#agent']])));
+          const id = (scope, job, rule_id) => unitId(caseRecord.case_id, scope, job, null, rule_id);
+          const row = (scope, job, rule_id) => ({
+            unit_id: id(scope, job, rule_id), case_id: caseRecord.case_id, source_path: source,
+            scope, job_id: job, step_index: null, rule_id,
           });
-          const registryRows = [
-            row('agent-usage', 'reusable-call', 'agentci/agent-usage'),
-            row('prompt', 'reusable-call', 'agentci/untrusted-input-in-prompt'),
-            row('shell', 'reusable-call', 'agentci/ai-shell-access'),
-            row('gated-write', 'job', 'agentci/gated-ai-write-token'),
-            row('broad-write', 'job', 'agentci/broad-write-permissions'),
-          ];
-          const expectedUnitIds = ['agent-usage', 'prompt', 'shell', 'gated-write', 'broad-write'];
+          const registryRows = callers.flatMap((job) => [
+            row('reusable-call', job, 'agentci/agent-usage'),
+            row('reusable-call', job, 'agentci/untrusted-input-in-prompt'),
+            row('reusable-call', job, 'agentci/ai-shell-access'),
+            row('job', job, 'agentci/gated-ai-write-token'),
+            row('job', job, 'agentci/broad-write-permissions'),
+          ]);
+          const expectedUnitIds = registryRows.map((row) => row.unit_id);
           // Synthetic smoke only; formal scoring must use the frozen manifest vocabulary.
           const registeredTaskIds = ['agentci/agent-usage', ...Object.keys(RULES)];
           const projected = projectPrimary({ caseRecord, registryRows, expectedUnitIds, registeredTaskIds, result });
@@ -341,11 +404,16 @@ jobs:
           assert.deepEqual(projected.structural_gap_unit_ids, []);
           assert.deepEqual(projected.out_of_scope_records, []);
           assert.deepEqual(projected.units.map((unit) => [unit.unit_id, unit.alert, unit.matched_records]), [
-            ['agent-usage', true, [{ kind: 'agent_usage', index: 0, id: '.github/workflows/reusable.yml:agent:0:.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],
-            ['prompt', true, [{ kind: 'finding', index: 0, id: 'agentci/untrusted-input-in-prompt:.github/workflows/reusable.yml:agent:0:.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],
-            ['shell', true, [{ kind: 'finding', index: 1, id: 'agentci/ai-shell-access:.github/workflows/reusable.yml:agent:0:.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],
-            ['gated-write', true, [{ kind: 'finding', index: 2, id: 'agentci/gated-ai-write-token:.github/workflows/reusable.yml:agent::.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],
-            ['broad-write', true, [{ kind: 'finding', index: 3, id: 'agentci/broad-write-permissions:.github/workflows/reusable.yml:agent::.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],
+            [expectedUnitIds[0], true, [{ kind: 'agent_usage', index: 0, id: '.github/workflows/reusable.yml:agent:0:.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],
+            [expectedUnitIds[1], true, [{ kind: 'finding', index: 0, id: 'agentci/untrusted-input-in-prompt:.github/workflows/reusable.yml:agent:0:.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],
+            [expectedUnitIds[2], true, [{ kind: 'finding', index: 1, id: 'agentci/ai-shell-access:.github/workflows/reusable.yml:agent:0:.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],
+            [expectedUnitIds[3], true, [{ kind: 'finding', index: 2, id: 'agentci/gated-ai-write-token:.github/workflows/reusable.yml:agent::.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],
+            [expectedUnitIds[4], true, [{ kind: 'finding', index: 3, id: 'agentci/broad-write-permissions:.github/workflows/reusable.yml:agent::.github/workflows/caller.yml#agent>.github/workflows/bridge.yml#agent' }]],
+            [expectedUnitIds[5], true, [{ kind: 'agent_usage', index: 1, id: '.github/workflows/reusable.yml:agent:0:.github/workflows/caller.yml#second>.github/workflows/bridge.yml#agent' }]],
+            [expectedUnitIds[6], true, [{ kind: 'finding', index: 4, id: 'agentci/untrusted-input-in-prompt:.github/workflows/reusable.yml:agent:0:.github/workflows/caller.yml#second>.github/workflows/bridge.yml#agent' }]],
+            [expectedUnitIds[7], true, [{ kind: 'finding', index: 5, id: 'agentci/ai-shell-access:.github/workflows/reusable.yml:agent:0:.github/workflows/caller.yml#second>.github/workflows/bridge.yml#agent' }]],
+            [expectedUnitIds[8], true, [{ kind: 'finding', index: 6, id: 'agentci/gated-ai-write-token:.github/workflows/reusable.yml:agent::.github/workflows/caller.yml#second>.github/workflows/bridge.yml#agent' }]],
+            [expectedUnitIds[9], true, [{ kind: 'finding', index: 7, id: 'agentci/broad-write-permissions:.github/workflows/reusable.yml:agent::.github/workflows/caller.yml#second>.github/workflows/bridge.yml#agent' }]],
           ]);
           const checkoutSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
           assert.equal(checkoutSha, preflight.action_commit);
@@ -406,6 +474,7 @@ jobs:
           import { readFileSync, writeFileSync } from 'node:fs';
           import YAML from 'yaml';
           import { RULES } from './dist/index.js';
+          import { unitId } from './scripts/benchmark/unit-id.mjs';
           import { loadActionRun, projectPrimary } from './scripts/benchmark/v4-primary-projection.mjs';
 
           assert.equal(process.env.E4_INCOMPLETE_OUTCOME, 'failure');
@@ -477,17 +546,18 @@ jobs:
             ({ code, kind, severity, file })), [
             { code: 'agentci/parse-error', kind: 'parse', severity: 'error', file: source },
           ]);
+          const gapUnitId = unitId(caseRecord.case_id, 'workflow', null, null, 'agentci/agent-usage');
           const registryRows = [{
-            unit_id: 'parse-gap', case_id: caseRecord.case_id, source_path: source,
+            unit_id: gapUnitId, case_id: caseRecord.case_id, source_path: source,
             scope: 'workflow', job_id: null, step_index: null, rule_id: 'agentci/agent-usage',
           }];
           const projected = projectPrimary({
-            caseRecord, registryRows, expectedUnitIds: ['parse-gap'],
+            caseRecord, registryRows, expectedUnitIds: [gapUnitId],
             registeredTaskIds: ['agentci/agent-usage', ...Object.keys(RULES)],
             sourceBytes: readFileSync(`${inputRoot}/${source}`), result,
           });
-          assert.deepEqual(projected.units, [{ unit_id: 'parse-gap', alert: false, matched_records: [] }]);
-          assert.deepEqual(projected.parse_gap_unit_ids, ['parse-gap']);
+          assert.deepEqual(projected.units, [{ unit_id: gapUnitId, alert: false, matched_records: [] }]);
+          assert.deepEqual(projected.parse_gap_unit_ids, [gapUnitId]);
           assert.deepEqual(projected.structural_gap_unit_ids, []);
           assert.deepEqual(projected.out_of_scope_records, []);
           writeFileSync('artifacts/e4-incomplete-receipt.json', JSON.stringify({
@@ -514,6 +584,8 @@ jobs:
           name: e4-synthetic-${{ github.run_id }}-${{ github.run_attempt }}
           if-no-files-found: error
           path: |
+            artifacts/event-json.json
+            artifacts/event-json.sarif
             artifacts/e3-reusable-preflight.json
             artifacts/reusable.json
             artifacts/reusable.sarif
@@ -530,6 +602,8 @@ jobs:
           name: e4-synthetic-debug-${{ github.run_id }}-${{ github.run_attempt }}
           if-no-files-found: warn
           path: |
+            artifacts/event-json.json
+            artifacts/event-json.sarif
             artifacts/e3-reusable-preflight.json
             artifacts/reusable.json
             artifacts/reusable.sarif

@@ -1,9 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { csvObjects } from "./csv.mjs";
 
 export const repositoryRoot = path.resolve(
-  path.dirname(new URL(import.meta.url).pathname),
+  path.dirname(fileURLToPath(import.meta.url)),
   "../..",
 );
 export const benchmarkRoot = path.join(repositoryRoot, "benchmark");

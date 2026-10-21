@@ -36,6 +36,27 @@ function captureIo(): ActionIo & { logs: string[]; errors: string[] } {
 }
 
 describe("JavaScript Action entrypoint", () => {
+  it("pins script-safe npm before dependency installation and packaging tests", async () => {
+    const ci = YAML.parse(
+      await fs.readFile(".github/workflows/ci.yml", "utf8"),
+    );
+    const steps = ci.jobs.verify.steps;
+    const npmIndex = steps.findIndex(
+      (step: { name?: string }) => step.name === "Setup packaging npm",
+    );
+    const installIndex = steps.findIndex(
+      (step: { name?: string }) => step.name === "Install dependencies",
+    );
+    expect(npmIndex).toBeGreaterThan(-1);
+    expect(npmIndex).toBeLessThan(installIndex);
+    expect(steps[npmIndex].run).toContain(
+      "npm install --global npm@11.16.0 --ignore-scripts --no-audit --no-fund",
+    );
+    expect(steps[npmIndex].run).toContain(
+      'test "$(npm --version)" = "11.16.0"',
+    );
+  });
+
   it("keeps synthetic Action regressions and raw evidence in the same CI job", async () => {
     const ci = YAML.parse(
       await fs.readFile(".github/workflows/ci.yml", "utf8"),
@@ -75,6 +96,10 @@ describe("JavaScript Action entrypoint", () => {
     expect(steps[eventIndex + 1].run).toContain(
       "agentci/untrusted-ai-write-token",
     );
+    expect(steps[eventIndex + 1].run).toContain(
+      "registryRowsFromCsv(renderCsv(",
+    );
+    expect(steps[eventIndex + 1].run).toContain("projected.units");
     const actionIndex = steps.findIndex((step) => step.id === "reusable");
     expect(steps[actionIndex - 1].run).toContain(
       "['show', `${actionCommit}:${file}`]",
@@ -87,7 +112,7 @@ describe("JavaScript Action entrypoint", () => {
     expect(steps[actionIndex]).toMatchObject({
       uses: "./",
       with: {
-        path: "corpus/adversarial/cases/local-reusable",
+        path: "tests/fixtures/e3-two-callers",
         json: "artifacts/reusable.json",
         "fail-on": "none",
       },
@@ -100,6 +125,12 @@ describe("JavaScript Action entrypoint", () => {
     });
     expect(steps[actionIndex + 1].run).toContain(
       "artifacts/e4-synthetic-receipt.json",
+    );
+    expect(steps[actionIndex + 1].run).toContain(
+      "unitId(caseRecord.case_id, scope, job, null, rule_id)",
+    );
+    expect(steps[actionIndex + 1].run).toContain(
+      "const callers = ['agent', 'second']",
     );
     expect(steps[actionIndex + 1].run).toContain(
       "['show', `${process.env.E4_WORKFLOW_SHA}:.github/workflows/ci.yml`]",
@@ -132,6 +163,9 @@ describe("JavaScript Action entrypoint", () => {
     );
     expect(steps[actionIndex + 3].run).toContain("agentci/parse-error");
     expect(steps[actionIndex + 3].run).toContain(
+      "unitId(caseRecord.case_id, 'workflow', null, null, 'agentci/agent-usage')",
+    );
+    expect(steps[actionIndex + 3].run).toContain(
       "artifacts/e4-incomplete-receipt.json",
     );
     for (const run of [
@@ -160,6 +194,8 @@ describe("JavaScript Action entrypoint", () => {
       },
     });
     for (const file of [
+      "artifacts/event-json.json",
+      "artifacts/event-json.sarif",
       "artifacts/e3-reusable-preflight.json",
       "artifacts/reusable.json",
       "artifacts/reusable.sarif",
@@ -411,10 +447,10 @@ describe("JavaScript Action entrypoint", () => {
     expect(io.errors[0]).toContain("at or above high");
   });
 
-  it("preserves reusable-workflow caller paths in the JSON output", async () => {
+  it("preserves distinct nested reusable-workflow caller paths in the JSON output", async () => {
     const temporary = await temporaryOutput();
     const code = await runAction({
-      INPUT_PATH: "corpus/adversarial/cases/local-reusable",
+      INPUT_PATH: "tests/fixtures/e3-two-callers",
       INPUT_SARIF: temporary.sarif,
       INPUT_JSON: temporary.json,
       "INPUT_FAIL-ON": "none",
@@ -423,15 +459,25 @@ describe("JavaScript Action entrypoint", () => {
 
     expect(code).toBe(0);
     const result = JSON.parse(await fs.readFile(temporary.json, "utf8"));
-    expect(result.agent_usages[0].call_chain).toEqual([
-      ".github/workflows/caller.yml#agent",
-      ".github/workflows/bridge.yml#agent",
+    expect(
+      result.agent_usages.map(
+        (usage: { call_chain: string[] }) => usage.call_chain,
+      ),
+    ).toEqual([
+      [
+        ".github/workflows/caller.yml#agent",
+        ".github/workflows/bridge.yml#agent",
+      ],
+      [
+        ".github/workflows/caller.yml#second",
+        ".github/workflows/bridge.yml#agent",
+      ],
     ]);
     expect(
-      result.findings.some((finding: { call_chain?: string[] }) =>
-        finding.call_chain?.includes(".github/workflows/caller.yml#agent"),
+      result.findings.map(
+        (finding: { call_chain?: string[] }) => finding.call_chain?.[0],
       ),
-    ).toBe(true);
+    ).toContain(".github/workflows/caller.yml#second");
   });
 
   it("keeps one incomplete-analysis diagnostic per reusable-workflow caller in Action JSON", async () => {

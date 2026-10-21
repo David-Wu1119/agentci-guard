@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import YAML from "yaml";
+import { csvObjects } from "./csv.mjs";
+import { unitId } from "./unit-id.mjs";
 
 const AGENT_TASK = "agentci/agent-usage";
 const CONFIG_FILES = ["agentci.config.json", ".agentcirc.json"];
@@ -22,6 +24,12 @@ function validHash(value) {
   return typeof value === "string" && /^[0-9a-f]{64}$/.test(value);
 }
 
+function stringArray(value) {
+  return (
+    Array.isArray(value) && value.every((item) => typeof item === "string")
+  );
+}
+
 function relativeFile(value) {
   requireValue(typeof value === "string" && value.length > 0, "missing path");
   const normalized = value.replaceAll("\\", "/");
@@ -35,6 +43,21 @@ function relativeFile(value) {
     `non-canonical relative path: ${value}`,
   );
   return value;
+}
+
+function referencedWorkflowFiles(record) {
+  const files = [relativeFile(record.file)];
+  if (record.call_chain === undefined) return files;
+  requireValue(
+    Array.isArray(record.call_chain) &&
+      record.call_chain.every(
+        (entry) => typeof entry === "string" && /^[^#]+#[^#]+$/.test(entry),
+      ),
+    "invalid call_chain",
+  );
+  for (const entry of record.call_chain)
+    files.push(relativeFile(entry.slice(0, entry.indexOf("#"))));
+  return files;
 }
 
 function inside(root, file) {
@@ -142,18 +165,27 @@ function validateResult(result) {
     ["finding", result.findings],
     ["agent usage", result.agent_usages],
   ]) {
+    const seen = new Set();
     for (const record of records) {
       requireValue(isRecord(record), `malformed ${kind}`);
       requireValue(
         typeof record.id === "string" && record.id,
         `missing ${kind} id`,
       );
-      relativeFile(record.file);
+      requireValue(!seen.has(record.id), `duplicate ${kind} id: ${record.id}`);
+      seen.add(record.id);
+      referencedWorkflowFiles(record);
       if (kind === "finding") {
         requireValue(
           typeof record.rule_id === "string" && record.rule_id,
           "missing finding rule_id",
         );
+        for (const field of ["title", "message", "why", "evidence"])
+          requireValue(
+            typeof record[field] === "string",
+            `invalid finding ${field}`,
+          );
+        requireValue(stringArray(record.fix), "invalid finding fix");
       } else {
         requireValue(
           typeof record.job === "string" && record.job,
@@ -163,7 +195,32 @@ function validateResult(result) {
           Number.isSafeInteger(record.step_index) && record.step_index >= 0,
           "invalid agent usage step_index",
         );
+        requireValue(
+          ["action", "cli", "http", "other"].includes(record.kind),
+          "invalid agent usage kind",
+        );
+        requireValue(
+          typeof record.evidence === "string",
+          "invalid agent usage evidence",
+        );
       }
+      if (record.step !== undefined || kind === "agent usage")
+        requireValue(typeof record.step === "string", `invalid ${kind} step`);
+      if (record.line !== undefined || kind === "agent usage")
+        requireValue(
+          Number.isSafeInteger(record.line) && record.line > 0,
+          `invalid ${kind} line`,
+        );
+      if (record.reachable_events !== undefined || kind === "agent usage")
+        requireValue(
+          stringArray(record.reachable_events),
+          `invalid ${kind} reachable_events`,
+        );
+      if (record.uncertain_reachable_events !== undefined)
+        requireValue(
+          stringArray(record.uncertain_reachable_events),
+          `invalid ${kind} uncertain_reachable_events`,
+        );
       if (record.job !== undefined) {
         requireValue(
           typeof record.job === "string" && record.job,
@@ -175,18 +232,6 @@ function validateResult(result) {
           Number.isSafeInteger(record.step_index) && record.step_index >= 0,
           `invalid ${kind} step_index`,
         );
-      }
-      if (record.call_chain !== undefined) {
-        requireValue(
-          Array.isArray(record.call_chain) &&
-            record.call_chain.every(
-              (entry) =>
-                typeof entry === "string" && /^[^#]+#[^#]+$/.test(entry),
-            ),
-          `invalid ${kind} call_chain`,
-        );
-        for (const entry of record.call_chain)
-          relativeFile(entry.slice(0, entry.indexOf("#")));
       }
     }
   }
@@ -204,7 +249,27 @@ function validateResult(result) {
       ["error", "warning"].includes(diagnostic.severity),
       "invalid diagnostic severity",
     );
-    relativeFile(diagnostic.file);
+    requireValue(
+      typeof diagnostic.message === "string",
+      "invalid diagnostic message",
+    );
+    if (diagnostic.line !== undefined)
+      requireValue(
+        Number.isSafeInteger(diagnostic.line) && diagnostic.line > 0,
+        "invalid diagnostic line",
+      );
+    if (diagnostic.job !== undefined)
+      requireValue(
+        typeof diagnostic.job === "string",
+        "invalid diagnostic job",
+      );
+    if (diagnostic.step_index !== undefined)
+      requireValue(
+        Number.isSafeInteger(diagnostic.step_index) &&
+          diagnostic.step_index >= 0,
+        "invalid diagnostic step_index",
+      );
+    referencedWorkflowFiles(diagnostic);
   }
   requireValue(
     result.analysis_complete ===
@@ -355,6 +420,22 @@ export async function loadActionRun(options) {
   );
   const result = JSON.parse(jsonBytes.toString("utf8"));
   validateResult(result);
+  const workflowPaths = new Set(
+    actualInputs
+      .filter((entry) => entry.path.startsWith(".github/workflows/"))
+      .map((entry) => entry.path),
+  );
+  for (const record of [
+    ...result.findings,
+    ...result.agent_usages,
+    ...result.diagnostics,
+  ]) {
+    for (const file of referencedWorkflowFiles(record))
+      requireValue(
+        workflowPaths.has(file),
+        `record references workflow absent from input inventory: ${file}`,
+      );
+  }
   // A matching root is necessary for an honest run, but E4 still must attest the invocation.
   requireValue(
     path.isAbsolute(result.root) &&
@@ -362,10 +443,7 @@ export async function loadActionRun(options) {
     "Action JSON scan root differs from input root",
   );
   requireValue(
-    result.workflow_count ===
-      actualInputs.filter((entry) =>
-        entry.path.startsWith(".github/workflows/"),
-      ).length,
+    result.workflow_count === workflowPaths.size,
     "workflow count contradicts input inventory",
   );
   const hasError = result.diagnostics.some(
@@ -380,6 +458,47 @@ export async function loadActionRun(options) {
 
 function registryKey(caseId, file, scope, job, step, rule) {
   return JSON.stringify([caseId, file, scope, job, step, rule]);
+}
+
+export function registryRowsFromCsv(text) {
+  requireValue(typeof text === "string", "registry CSV must be text");
+  const rows = csvObjects(text);
+  requireValue(rows.length > 0, "missing registry CSV rows");
+  const required = [
+    "unit_id",
+    "case_id",
+    "source_path",
+    "scope",
+    "job_id",
+    "step_index",
+    "rule_id",
+  ];
+  for (const column of required)
+    requireValue(
+      Object.hasOwn(rows[0], column),
+      `missing registry column: ${column}`,
+    );
+  return rows.map((row) => {
+    for (const column of required.filter(
+      (name) => name !== "job_id" && name !== "step_index",
+    ))
+      requireValue(row[column] !== "", `empty registry cell: ${column}`);
+    const step = row.step_index;
+    requireValue(
+      step === "" ||
+        (/^(0|[1-9][0-9]*)$/.test(step) && Number.isSafeInteger(Number(step))),
+      `invalid registry step_index: ${step}`,
+    );
+    return {
+      unit_id: row.unit_id,
+      case_id: row.case_id,
+      source_path: row.source_path,
+      scope: row.scope,
+      job_id: row.job_id === "" ? null : row.job_id,
+      step_index: step === "" ? null : Number(step),
+      rule_id: row.rule_id,
+    };
+  });
 }
 
 // Use the frozen task vocabulary; deriving it from one case's rows can hide a missing unit.
@@ -478,6 +597,10 @@ export function projectPrimary({
       row.scope !== "step" || step !== null,
       "missing registry step index",
     );
+    requireValue(
+      row.unit_id === unitId(row.case_id, row.scope, job, step, row.rule_id),
+      `unit ID does not match registry identity: ${row.unit_id}`,
+    );
     const key = registryKey(
       row.case_id,
       row.source_path,
@@ -537,6 +660,11 @@ export function projectPrimary({
           `selected caller is not first: ${record.id}`,
         );
         if (!first.startsWith(prefix)) {
+          // A selected callee needs its own mapping contract, not a no-alert.
+          requireValue(
+            record.file !== caseRecord.source_path,
+            `selected-source record has an external caller: ${record.id}`,
+          );
           outOfScope.push(reference);
           continue;
         }
@@ -574,6 +702,10 @@ export function projectPrimary({
     "selected parse diagnostic lacks workflow units",
   );
   if (workflowGapIds.length > 0) {
+    requireValue(
+      registryRows.every((row) => row.scope === "workflow"),
+      "workflow gap rows cannot mix with non-workflow rows",
+    );
     requireValue(
       Buffer.isBuffer(sourceBytes) &&
         validHash(caseRecord.sha256) &&

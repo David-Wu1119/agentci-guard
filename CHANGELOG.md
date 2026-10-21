@@ -53,6 +53,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The development toolchain pins Vite 8.1.6 to address GHSA-587h-7wmj-h5pm;
+  the high-severity dependency audit remains enforced.
+- CI pins npm 11.16.0 for script-isolated packaging verification instead of
+  relying on Node 22's bundled npm 10, which runs `prepare` despite
+  `--ignore-scripts`. Existing package tests and Node runtime choices remain.
+- The browser render check writes screenshots and its JSON report under the
+  actual site directory even when the checkout path contains URL-encoded
+  characters; it no longer creates an encoded sibling output directory.
+- Standalone package verification rejects malformed or repeated `--record`
+  options before invoking npm instead of silently dropping or misreading them.
+- Recorded package verification preserves existing receipts and tarballs,
+  including symlinks and same-name collisions, and retains the artifact before
+  writing a new receipt exclusively.
+- Package-smoke Action and CLI runs no longer inherit parent JSON, GitHub
+  output or step-summary destinations, avoiding writes outside temporary outputs.
+- Synthetic E3 projection rejects duplicate Action finding or agent-usage IDs
+  within each collection instead of accepting ambiguous records.
+- Synthetic E3 projection rejects malformed registry CSV quoting and preserves
+  quoted carriage returns instead of silently repairing an invalid identity.
+- Benchmark tools and the four top-level verification scripts resolve checkout
+  paths containing spaces, Unicode, `%` or `#` without mistaking URL-encoded
+  characters for filesystem names. Frozen registries, snapshots and scanner
+  behavior are unchanged; the full Vitest suite does not support `#` paths.
+- Blank annotation-registry export rejects empty or zero-unit manifests before
+  writing CSV and accepts absolute or repository-root-relative snapshot paths.
+- The dependency audit gate rejects malformed responses, failed processes and
+  invalid or repeated command options instead of accepting an unreliable result.
+- Candidate-pilot test-retest reports retain the frozen source-manifest,
+  contract, scanner-commit, source-tree and bundle pins without changing labels.
 - A standalone `toJSON(github.event)` from `issue_comment` now counts as both
   comment and parent Issue/PR text when passed to a local AI CLI, or to a
   verified Anthropic Action's direct prompt or bare environment reference. An unused Action

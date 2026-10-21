@@ -4,15 +4,35 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 // Usage: node scripts/verify-standalone-package.mjs [--record <file.json>]
 // --record writes the packed artifact's identity (filename, SHA-256, version,
 // source commit) and every check performed, so a reviewer can tie a tarball to
 // the commit and behavior it was verified against.
 const recordPath = (() => {
-  const index = process.argv.indexOf("--record");
-  return index === -1 ? undefined : process.argv[index + 1];
+  const args = process.argv.slice(2);
+  if (args.length === 0) return undefined;
+  if (
+    args.length !== 2 ||
+    args[0] !== "--record" ||
+    !args[1].trim() ||
+    args[1].startsWith("--")
+  ) {
+    throw new Error(
+      "Usage: verify-standalone-package.mjs [--record <file.json>]",
+    );
+  }
+  const file = path.resolve(args[1]);
+  if (fs.lstatSync(file, { throwIfNoEntry: false })) {
+    throw new Error(`Refusing to overwrite existing package record: ${file}`);
+  }
+  return file;
 })();
+// Keep every smoke subprocess out of the caller's GitHub output files.
+delete process.env.INPUT_JSON;
+delete process.env.GITHUB_OUTPUT;
+delete process.env.GITHUB_STEP_SUMMARY;
 const checks = [];
 const check = (name, ok, detail) => {
   checks.push({ name, ok, ...(detail === undefined ? {} : { detail }) });
@@ -23,7 +43,7 @@ const check = (name, ok, detail) => {
 };
 
 const repositoryRoot = path.resolve(
-  path.dirname(new URL(import.meta.url).pathname),
+  path.dirname(fileURLToPath(import.meta.url)),
   "..",
 );
 const temporary = fs.mkdtempSync(
@@ -357,13 +377,15 @@ jobs:
       node: process.version,
       checks,
     };
-    fs.mkdirSync(path.dirname(path.resolve(recordPath)), { recursive: true });
-    fs.writeFileSync(recordPath, JSON.stringify(record, null, 2) + "\n");
-    // Keep the verified tarball beside the record so the hash can be re-checked.
-    fs.copyFileSync(
-      tarballPath,
-      path.join(path.dirname(path.resolve(recordPath)), filename),
-    );
+    const retainedTarball = path.join(path.dirname(recordPath), filename);
+    if (recordPath === retainedTarball)
+      throw new Error("Package receipt path collides with retained tarball.");
+    fs.mkdirSync(path.dirname(recordPath), { recursive: true });
+    // Retain the artifact before publishing its receipt; never replace evidence.
+    fs.copyFileSync(tarballPath, retainedTarball, fs.constants.COPYFILE_EXCL);
+    fs.writeFileSync(recordPath, JSON.stringify(record, null, 2) + "\n", {
+      flag: "wx",
+    });
   }
 
   console.log(

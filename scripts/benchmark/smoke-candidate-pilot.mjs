@@ -3,10 +3,11 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseCsv, renderCsv } from "./csv.mjs";
 
 const root = path.resolve(
-  path.dirname(new URL(import.meta.url).pathname),
+  path.dirname(fileURLToPath(import.meta.url)),
   "../..",
 );
 const temporary = fs.mkdtempSync(
@@ -33,12 +34,13 @@ try {
       "Candidate packet included unexpected source or bundle files.",
     );
   }
-  const scannerCommit = JSON.parse(
+  const pilotManifest = JSON.parse(
     fs.readFileSync(
       path.join(root, "benchmark/candidate-pilot/manifest.json"),
       "utf8",
     ),
-  ).candidate_scanner_commit;
+  );
+  const scannerCommit = pilotManifest.candidate_scanner_commit;
   for (const packet of [a, b]) {
     const text = ["README.md", "CONTRACT.md", "manifest.json", "SOURCES.md"]
       .map((name) => fs.readFileSync(path.join(packet, name), "utf8"))
@@ -103,6 +105,33 @@ try {
     }
     fs.writeFileSync(timing, renderCsv([timingHeader, ...timingRows]));
   }
+  const sheetA = path.join(a, "annotation-sheet.csv");
+  const goodCsv = fs.readFileSync(sheetA, "utf8");
+  const firstUnitId = parseCsv(goodCsv)[1][0];
+  const malformed = goodCsv.replace(
+    `\n${firstUnitId},`,
+    `\n${firstUnitId.slice(0, 1)}"${firstUnitId.slice(1)}",`,
+  );
+  if (malformed === goodCsv)
+    throw new Error("Synthetic CSV mutation did not apply.");
+  fs.writeFileSync(sheetA, malformed);
+  const malformedOutput = path.join(temporary, "malformed-quote.jsonl");
+  failure(
+    "Invalid CSV",
+    "import-annotation-csv.mjs",
+    sheetA,
+    "synthetic-smoke",
+    malformedOutput,
+    "--coverage",
+    "candidate-pilot",
+    "--review-mode",
+    "test-retest",
+    "--pass",
+    "1",
+  );
+  if (fs.existsSync(malformedOutput))
+    throw new Error("Malformed CSV created label output.");
+  fs.writeFileSync(sheetA, goodCsv);
   importPass(a, labelsA, "1");
   importPass(b, labelsB, "2");
   failure(
@@ -136,6 +165,17 @@ try {
     result.accuracy_estimate !== null
   ) {
     throw new Error("Candidate report has wrong scope or counts.");
+  }
+  for (const field of [
+    "candidate_scanner_commit",
+    "candidate_scanner_source_tree",
+    "candidate_bundle_sha256",
+    "contract_sha256",
+    "source_manifest_sha256",
+  ]) {
+    if (result[field] !== pilotManifest[field]) {
+      throw new Error(`Candidate report lost pinned ${field}.`);
+    }
   }
   const comparison = run(
     "compare-annotations.mjs",

@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 import { renderCsv } from "./csv.mjs";
+import { unitId } from "./unit-id.mjs";
 
 const repositoryRoot = path.resolve(
-  path.dirname(new URL(import.meta.url).pathname),
+  path.dirname(fileURLToPath(import.meta.url)),
   "../..",
 );
 const [mode = "--check", manifestArgument, outputArgument, ...extra] =
@@ -30,14 +32,10 @@ const outputPath = outputArgument
 if (manifestArgument && outputPath === frozenOutputPath) {
   throw new Error("Refusing to overwrite the frozen v3 annotation registry.");
 }
-const manifest = JSON.parse(
-  fs.readFileSync(
-    manifestArgument
-      ? path.resolve(manifestArgument)
-      : path.join(repositoryRoot, "benchmark", "manifest.json"),
-    "utf8",
-  ),
-);
+const manifestPath = manifestArgument
+  ? path.resolve(manifestArgument)
+  : path.join(repositoryRoot, "benchmark", "manifest.json");
+const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 if (manifestArgument) {
   const frozenCandidate =
     manifest.pilot_id === "agentci-nine-rule-candidate-dev-micro-pilot-v1";
@@ -137,7 +135,12 @@ const stepTasks = [
   ),
 ];
 
+if (!Array.isArray(manifest.cases) || manifest.cases.length === 0) {
+  throw new Error("Manifest has zero annotation units: no cases.");
+}
+
 for (const item of manifest.cases) {
+  const caseStart = rows.length;
   const snapshot = path.resolve(repositoryRoot, item.snapshot_path);
   const raw = fs.readFileSync(snapshot, "utf8");
   const document = YAML.parseDocument(raw, { prettyErrors: true });
@@ -192,6 +195,9 @@ for (const item of manifest.cases) {
         );
       }
     }
+  }
+  if (rows.length === caseStart) {
+    throw new Error(`Case ${item.case_id} has zero annotation units.`);
   }
 }
 
@@ -259,12 +265,6 @@ function annotationRow(
     "",
     "",
   ];
-}
-
-function unitId(caseId, scope, jobId, stepIndex, task) {
-  return [caseId, scope, jobId ?? "-", stepIndex ?? "-", task]
-    .map((part) => encodeURIComponent(String(part)))
-    .join("|");
 }
 
 function normalizeTriggers(value) {
