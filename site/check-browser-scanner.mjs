@@ -220,7 +220,10 @@ assert.ok(
   ),
 );
 
-assert.throws(() => scan("foo: bar\n"), /not a GitHub Actions workflow/);
+assert.throws(() => scan("foo: bar\n"), {
+  code: "agentci/browser-input-invalid",
+  message: /not a GitHub Actions workflow/,
+});
 assert.throws(
   () => scan("on:\njobs:\n  agent: {}\n"),
   /not a GitHub Actions workflow/,
@@ -242,7 +245,10 @@ assert.throws(() => scan("a".repeat(scan.maxChars + 1)), {
   name: "RangeError",
 });
 const tooManySteps = `on: push\njobs:\n  agent:\n    runs-on: ubuntu-latest\n    steps:\n${"      - run: echo ok\n".repeat(scan.maxSteps + 1)}`;
-assert.throws(() => scan(tooManySteps), /browser limit of 500 steps/);
+assert.throws(() => scan(tooManySteps), {
+  code: "agentci/browser-input-invalid",
+  message: /browser limit of 500 steps/,
+});
 const duplicateKey = scan("on: push\non: pull_request\njobs: {}\n");
 assert.equal(duplicateKey.analysis_complete, false);
 assert.equal(duplicateKey.diagnostics[0]?.code, "agentci/parse-error");

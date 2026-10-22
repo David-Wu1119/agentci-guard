@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Documented the instruction-file ingestion blind spot, including the limits
+  of `unsafe-checkout` and `analysis_complete=true`. This adds no detection
+  or exploit-prevention claim.
 - Clarified that the 160-unit candidate pilot is pinned to `38a3272` and
   cannot validate the current scanner's rule semantics. Its frozen contract
   and packet are unchanged; no human labels were created.
@@ -82,6 +85,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   invalid or repeated command options instead of accepting an unreliable result.
 - Candidate-pilot test-retest reports retain the frozen source-manifest,
   contract, scanner-commit, source-tree and bundle pins without changing labels.
+- Browser empty, oversized, non-workflow, and step-limit YAML errors plus
+  file-size/read errors now identify the affected input to assistive technology;
+  the error state clears when input changes or a scan succeeds.
 - A standalone `toJSON(github.event)` from `issue_comment` now counts as both
   comment and parent Issue/PR text when passed to a local AI CLI, or to a
   verified Anthropic Action's direct prompt or bare environment reference. An unused Action
@@ -326,10 +332,13 @@ install -g` bin entry is a symlink, so `agentci --version` and `agentci scan`
   the diagnostic code as descriptor, its severity as level, and its file and
   line as location), plus `agentci/analysisComplete` and
   `agentci/diagnosticCount` run properties. The CLI (`scan` and `org`) and the
-  Action write this form. A consumer that only counts `results` can therefore
-  no longer mistake an incomplete zero-finding scan for a clean one. Both forms
-  validate against the vendored OASIS SARIF 2.1.0 schema. A bare findings
-  array is still accepted and then makes no claim about completeness.
+  Action write this form. **Correction (2026-10-12):** An earlier version of
+  this note incorrectly said that counting only `results` prevents an
+  incomplete zero-finding scan from appearing clean. Such a run has an empty
+  `results` array; consumers must inspect `invocations` or the
+  `agentci/analysisComplete` run property. Both forms validate against the
+  vendored OASIS SARIF 2.1.0 schema. A bare findings array is still accepted
+  and then makes no claim about completeness.
 - The Action prints a `::warning::` annotation and appends a note to the step
   summary when the analysis is incomplete, naming the diagnostic codes. Exit
   codes are unchanged: warnings do not fail the step; error diagnostics still

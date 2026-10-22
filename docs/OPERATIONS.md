@@ -144,8 +144,10 @@ expectation was wrong, and expect that argument to be challenged.
 
 ## Releasing
 
-Releases are immutable semver tags plus a floating `v0` that every README pins.
-The order matters, because `v0` is what consumers actually run.
+Releases use semver release tags and a floating `v0` compatibility tag. The
+README example pins a release-specific tag (`v0.6.2`); a full commit SHA is the
+only immutable reference. Consumers opting into `v0` take updates when it
+moves. The order matters because that changes what those consumers run.
 
 1. Bump `version` in `package.json`. The CLI reads it from there.
 2. Move the `## [Unreleased]` changelog block under a dated `## [x.y.z]`
@@ -169,7 +171,7 @@ every consumer for weeks. Do not skip step 7's condition.
 
 npm publication is a separate decision with its own authorization. The Action
 release does not imply it. When it happens, dispatch
-`.github/workflows/published-npm-smoke.yml` at the immutable tag and confirm
+`.github/workflows/published-npm-smoke.yml` at the release tag and confirm
 the installed CLI works in an empty consumer project. Until then, README
 `npx agentci-guard` commands resolve to whatever is on npm, which may lag the
 Action.
@@ -240,7 +242,9 @@ a defect. Recorded 2026-09-05 in `evidence/sprint-2026-09-05/day7/`.
 - Conditions on runtime values (`steps.*`, `needs.*`, `env.*`) cannot be
   resolved and are kept conservative, which can produce extra findings. In the
   v3 development sample, 94 of 152 workflows had an event-condition
-  diagnostic; the effect on precision and recall is unmeasured.
+  diagnostic at v0.6.0 (recorded 2026-09-05 in `docs/REVIEW_READY.md`,
+  commit `de1eb2e`). This is a historical count, not a measurement of the
+  current scanner; the effect on precision and recall is unmeasured.
 - Runtime permission checks (a step that queries collaborator access and
   exports an `allowed` output) are not trusted as actor gates, because a static
   reader cannot prove they run before untrusted content is fetched. This is a

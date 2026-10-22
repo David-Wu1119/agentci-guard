@@ -40,17 +40,24 @@ against the checksum-pinned official OASIS SARIF 2.1.0 Errata 01 schema.
 `scripts/verify-sarif.mjs` separately checks AgentCI rule metadata, severity
 properties, relative artifact locations, and meaningful line numbers.
 
-After the immutable `v0.1.1` tag and GitHub release exist,
-`.github/workflows/published-tag-smoke.yml` repeats those checks through the
-fully qualified `David-Wu1119/agentci-guard@v0.1.1` consumer reference without
-installing repository dependencies. The moving `v0` tag must not be updated
-until this run passes.
+`.github/workflows/published-tag-smoke.yml` is pinned to one release tag
+(`v0.6.2` as of this commit) and runs the published Action through the fully
+qualified `David-Wu1119/agentci-guard@v0.6.2` consumer reference, without
+installing repository dependencies. It runs on that release's `release` event
+or on a manual dispatch at `refs/tags/v0.6.2`. Its expected outputs are those
+of the tagged release and can differ from the current `main` CI expectations.
+A future move of the floating `v0` tag must wait for the corresponding
+published-Action consumer smoke to pass. That run validates the released tag,
+not an untagged development commit.
 
 After npm publication, manually dispatch
 `.github/workflows/published-npm-smoke.yml` with the workflow ref set to
-`v0.1.1`. The job refuses any other ref, creates an empty consumer project,
-installs exactly `agentci-guard@0.1.1` from the public registry, and verifies
-vulnerable and hardened scans before `v0` can move.
+`v0.6.2`. The job refuses any other ref, creates an empty consumer project,
+installs exactly `agentci-guard@0.6.2` from the public registry, and verifies
+vulnerable and hardened scans before `v0` can move. This preserves the existing
+npm-before-`v0` requirement; whether to decouple the channels remains an owner
+decision. The workflow's presence does not establish that this package exists
+on npm or that either consumer smoke has passed.
 
 Local Action execution can be reproduced without a GitHub token:
 

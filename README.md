@@ -65,7 +65,13 @@ GitHub Actions_](https://arxiv.org/abs/2605.07135). Its TaintAWI models
 untrusted event data reaching agents and AI-derived output reaching later
 scripts; it analyzed 13,392 workflows and judged 496 of 519 reviewed alerts
 exploitable under its threat model. Those are not 496 demonstrated attacks.
-AgentCI Guard has not demonstrated a novel detector or comparative advantage.
+
+[GitInject](https://arxiv.org/abs/2606.09935v1) also studies prompt injection
+through agent instruction files supplied by an untrusted PR branch, such as
+`CLAUDE.md`, `AGENTS.md`, and `GEMINI.md`. AgentCI Guard does not inspect
+those files or trace whether an agent loads them; neither a clean scan nor
+`analysis_complete=true` excludes that route. AgentCI Guard has not
+demonstrated a novel detector or comparative advantage.
 
 ## What it detects
 
@@ -156,9 +162,10 @@ automatically uploaded artifact, and may contain repository paths and workflow
 evidence. Choose a trusted output directory for both outputs when scanning an
 untrusted checkout: parent directories and the SARIF path can still be
 symlinks. When the analysis is incomplete, the Action also prints a
-`::warning::` annotation naming the diagnostic codes and appends the same note
-to the step summary, so a step with zero findings cannot look clean when the
-analyzer did not finish:
+`::warning::` annotation naming the diagnostic codes and, when available,
+appends the same note to the step summary. A zero-finding step can still
+succeed; consumers must check the warning or `analysis-complete` output rather
+than treating a successful step as proof of complete analysis:
 
 ```yaml
 - uses: David-Wu1119/agentci-guard@v0.6.2
@@ -196,8 +203,10 @@ Recognized unsupported constructs become diagnostics and set
 constructed commands, so `analysis_complete: true` is not proof of safety. When
 analysis is marked incomplete, SARIF carries that status: its run has an
 `invocation` with `executionSuccessful: false`
-and one `toolExecutionNotification` per diagnostic — so a SARIF consumer that
-only counts `results` still sees that the scan did not finish.
+and one `toolExecutionNotification` per diagnostic. Consumers must inspect
+`runs[].invocations` or the run's `agentci/analysisComplete` property;
+counting only `runs[].results` can mistake an incomplete zero-finding scan
+for a clean one. The Action also emits an incomplete-analysis warning.
 
 ### Whole organization
 
