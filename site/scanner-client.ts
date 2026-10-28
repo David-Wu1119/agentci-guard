@@ -8,6 +8,10 @@ const file = `${root}/.github/workflows/input.yml`;
 const maxChars = 250_000;
 const maxSteps = 500;
 
+class BrowserInputError extends Error {
+  readonly code = "agentci/browser-input-invalid";
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
@@ -43,7 +47,7 @@ function scanWorkflowText(raw: string): ScanResult {
         return hasCall === hasSteps;
       })
     ) {
-      throw new Error(
+      throw new BrowserInputError(
         "This is YAML, but not a GitHub Actions workflow with an event and executable jobs.",
       );
     }
@@ -53,7 +57,7 @@ function scanWorkflowText(raw: string): ScanResult {
       0,
     );
     if (stepCount > maxSteps) {
-      throw new RangeError(
+      throw new BrowserInputError(
         `Workflow exceeds the browser limit of ${maxSteps} steps.`,
       );
     }

@@ -324,6 +324,8 @@ const setAndScan = (raw) =>
       usageRows: document.querySelectorAll("#scan-agent-usages li").length,
       injectedUsageImages: document.querySelectorAll("#scan-agent-usages img").length,
       diagnostics: document.querySelectorAll("#scan-diagnostics li").length,
+      yamlInvalid: input.getAttribute("aria-invalid"),
+      yamlDescription: input.getAttribute("aria-describedby"),
       focus: document.activeElement.id,
       errorTop: document.getElementById("scan-error").getBoundingClientRect().top,
       errorBottom: document.getElementById("scan-error").getBoundingClientRect().bottom,
@@ -350,6 +352,8 @@ assert.ok(partial.diagnostics > 0);
 const genericYaml = await setAndScan("foo: bar");
 assert.match(genericYaml.error, /not a GitHub Actions workflow/);
 assert.equal(genericYaml.outputHidden, true);
+assert.equal(genericYaml.yamlInvalid, "true");
+assert.equal(genericYaml.yamlDescription, "scan-scope scan-error");
 const clean = await setAndScan(
   "on: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ok\n",
 );
@@ -357,6 +361,8 @@ assert.equal(clean.heading, "0 findings for pasted YAML");
 assert.match(clean.findingText, /not proof of safety/i);
 assert.match(clean.usageText, /No supported agent-use step detected/);
 assert.equal(clean.error, "");
+assert.equal(clean.yamlInvalid, null);
+assert.equal(clean.yamlDescription, "scan-scope");
 const usageOnly = await setAndScan(
   "on: push\npermissions:\n  contents: read\njobs:\n  agent:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Agent\n        uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567\n        with:\n          prompt: hi\n",
 );
@@ -399,23 +405,54 @@ assert.match(empty.error, /Paste workflow YAML/);
 assert.equal(empty.outputHidden, true);
 assert.equal(empty.usageRows, 0);
 assert.equal(empty.focus, "scan-results-heading");
+assert.equal(empty.yamlInvalid, "true");
+assert.equal(empty.yamlDescription, "scan-scope scan-error");
 assert.ok(
   empty.errorTop >= 0 && empty.errorBottom <= empty.viewportHeight,
   JSON.stringify(empty),
 );
+const clearedYamlError = await evaluate(`(() => {
+  const input = document.getElementById("workflow-yaml");
+  input.value = "on: push";
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  return { invalid: input.getAttribute("aria-invalid"), description: input.getAttribute("aria-describedby"), errorHidden: document.getElementById("scan-error").hidden };
+})()`);
+assert.deepEqual(clearedYamlError, {
+  invalid: null,
+  description: "scan-scope",
+  errorHidden: true,
+});
 const oversized = await evaluate(`(() => {
   const input = document.getElementById("workflow-yaml");
   input.value = "x".repeat(window.agentciScanWorkflow.maxChars + 1);
   document.getElementById("scan-button").click();
-  return { error: document.getElementById("scan-error").textContent, outputHidden: document.getElementById("scan-output").hidden };
+  return { error: document.getElementById("scan-error").textContent, outputHidden: document.getElementById("scan-output").hidden,
+    invalid: input.getAttribute("aria-invalid"), description: input.getAttribute("aria-describedby") };
 })()`);
 assert.match(oversized.error, /too large/);
 assert.equal(oversized.outputHidden, true);
+assert.equal(oversized.invalid, "true");
+assert.equal(oversized.description, "scan-scope scan-error");
 const tooManySteps = await setAndScan(
   `on: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n${Array.from({ length: 501 }, () => "      - run: echo ok").join("\n")}\n`,
 );
 assert.match(tooManySteps.error, /browser limit of 500 steps/);
 assert.equal(tooManySteps.outputHidden, true);
+assert.equal(tooManySteps.yamlInvalid, "true");
+assert.equal(tooManySteps.yamlDescription, "scan-scope scan-error");
+const recoveredYamlError = await evaluate(`(() => {
+  const input = document.getElementById("workflow-yaml");
+  input.value = document.querySelector("#research pre code").textContent;
+  document.getElementById("scan-button").click();
+  return { invalid: input.getAttribute("aria-invalid"), description: input.getAttribute("aria-describedby"),
+    errorHidden: document.getElementById("scan-error").hidden, outputHidden: document.getElementById("scan-output").hidden };
+})()`);
+assert.deepEqual(recoveredYamlError, {
+  invalid: null,
+  description: "scan-scope",
+  errorHidden: true,
+  outputHidden: false,
+});
 checks.push({
   malformed,
   partial,
@@ -427,8 +464,10 @@ checks.push({
   hostileUsage,
   reset,
   empty,
+  clearedYamlError,
   oversized,
   tooManySteps,
+  recoveredYamlError,
 });
 await evaluate("window.confirm = () => true");
 const filePick = await evaluate(`(async () => {
@@ -491,7 +530,7 @@ assert.ok(
 );
 checks.push({ longFilename });
 const oversizeFile = await evaluate(`(async () => {
-  const pasted = "on: push";
+  const pasted = document.querySelector("#research pre code").textContent;
   const yaml = document.getElementById("workflow-yaml");
   yaml.value = pasted;
   yaml.dispatchEvent(new Event("input", { bubbles: true }));
@@ -505,12 +544,64 @@ const oversizeFile = await evaluate(`(async () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
   return { pastedPreserved: yaml.value === pasted,
     error: document.getElementById("scan-error").textContent,
-    outputHidden: document.getElementById("scan-output").hidden };
+    outputHidden: document.getElementById("scan-output").hidden,
+    fileInvalid: input.getAttribute("aria-invalid"),
+    fileDescription: input.getAttribute("aria-describedby"),
+    yamlInvalid: yaml.getAttribute("aria-invalid") };
 })()`);
 assert.equal(oversizeFile.pastedPreserved, true);
 assert.match(oversizeFile.error, /too large/);
 assert.equal(oversizeFile.outputHidden, true);
+assert.equal(oversizeFile.fileInvalid, "true");
+assert.equal(oversizeFile.fileDescription, "scan-error");
+assert.equal(oversizeFile.yamlInvalid, null);
 checks.push({ oversizeFile });
+const scanAfterFileError = async () => {
+  const state = await evaluate(`(() => {
+    const input = document.getElementById("workflow-file");
+    document.getElementById("scan-button").click();
+    return { heading: document.getElementById("scan-results-heading").textContent,
+      errorHidden: document.getElementById("scan-error").hidden,
+      errorText: document.getElementById("scan-error").textContent,
+      outputHidden: document.getElementById("scan-output").hidden,
+      fileInvalid: input.getAttribute("aria-invalid"),
+      fileDescription: input.getAttribute("aria-describedby") };
+  })()`);
+  assert.match(state.heading, /for pasted YAML/);
+  assert.deepEqual(state, {
+    heading: state.heading,
+    errorHidden: true,
+    errorText: "",
+    outputHidden: false,
+    fileInvalid: null,
+    fileDescription: null,
+  });
+  return state;
+};
+checks.push({ recoveredOversizeFile: await scanAfterFileError() });
+const unreadableFile = await evaluate(`(async () => {
+  const transfer = new DataTransfer();
+  transfer.items.add(new File(["on: push"], "unreadable.yml"));
+  const input = document.getElementById("workflow-file");
+  const originalText = Blob.prototype.text;
+  Blob.prototype.text = () => Promise.reject(new Error("Simulated file read failure"));
+  try {
+    input.files = transfer.files;
+    input.dispatchEvent(new Event("change"));
+    for (let attempt = 0; attempt < 100 && document.getElementById("scan-button").disabled; attempt++)
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    return { error: document.getElementById("scan-error").textContent,
+      invalid: input.getAttribute("aria-invalid"),
+      description: input.getAttribute("aria-describedby") };
+  } finally {
+    Blob.prototype.text = originalText;
+  }
+})()`);
+assert.equal(unreadableFile.error, "Simulated file read failure");
+assert.equal(unreadableFile.invalid, "true");
+assert.equal(unreadableFile.description, "scan-error");
+checks.push({ unreadableFile });
+checks.push({ recoveredUnreadableFile: await scanAfterFileError() });
 await evaluate('document.getElementById("workflow-yaml").focus()');
 await send("Input.dispatchKeyEvent", {
   type: "keyDown",

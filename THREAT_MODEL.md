@@ -42,6 +42,16 @@ adversary can change trusted base-branch workflow YAML before the run.
 - Arbitrary data flow through scripts, generated files, composite Actions, or
   external services, including agent-initiated API/tool fetches.
 - Runtime behavior of downloaded Actions and model providers.
+- Agent ingestion of PR-controlled instruction files, such as `CLAUDE.md`,
+  `AGENTS.md`, or `GEMINI.md`, whether the workflow or the agent Action checks
+  out the PR code. Which files an agent loads depends on the agent, its
+  version, and its mode; the scanner does not inspect these files or trace
+  whether an agent loads them. The `unsafe-checkout` rule fires only for a
+  `pull_request_target` checkout that requests PR code with
+  `allow-unsafe-pr-checkout: true` or an `actions/checkout@v1` release ref,
+  and reports an ambiguous checkout ref as an incomplete-analysis diagnostic;
+  it does not cover the default `pull_request` merge checkout, a `workflow_run`
+  head checkout, or a checkout performed inside an agent Action.
 - Full GitHub expression language, matrices, dynamic object access, and
   authorization logic hidden in scripts.
 - Organization or repository permission defaults unless supplied through

@@ -17,22 +17,34 @@ const loadExampleButton = document.getElementById('load-example');
 let inputRevision = 0;
 let sourceLabel = 'pasted YAML';
 
+function clearInputError() {
+  yaml.removeAttribute('aria-invalid');
+  yaml.setAttribute('aria-describedby', 'scan-scope');
+  fileInput.removeAttribute('aria-invalid');
+  fileInput.removeAttribute('aria-describedby');
+}
+
 function resetResults(message) {
   heading.textContent = 'Ready to scan';
   status.textContent = message;
   error.hidden = true;
   error.textContent = '';
+  clearInputError();
   output.hidden = true;
   agentUsages.replaceChildren();
   findings.replaceChildren();
   diagnostics.replaceChildren();
 }
 
-function showError(message, focusHeading = true) {
+function showError(message, focusHeading = true, invalidInput = null) {
   resetResults('The scan did not run.');
   heading.textContent = 'Scan not completed';
   error.textContent = message;
   error.hidden = false;
+  if (invalidInput) {
+    invalidInput.setAttribute('aria-invalid', 'true');
+    invalidInput.setAttribute('aria-describedby', `${invalidInput === yaml ? 'scan-scope ' : ''}scan-error`);
+  }
   if (focusHeading) {
     heading.focus();
     heading.scrollIntoView({ behavior: 'instant', block: 'center' });
@@ -140,6 +152,8 @@ function renderResult(result) {
     ? 'analysis_complete: true. This covers only supported static checks for the supplied file; it does not validate the full GitHub Actions schema or guarantee security.'
     : 'analysis_complete: false. The diagnostics below identify unsupported or failed analysis; do not treat this as a clean scan.';
   error.hidden = true;
+  error.textContent = '';
+  clearInputError();
   output.hidden = false;
   heading.focus();
   heading.scrollIntoView({ behavior: 'instant', block: 'start' });
@@ -177,7 +191,7 @@ fileInput.addEventListener('change', async () => {
   fileInput.disabled = true;
   resetResults('Reading the selected file locally.');
   if (file.size > maxChars) {
-    showError(`File is too large. Choose a YAML file no larger than ${maxChars.toLocaleString()} bytes.`);
+    showError(`File is too large. Choose a YAML file no larger than ${maxChars.toLocaleString()} bytes.`, true, fileInput);
     fileInput.value = '';
     scanButton.disabled = false;
     fileInput.disabled = false;
@@ -192,7 +206,7 @@ fileInput.addEventListener('change', async () => {
     status.textContent = `${file.name} loaded locally. Select Scan workflow to analyze it.`;
   } catch (cause) {
     if (revision !== inputRevision) return;
-    showError(cause instanceof Error ? cause.message : 'Could not read the selected file.');
+    showError(cause instanceof Error ? cause.message : 'Could not read the selected file.', true, fileInput);
     fileInput.value = '';
   } finally {
     scanButton.disabled = false;
@@ -203,13 +217,14 @@ fileInput.addEventListener('change', async () => {
 
 scanButton.addEventListener('click', () => {
   const raw = yaml.value;
-  if (!raw.trim()) return showError('Paste workflow YAML or choose a file before scanning.');
-  if (raw.length > maxChars) return showError(`Workflow is too large. The limit is ${maxChars.toLocaleString()} characters.`);
+  if (!raw.trim()) return showError('Paste workflow YAML or choose a file before scanning.', true, yaml);
+  if (raw.length > maxChars) return showError(`Workflow is too large. The limit is ${maxChars.toLocaleString()} characters.`, true, yaml);
   if (typeof scanWorkflow !== 'function') return showError('The scanner did not load. Refresh the page, or use the CLI or GitHub Action instead.');
   try {
     renderResult(scanWorkflow(raw));
   } catch (cause) {
-    showError(cause instanceof Error ? cause.message : 'The scanner could not analyze this workflow.');
+    showError(cause instanceof Error ? cause.message : 'The scanner could not analyze this workflow.', true,
+      cause instanceof Error && cause.code === 'agentci/browser-input-invalid' ? yaml : null);
   }
 });
 
