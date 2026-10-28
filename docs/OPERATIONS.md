@@ -145,7 +145,7 @@ expectation was wrong, and expect that argument to be challenged.
 ## Releasing
 
 Releases use semver release tags and a floating `v0` compatibility tag. The
-README example pins a release-specific tag (`v0.6.2`); a full commit SHA is the
+README example pins a release-specific tag (`v0.7.0`); a full commit SHA is the
 only immutable reference. Consumers opting into `v0` take updates when it
 moves. The order matters because that changes what those consumers run.
 

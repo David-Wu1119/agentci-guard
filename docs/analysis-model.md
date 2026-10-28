@@ -1,8 +1,8 @@
 # Static Analysis Model
 
 AgentCI Guard evaluates each AI step under an explicit effective context. This
-document describes the **source-provenance candidate in this source tree**, not
-the tagged `v0.6.2` Action/CLI. The published v0.1.1 annotation predicates in
+document describes the **source-provenance candidate**, which ships in the
+tagged `v0.7.0` Action/CLI and is absent from earlier tags. The published v0.1.1 annotation predicates in
 [`benchmark/pilot/contracts/v0.1.1/RULES.md`](../benchmark/pilot/contracts/v0.1.1/RULES.md)
 remain a historical contract; changed candidate outcomes cannot be scored
 against those labels as independent accuracy evidence. The documented vendor

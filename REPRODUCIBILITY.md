@@ -41,10 +41,10 @@ against the checksum-pinned official OASIS SARIF 2.1.0 Errata 01 schema.
 properties, relative artifact locations, and meaningful line numbers.
 
 `.github/workflows/published-tag-smoke.yml` is pinned to one release tag
-(`v0.6.2` as of this commit) and runs the published Action through the fully
-qualified `David-Wu1119/agentci-guard@v0.6.2` consumer reference, without
+(`v0.7.0` as of this commit) and runs the published Action through the fully
+qualified `David-Wu1119/agentci-guard@v0.7.0` consumer reference, without
 installing repository dependencies. It runs on that release's `release` event
-or on a manual dispatch at `refs/tags/v0.6.2`. Its expected outputs are those
+or on a manual dispatch at `refs/tags/v0.7.0`. Its expected outputs are those
 of the tagged release and can differ from the current `main` CI expectations.
 A future move of the floating `v0` tag must wait for the corresponding
 published-Action consumer smoke to pass. That run validates the released tag,
@@ -52,12 +52,13 @@ not an untagged development commit.
 
 After npm publication, manually dispatch
 `.github/workflows/published-npm-smoke.yml` with the workflow ref set to
-`v0.6.2`. The job refuses any other ref, creates an empty consumer project,
-installs exactly `agentci-guard@0.6.2` from the public registry, and verifies
-vulnerable and hardened scans before `v0` can move. This preserves the existing
-npm-before-`v0` requirement; whether to decouple the channels remains an owner
-decision. The workflow's presence does not establish that this package exists
-on npm or that either consumer smoke has passed.
+`v0.7.0`. The job refuses any other ref, creates an empty consumer project,
+installs exactly `agentci-guard@0.7.0` from the public registry, and verifies
+vulnerable and hardened scans. Since the owner decision of 28 October 2026 the
+channels are decoupled: `v0` moves after the published-Action tag smoke alone,
+and npm publication is a separate, later step that this smoke then checks. The
+workflow's presence does not establish that this package exists on npm or that
+either consumer smoke has passed.
 
 Local Action execution can be reproduced without a GitHub token:
 
