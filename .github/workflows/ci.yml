@@ -65,19 +65,25 @@ jobs:
         timeout-minutes: 5
         run: |
           set -euo pipefail
+          google-chrome --version
           google-chrome --headless=new --no-sandbox \
+            --no-first-run --disable-background-networking \
+            --disable-component-update \
             --remote-debugging-port=9337 \
             --user-data-dir="$RUNNER_TEMP/agentci-site-chrome" about:blank \
             >"$RUNNER_TEMP/agentci-site-chrome.log" 2>&1 &
           chrome_pid=$!
           trap 'kill "$chrome_pid" 2>/dev/null || true' EXIT
-          for ((attempt = 0; attempt < 50; attempt++)); do
+          # Cold Chrome startup on hosted runners took >10 s on 2026-10-28.
+          for ((attempt = 0; attempt < 300; attempt++)); do
             if curl --fail --silent http://127.0.0.1:9337/json/version >/dev/null; then
+              echo "Chrome DevTools ready after ${SECONDS}s"
               node site/render-check.mjs
               exit 0
             fi
             sleep 0.2
           done
+          echo "Chrome DevTools not ready after ${SECONDS}s"
           sed -n '1,120p' "$RUNNER_TEMP/agentci-site-chrome.log"
           exit 1
 
