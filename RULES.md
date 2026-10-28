@@ -1,7 +1,8 @@
 # AgentCI Guard Rule Contract
 
 This file describes the later nine-rule baseline and the source-aware candidate
-changes in this checkout, which are not in the tagged `v0.6.2` Action/CLI.
+changes, which ship in the tagged `v0.7.0` Action/CLI and are absent from
+earlier tags.
 It is **not** the v0.1.1 annotation contract: that exact eight-rule contract is archived in
 [`benchmark/pilot/contracts/v0.1.1/RULES.md`](benchmark/pilot/contracts/v0.1.1/RULES.md).
 A finding rates supported static semantics, not proven exploitability or

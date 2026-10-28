@@ -38,8 +38,9 @@ effect in [`CHANGELOG.md`](CHANGELOG.md). The original 41-case adversarial
 regression set overruled two proposed changes; the public corpus has since
 grown with source-provenance cases. It is not an accuracy benchmark.
 
-The source-provenance behavior described below is a **research candidate in
-this source tree**, not a property of the tagged `v0.6.2` Action or CLI. The
+The source-provenance behavior described below ships in the tagged `v0.7.0`
+Action and CLI. It is still a **research candidate**, not a validated
+classifier: no human-labeled accuracy has been measured for it. The
 historical v0.1.1 eight-rule annotation contract remains unchanged in
 [`benchmark/pilot/contracts/v0.1.1/RULES.md`](benchmark/pilot/contracts/v0.1.1/RULES.md);
 these edits do not retroactively validate its labels or establish accuracy for
@@ -134,7 +135,7 @@ jobs:
       - uses: actions/checkout@v4
       # Pin a release-specific tag (use a full SHA for immutability). The floating `v0` is moved to each
       # release only after its published-Action smoke passes.
-      - uses: David-Wu1119/agentci-guard@v0.6.2
+      - uses: David-Wu1119/agentci-guard@v0.7.0
         with:
           path: .
           sarif: agentci-results.sarif
@@ -145,17 +146,16 @@ jobs:
           sarif_file: agentci-results.sarif
 ```
 
-The tagged `v0.6.2` Action sets `findings`, `critical`, `high`, `medium`, `low`,
-`sarif-path`, `diagnostics`, and `analysis-complete` as outputs. The Action in
-this source tree can additionally write the complete CLI-shaped scan result
+The tagged `v0.7.0` Action sets `findings`, `critical`, `high`, `medium`, `low`,
+`sarif-path`, `diagnostics`, and `analysis-complete` as outputs. It can
+additionally write the complete CLI-shaped scan result
 when given a `json` path (for example, `json: artifacts/agentci-results.json`)
 and then exposes that location as `json-path` and the Action-computed digest
 of its exact file bytes as `json-sha256`; omitted or empty `json` writes no JSON
 file and emits neither output. Comparing the digest with the file detects a
 post-Action change; it is not a signed CI attestation. The JSON path must not
 already exist: its writer will not overwrite an existing file or final-component
-symlink. This is not part of
-the tagged `v0.6.2` release. The JSON includes finding IDs, agent usages,
+symlink. Releases before `v0.7.0` have no `json` input. The JSON includes finding IDs, agent usages,
 call chains, diagnostics, and `analysis_complete`; SARIF is still written
 separately. The JSON is a local file, not an
 automatically uploaded artifact, and may contain repository paths and workflow
@@ -168,7 +168,7 @@ succeed; consumers must check the warning or `analysis-complete` output rather
 than treating a successful step as proof of complete analysis:
 
 ```yaml
-- uses: David-Wu1119/agentci-guard@v0.6.2
+- uses: David-Wu1119/agentci-guard@v0.7.0
   id: agentci
   with:
     fail-on: none
@@ -180,13 +180,12 @@ than treating a successful step as proof of complete analysis:
 
 The npm registry may lag the Action release (publication is a separate,
 human-authorized step; see [`docs/OPERATIONS.md`](docs/OPERATIONS.md)). To
-evaluate the tagged `v0.6.2` release rather than this newer source-aware
-candidate, install its tarball. The SHA-256 is in the release notes and in
-`evidence/sprint-2026-09-05/day9/SHA256SUMS-v0.6.2.txt`:
+run the tagged `v0.7.0` release, install its tarball. The SHA-256 is in the
+release notes:
 
 ```bash
-npm install -g https://github.com/David-Wu1119/agentci-guard/releases/download/v0.6.2/agentci-guard-0.6.2.tgz
-agentci --version                   # 0.6.2
+npm install -g https://github.com/David-Wu1119/agentci-guard/releases/download/v0.7.0/agentci-guard-0.7.0.tgz
+agentci --version                   # 0.7.0
 agentci scan . --fail-on none       # report-only for a first trial; diagnostics stay visible
 
 agentci scan . --json
@@ -245,7 +244,7 @@ docker run --rm -v "$PWD:/scan:ro" -v "$PWD/out:/out" agentci-guard \
 ```yaml
 repos:
   - repo: https://github.com/David-Wu1119/agentci-guard
-    rev: v0.6.2
+    rev: v0.7.0
     hooks:
       - id: agentci-guard
 ```

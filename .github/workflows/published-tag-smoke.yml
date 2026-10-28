@@ -1,4 +1,4 @@
-name: Published v0.6.2 tag smoke
+name: Published v0.7.0 tag smoke
 
 on:
   release:
@@ -12,9 +12,9 @@ jobs:
   consumer:
     if: >-
       (github.event_name == 'release' &&
-      github.event.release.tag_name == 'v0.6.2') ||
+      github.event.release.tag_name == 'v0.7.0') ||
       (github.event_name == 'workflow_dispatch' &&
-      github.ref == 'refs/tags/v0.6.2')
+      github.ref == 'refs/tags/v0.7.0')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout consumer fixtures
@@ -22,7 +22,7 @@ jobs:
 
       - name: Published Action smoke - vulnerable
         id: vulnerable
-        uses: David-Wu1119/agentci-guard@v0.6.2
+        uses: David-Wu1119/agentci-guard@v0.7.0
         with:
           path: examples/vulnerable
           sarif: artifacts/published-vulnerable.sarif
@@ -37,6 +37,7 @@ jobs:
           EXPECT_LOW: ${{ steps.vulnerable.outputs.low }}
           OUTPUT_SARIF_PATH: ${{ steps.vulnerable.outputs.sarif-path }}
           ANALYSIS_COMPLETE: ${{ steps.vulnerable.outputs.analysis-complete }}
+          EXPECT_DIAGNOSTICS: ${{ steps.vulnerable.outputs.diagnostics }}
         run: |
           node scripts/verify-sarif.mjs artifacts/published-vulnerable.sarif
           test "$EXPECT_FINDINGS" = "9"
@@ -45,11 +46,12 @@ jobs:
           test "$EXPECT_MEDIUM" = "3"
           test "$EXPECT_LOW" = "0"
           test "$OUTPUT_SARIF_PATH" = "artifacts/published-vulnerable.sarif"
-          test "$ANALYSIS_COMPLETE" = "true"
+          test "$ANALYSIS_COMPLETE" = "false"
+          test "$EXPECT_DIAGNOSTICS" = "1"
 
       - name: Published Action smoke - hardened
         id: hardened
-        uses: David-Wu1119/agentci-guard@v0.6.2
+        uses: David-Wu1119/agentci-guard@v0.7.0
         with:
           path: examples/hardened
           sarif: artifacts/published-hardened.sarif
@@ -69,7 +71,7 @@ jobs:
       - name: Published Action smoke - threshold failure
         id: threshold
         continue-on-error: true
-        uses: David-Wu1119/agentci-guard@v0.6.2
+        uses: David-Wu1119/agentci-guard@v0.7.0
         with:
           path: examples/vulnerable
           sarif: artifacts/published-threshold.sarif

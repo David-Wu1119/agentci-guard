@@ -1,4 +1,4 @@
-name: Published npm v0.6.2 smoke
+name: Published npm v0.7.0 smoke
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   consumer:
-    if: github.ref == 'refs/tags/v0.6.2'
+    if: github.ref == 'refs/tags/v0.7.0'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout consumer fixtures
@@ -22,7 +22,7 @@ jobs:
             --ignore-scripts \
             --no-audit \
             --no-fund \
-            agentci-guard@0.6.2
+            agentci-guard@0.7.0
           mkdir -p artifacts
           "$consumer_dir/node_modules/.bin/agentci" \
             scan "$GITHUB_WORKSPACE/examples/vulnerable" \
@@ -63,7 +63,8 @@ jobs:
             }
           }
           if (
-            vulnerable.analysis_complete !== true ||
+            vulnerable.analysis_complete !== false ||
+            vulnerable.diagnostics.length !== 1 ||
             hardened.analysis_complete !== true ||
             hardened.findings.length !== 0
           ) {

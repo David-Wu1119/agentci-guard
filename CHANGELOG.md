@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-28
+
 ### Added
 
 - Opt-in Action JSON now emits `json-sha256`, the Action-computed hash of its
@@ -15,6 +17,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   post-Action JSON swap, not a signed or complete E4 provenance seal.
 
 ### Changed
+
+- Release-level behavior against v0.6.2 (`7defcb5`) on the frozen 152-case
+  development benchmark, scanned per case with `--json --fail-on none`:
+  critical 6→4, high 68→36, medium 184→180, low 0→0; complete scans 58→46;
+  43 cases change severity counts or completeness. Per-case rows and both
+  `dist/cli.js` hashes are in `evidence/release-v0.7.0/`. Of the 34 high
+  findings removed (2 were added elsewhere), 23 are in cases that now carry
+  the `analysis-agent-implicit-ingestion-unknown` diagnostic from the
+  implicit-ingestion evidence rule below. This is scanner behavior, not
+  evidence that the removed alerts were false positives.
+- The floating `v0` tag now moves after the published-Action tag smoke
+  alone; npm publication is a separate, later step (owner decision,
+  28 October 2026). `examples/vulnerable` now reports one diagnostic and
+  `analysis-complete: false` with the same 9 findings (2 critical, 4 high,
+  3 medium).
 
 - Documented the instruction-file ingestion blind spot, including the limits
   of `unsafe-checkout` and `analysis_complete=true`. This adds no detection
