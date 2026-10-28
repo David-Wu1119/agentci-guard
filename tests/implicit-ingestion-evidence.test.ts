@@ -258,11 +258,12 @@ jobs:
       ".",
       { ignore: [], ignorePaths: [] },
     );
+    // The critical issue_comment path defeats the whole-job gated exception.
     expect(
       result.findings.find(
         (finding) => finding.rule_id === "agentci/gated-ai-write-token",
-      )?.reachable_events,
-    ).toEqual(["issues"]);
+      ),
+    ).toBeUndefined();
     expect(
       result.findings.find(
         (finding) => finding.rule_id === "agentci/untrusted-ai-write-token",

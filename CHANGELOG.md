@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `untrusted-ai-write-token` and `gated-ai-write-token` are now mutually
+  exclusive at a job, as the rule contract states. A job with one gated event
+  path and one critical path previously reported both rules, high on one event
+  and critical on the other. It now reports only the critical rule, on its
+  critical events. A job with an unresolved ingesting path now reports
+  neither rule; its diagnostics stay. On the frozen 152-case development
+  benchmark, 0 cases change, because no job there carries both rules. The
+  synthetic regression tests in `tests/gated-write.test.ts` fail before this
+  change and pass after it. This is a contract alignment found by a synthetic
+  check of owner decision A04-D1 (28 October 2026), not an accuracy result.
+
 ## [0.7.0] - 2026-10-28
 
 ### Added

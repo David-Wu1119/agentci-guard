@@ -1579,10 +1579,14 @@ function analyzeWorkflow(
           ) ||
           runDataflowUnknownEvents.some((events) => events.includes(event)),
       );
-      const gatedEvents = reachableUntrusted.filter(
-        (event) =>
-          !criticalEvents.includes(event) && !unknownEvents.includes(event),
-      );
+      // The two write-token rules are mutually exclusive at a job: an
+      // ungated or unresolved path among the ingesting events defeats the
+      // whole-job gated exception, so the gated rule is never reported beside
+      // the critical one.
+      const gatedEvents =
+        criticalEvents.length === 0 && unknownEvents.length === 0
+          ? reachableUntrusted
+          : [];
       for (const [rule, events] of [
         ["agentci/untrusted-ai-write-token", criticalEvents],
         ["agentci/gated-ai-write-token", gatedEvents],
