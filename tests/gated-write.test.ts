@@ -100,7 +100,7 @@ jobs:
     ).toEqual(["issue_comment"]);
   });
 
-  it("separates a gated comment path from a critical parent-Issue path", () => {
+  it("reports only the critical rule when a gated comment path shares a job with a critical parent-Issue path", () => {
     const raw = `
 on: [issue_comment, issues]
 permissions:
@@ -117,9 +117,9 @@ jobs:
         uses: anthropics/claude-code-action@${VERIFIED_TAG_REF}
 `;
     const result = findings(raw);
-    expect(
-      result.find((finding) => finding.rule_id === GATED)?.reachable_events,
-    ).toEqual(["issue_comment"]);
+    // Job-level exclusivity: the ungated issues path defeats the whole-job
+    // gated exception, so the gated rule is not reported beside it.
+    expect(result.find((finding) => finding.rule_id === GATED)).toBeUndefined();
     expect(
       result.find((finding) => finding.rule_id === CRITICAL)?.reachable_events,
     ).toEqual(["issues"]);
@@ -127,6 +127,33 @@ jobs:
       result.find((finding) => finding.rule_id === CRITICAL)
         ?.uncertain_reachable_events ?? [],
     ).toEqual([]);
+  });
+
+  it("reports only the critical rule when an ungated sibling run: path is on another event", () => {
+    const raw = `
+on:
+  issue_comment:
+    types: [created]
+  pull_request:
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - if: github.event_name == 'issue_comment'
+        uses: anthropics/claude-code-action@${VERIFIED_TAG_REF}
+        with:
+          prompt: "Answer this comment: \${{ github.event.comment.body }}"
+      - if: github.event_name == 'pull_request'
+        run: 'claude -p "Review \${{ github.event.pull_request.title }}"'
+`;
+    const result = findings(raw);
+    expect(result.find((finding) => finding.rule_id === GATED)).toBeUndefined();
+    expect(
+      result.find((finding) => finding.rule_id === CRITICAL)?.reachable_events,
+    ).toEqual(["pull_request"]);
   });
 
   it("keeps the bare tag-mode template critical for attacker-authored parent issues", () => {

@@ -10322,9 +10322,7 @@ ${writerInput.material}`,
           (step) => step.implicitIngestionUnknown && step.events.includes(event) || step.toolFetchUnknownEvents.includes(event) || step.remoteHttp && step.ingestionEvents.includes(event)
         ) || runDataflowUnknownEvents.some((events) => events.includes(event))
       );
-      const gatedEvents = reachableUntrusted.filter(
-        (event) => !criticalEvents.includes(event) && !unknownEvents.includes(event)
-      );
+      const gatedEvents = criticalEvents.length === 0 && unknownEvents.length === 0 ? reachableUntrusted : [];
       for (const [rule, events] of [
         ["agentci/untrusted-ai-write-token", criticalEvents],
         ["agentci/gated-ai-write-token", gatedEvents]

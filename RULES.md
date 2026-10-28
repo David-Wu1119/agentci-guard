@@ -189,12 +189,16 @@ PR can point to a fork branch they did not author, so an actor gate alone
 cannot dismiss that source. An `issue_comment` may target a PR and is
 conservatively treated as capable of bringing in those paths too.
 
-The candidate classifies each reachable event path separately. It emits
-`gated-ai-write-token` at high only when that event's ingested source text is
-attributable to the actor checked by an inspected Action's intact write-access
-gate, the event is modeled as checked, no same-event agent path has unresolved
-input flow, and no same-event `run:` step expands untrusted text. A job can
-therefore have a high finding on one event and a critical finding on another.
+The candidate classifies each reachable event path, then applies the two
+write-token rules at the job. An event path qualifies for the gate only when
+its ingested source text is attributable to the actor checked by an inspected
+Action's intact write-access gate, the event is modeled as checked, no
+same-event agent path has unresolved input flow, and no same-event `run:` step
+expands untrusted text. `gated-ai-write-token` is reported at high only when
+every ingesting event path qualifies. If any ingesting path is critical or
+has unresolved input flow, the whole-job gated exception fails: the job reports only
+`untrusted-ai-write-token`, on the critical events, or neither rule while the
+path stays unresolved. The two rules never appear on the same job.
 If a trusted actor activates an agent on someone else's parent Issue/PR, the
 gate does not justify that path's downgrade. This is a static severity
 heuristic, not proof that the Action accepted or rejected a runtime trigger.
