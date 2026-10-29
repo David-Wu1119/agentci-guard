@@ -140,19 +140,20 @@ the job's finding is `agentci/gated-ai-write-token` at high rather than
   `pull_request_review_comment`; `pull_request_target` and the discussion events
   are not listed and keep potential critical findings when Action event support
   is unverified;
-- every relevant text source belongs to the actor checked by that gate, and
-  no other AI path reachable on that event has unresolved implicit, tool-fetch,
-  or CLI input flow. Parent Issue,
+- every relevant text source belongs to the actor checked by that gate. Parent Issue,
   PR, or discussion content may have a different author on comment, review, or
   label activity and therefore prevents the downgrade;
+- no AI step in the job has unresolved implicit, tool-fetch, or CLI input
+  flow on any reachable untrusted event, including events with no established
+  ingestion;
 - no `run:` step in the job expands untrusted event text on any reachable
   event, including events no agent ingests, because that path bypasses the
-  agent's gate entirely. If another agent's inherited input is
-  unresolved, neither the high nor the critical write-token finding is
-  asserted from that unknown path. The two rules never appear on the same job:
-  a failed condition on any event makes the job critical, reported on the
-  critical events, or on every ingesting event when only a `run:` expansion
-  on another event fails it.
+  agent's gate entirely. The two rules never appear on the same job: a
+  confirmed critical path makes the job critical, reported on the critical
+  events, or on every ingesting event when only a `run:` expansion on another
+  event fails the exception. Otherwise, unresolved input on any AI path
+  leaves both write-token rules unreported for the whole job; its
+  diagnostic stays and analysis remains incomplete.
 
 The Action's gate answers "who activated this run?", not "who authored every
 piece of text the agent reads?" A trusted maintainer can label an attacker

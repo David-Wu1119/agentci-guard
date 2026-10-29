@@ -10289,11 +10289,14 @@ ${writerInput.material}`,
         (run) => run.events.some((event) => UNTRUSTED_EVENTS.has(event))
       ) : [];
       const criticalEvents = crossEventRuns.length > 0 ? reachableUntrusted : eventCriticalEvents;
-      const unknownEvents = reachableUntrusted.filter(
-        (event) => aiSteps.some(
-          (step) => step.implicitIngestionUnknown && step.events.includes(event) || step.toolFetchUnknownEvents.includes(event) || step.remoteHttp && step.ingestionEvents.includes(event)
-        ) || runDataflowUnknownEvents.some((events) => events.includes(event))
-      );
+      const unknownEvents = unionEvents([
+        ...aiSteps.flatMap((step) => [
+          ...step.implicitIngestionUnknown ? step.events : [],
+          ...step.toolFetchUnknownEvents,
+          ...step.remoteHttp ? step.ingestionEvents : []
+        ]),
+        ...runDataflowUnknownEvents.flat()
+      ]).filter((event) => UNTRUSTED_EVENTS.has(event));
       const gatedEvents = criticalEvents.length === 0 && unknownEvents.length === 0 ? reachableUntrusted : [];
       for (const [rule, events] of [
         ["agentci/untrusted-ai-write-token", criticalEvents],

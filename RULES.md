@@ -192,14 +192,17 @@ conservatively treated as capable of bringing in those paths too.
 The candidate classifies each reachable event path, then applies the two
 write-token rules at the job. An event path qualifies for the gate only when
 its ingested source text is attributable to the actor checked by an inspected
-Action's intact write-access gate, the event is modeled as checked, no
-same-event agent path has unresolved input flow, and no same-event `run:` step
-expands untrusted text. `gated-ai-write-token` is reported at high only when
-every ingesting event path qualifies and no `run:` step in the job expands
-untrusted text on any reachable event. If any ingesting path is critical or
-has unresolved input flow, the whole-job gated exception fails: the job reports only
-`untrusted-ai-write-token`, on the critical events, or neither rule while the
-path stays unresolved. A `run:` expansion only on an event no agent ingests
+Action's intact write-access gate, the event is modeled as checked, and no
+same-event `run:` step expands untrusted text. `gated-ai-write-token` is
+reported at high only when every ingesting event path qualifies, no AI step
+in the job has unresolved input flow on any reachable untrusted event, and no
+`run:` step in the job expands untrusted text on any reachable event.
+Unresolved input flow defeats the whole-job gated exception even on an event
+with no established ingestion. If any ingesting path is critical, the job
+reports only `untrusted-ai-write-token`, on the critical events. Otherwise, an
+unresolved path leaves both rules unreported while its diagnostic stays and analysis remains incomplete, unless
+a `run:` expansion independently establishes a critical path.
+A `run:` expansion only on an event no agent ingests
 also fails the exception; the job then reports `untrusted-ai-write-token` on
 its ingesting events. The two rules never appear on the same job.
 If a trusted actor activates an agent on someone else's parent Issue/PR, the
