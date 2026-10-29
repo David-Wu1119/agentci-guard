@@ -40,10 +40,10 @@ export const AI_AGENT_ACTION_PATTERNS = [
 // Pure installation/help/version checks are not agent executions.
 // npx -y/--yes are supported only for the known Claude Code npm package.
 export const AI_AGENT_CLI_PATTERNS = [
-  /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|npx|uvx)\s+)*claude(?=[\s;&|)]|$)(?![ \t]+(?:--version|--help|-h)(?:[\s;&|)]|$))/im,
-  /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|uvx)\s+|npx\s+(?:(?:-y|--yes)\s+)*)*@anthropic-ai\/claude-code(?:@[A-Za-z0-9^~][A-Za-z0-9._+^~-]*)?(?=[\s;&|)]|$)(?![ \t]+(?:--version|--help|-h)(?:[\s;&|)]|$))/im,
-  /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|npx|uvx)\s+)*(?:python3?\s+-m\s+)?aider(?=[\s;&|)]|$)(?![ \t]+(?:--version|--help|-h)(?:[\s;&|)]|$))/im,
-  /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|npx|uvx)\s+)*cursor-agent(?=[\s;&|)]|$)(?![ \t]+(?:--version|--help|-h)(?:[\s;&|)]|$))/im,
+  /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|npx|uvx)\s+)*claude(?=[\s;&|)]|$)/im,
+  /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|uvx)\s+|npx\s+(?:(?:-y|--yes)\s+)*)*@anthropic-ai\/claude-code(?:@[A-Za-z0-9^~][A-Za-z0-9._+^~-]*)?(?=[\s;&|)]|$)/im,
+  /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|npx|uvx)\s+)*(?:python3?\s+-m\s+)?aider(?=[\s;&|)]|$)/im,
+  /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|npx|uvx)\s+)*cursor-agent(?=[\s;&|)]|$)/im,
   /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|npx|uvx)\s+)*codex[ \t]+(?:exec|run)(?:[\s]|$)/im,
 ];
 
@@ -181,8 +181,57 @@ const SECRET_PATTERNS = [
   /\$\{\{\s*(?:env\.)?[A-Z0-9_]*(?:TOKEN|KEY)\s*\}\}/,
 ];
 const SHELL_TOOL_PATTERN = /(?:^|[\s,[("'`])(?:Bash|Shell)(?=$|[\s,(\])}"'`])/i;
-const SHELL_ARGUMENT_PATTERN =
+const SHELL_ARGUMENT_PATTERN = /--dangerously-skip-permissions\b/i;
+const LEGACY_SHELL_ARGUMENT_PATTERN =
   /(?:--allowedTools?\s+[^\n]*(?:Bash|Shell)|--dangerously-skip-permissions)\b/i;
+
+function argumentsAllowShell(value: string): boolean {
+  const words = shellWords(value);
+  let malformedSettings = false;
+  let index = 0;
+  for (; index < words.length; index++) {
+    const argument = words[index].text;
+    if (argument === "--") break;
+    if (/^--(?:append-system-prompt|system-prompt)$/.test(argument)) {
+      index++;
+      continue;
+    }
+    const settings = /^--settings(?:=(.*))?$/.exec(argument);
+    if (settings) {
+      const json = settings[1] ?? words[++index]?.text ?? "";
+      try {
+        const allow = JSON.parse(json)?.permissions?.allow;
+        if (
+          Array.isArray(allow) &&
+          allow.some(
+            (tool) =>
+              typeof tool === "string" &&
+              /^(?:Bash|Shell)(?:\(|$)/i.test(tool.trim()),
+          )
+        )
+          return true;
+      } catch {
+        malformedSettings = true;
+      }
+      continue;
+    }
+    if (SHELL_ARGUMENT_PATTERN.test(argument)) return true;
+    const flag = /^--allowed(?:Tools?|-tools)(?:=(.*))?$/i.exec(argument);
+    if (!flag) continue;
+    const tools = [flag[1] ?? ""];
+    while (index + 1 < words.length && !words[index + 1].text.startsWith("-")) {
+      tools.push(words[++index].text);
+    }
+    if (SHELL_TOOL_PATTERN.test(tools.join(" "))) return true;
+  }
+  // Unparseable settings retain the parent's result, bounded by `--`.
+  return (
+    malformedSettings &&
+    LEGACY_SHELL_ARGUMENT_PATTERN.test(
+      value.slice(0, words[index]?.start ?? value.length),
+    )
+  );
+}
 
 /**
  * anthropics/claude-code-action refuses to run for users without repository
@@ -279,7 +328,12 @@ export function looksLikeAiHttpDispatch(value: string): boolean {
   );
 }
 
-type ShellWord = { text: string; expandableText: string; raw?: string };
+type ShellWord = {
+  text: string;
+  expandableText: string;
+  raw?: string;
+  start?: number;
+};
 export type AiCliInvocation = {
   command: string;
   expandableCommand: string;
@@ -306,7 +360,12 @@ function shellWords(value: string): ShellWord[] {
   let wordStart = 0;
   const push = (end: number) => {
     if (started)
-      words.push({ text, expandableText, raw: value.slice(wordStart, end) });
+      words.push({
+        text,
+        expandableText,
+        raw: value.slice(wordStart, end),
+        start: wordStart,
+      });
     text = "";
     expandableText = "";
     started = false;
@@ -550,8 +609,12 @@ function shellCommandSegments(value: string): Array<{
       index = newline >= 0 ? newline : script.length;
       continue;
     }
-    // `2>&1` duplicates a file descriptor; its `&` is not a command boundary.
-    if (character === "&" && script[index - 1] === ">") continue;
+    // `2>&1` and `&>file` redirections do not introduce command boundaries.
+    if (
+      character === "&" &&
+      (script[index - 1] === ">" || script[index + 1] === ">")
+    )
+      continue;
     if (character === "(" || character === "\n") {
       const prefix = script
         .slice(Math.max(start, script.lastIndexOf("{", index - 1) + 1), index)
@@ -1149,31 +1212,122 @@ function evalLaunchedCommand(words: ShellWord[]): ShellWord[] {
   return words.slice(index);
 }
 
+function isCliHelpCheck(args: ShellWord[], cli: string): boolean {
+  let help = false;
+  let prompt = false;
+  for (let index = 0; index < args.length; index++) {
+    const argument = args[index].text;
+    if (argument === "--") {
+      prompt ||= index + 1 < args.length;
+      break;
+    }
+    if (/^(?:--help|-h|--version)$/.test(argument)) {
+      help = true;
+    } else if (
+      /^(?:-p|--print|--prompt|--message)(?:=|$)/.test(argument) ||
+      (argument === "-m" && /\baider$/.test(cli))
+    ) {
+      prompt = true;
+    } else if (
+      /^--(?:allowed-?tools?|disallowed-?tools?)(?:=|$)/i.test(argument)
+    ) {
+      while (index + 1 < args.length && !args[index + 1].text.startsWith("-"))
+        index++;
+    } else if (
+      /^(?:-m|--(?:model|system-prompt|append-system-prompt|input-format|output-format|permission-mode))(?:=|$)/.test(
+        argument,
+      )
+    ) {
+      // A required operand is a value even when it starts with `-`.
+      if (!argument.includes("=") && args[index + 1]) index++;
+    } else if (!argument.startsWith("-")) {
+      // Preserve possible prompts after options whose arity is not modeled.
+      prompt = true;
+    }
+  }
+  return help && !prompt;
+}
+
+function leadingRedirectionWordCount(words: ShellWord[]): number {
+  let index = 0;
+  while (index < words.length) {
+    const raw = words[index].raw ?? "";
+    const redirect = /^(?:\d*>>?|\d*<|&>)(?![<>])/.exec(raw);
+    if (!redirect) break;
+    let target = raw.slice(redirect[0].length);
+    for (
+      let next = firstUnquotedRedirection(target);
+      next >= 0;
+      next = firstUnquotedRedirection(target)
+    ) {
+      target = target.slice(next + 1);
+    }
+    // A chained trailing operator still needs the next word as its target.
+    index += /^(?:[&|])?$/.test(target) ? 2 : 1;
+  }
+  return index;
+}
+
+/**
+ * Move a redirection index back over a file-descriptor number (`2>`) or `&`
+ * (`&>`) that starts the same word, so the prefix is not left behind as an
+ * argument of the command.
+ */
+function redirectionWordStart(command: string, index: number): number {
+  if (index <= 0) return index;
+  let start = index;
+  while (start > 0 && /\d/.test(command[start - 1])) start--;
+  if (start === index && command[start - 1] === "&") start--;
+  return start === 0 || /\s/.test(command[start - 1]) ? start : index;
+}
+
 /** Direct local CLI commands, excluding sibling commands and shell comments. */
 export function aiCliInvocations(value: string): AiCliInvocation[] {
   const invocations: AiCliInvocation[] = [];
   for (const segment of shellExecutableSegments(value)) {
     if (segment.reach === false) continue;
-    const redirection = firstUnquotedRedirection(segment.command);
+    const words = shellWords(segment.command);
+    const commandIndex = leadingRedirectionWordCount(words);
+    // A command that starts with a redirection is left undetected, as before:
+    // skipping redirect words misread chained targets (`> a> claude echo`) as
+    // the command. Known limitation: `>out.txt claude -p` is not observed.
+    if (commandIndex > 0) continue;
+    const afterLeadingRedirections = words
+      .slice(commandIndex)
+      .map((word) => word.raw ?? word.text)
+      .join(" ");
+    const redirection = redirectionWordStart(
+      afterLeadingRedirections,
+      firstUnquotedRedirection(afterLeadingRedirections),
+    );
     const command =
       redirection >= 0
-        ? segment.command.slice(0, redirection)
-        : segment.command;
+        ? afterLeadingRedirections.slice(0, redirection)
+        : afterLeadingRedirections;
     const { commandWords, prefixWords } = envLaunchedCommand(
       shellWords(command),
     );
     const executable = commandWords.map((word) => word.text).join(" ");
-    if (
-      !AI_AGENT_CLI_PATTERNS.some(
-        (pattern) => pattern.exec(executable)?.index === 0,
-      )
-    ) {
-      continue;
-    }
+    const cli = AI_AGENT_CLI_PATTERNS.map((pattern) =>
+      pattern.exec(executable),
+    ).find((match) => match?.index === 0);
+    if (!cli) continue;
+    const args = commandWords.slice(shellWords(cli[0]).length);
+    const redirectTail =
+      redirection >= 0
+        ? shellWords(afterLeadingRedirections.slice(redirection))
+        : [];
+    // Redirect targets are not prompts; remaining tail arguments can be.
+    const helpArgs = [
+      ...args,
+      ...redirectTail.slice(leadingRedirectionWordCount(redirectTail)),
+    ];
+    if (isCliHelpCheck(helpArgs, cli[0])) continue;
     // The shell also accepts arguments *after* a redirect. We intentionally
     // exclude the redirect tail from proven prompt material, but cannot call
     // the command complete without parsing that tail's remaining arguments.
     const opaqueInput =
+      commandIndex > 0 ||
       redirection >= 0 ||
       commandWords.some((word) => /\$\(|`/.test(word.text)) ||
       prefixWords.some((word) => /\$/.test(word.expandableText));
@@ -1504,7 +1658,7 @@ export function containsShellAccess(value: unknown): boolean {
     }
     if (
       /^(?:claude_)?args$|^(?:options?|additional_args)$/.test(normalized) &&
-      SHELL_ARGUMENT_PATTERN.test(stringValue(raw))
+      argumentsAllowShell(stringValue(raw))
     ) {
       return true;
     }

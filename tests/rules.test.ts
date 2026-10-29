@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import YAML from "yaml";
 import { untrustedGitHubContextEvents } from "../src/detect.js";
-import { scanWorkflow, type WorkflowFile } from "../src/index.js";
+import {
+  scanWorkflow,
+  scanWorkflowFiles,
+  type WorkflowFile,
+} from "../src/index.js";
 
 const ROOT = "/repo";
 
@@ -383,6 +387,160 @@ jobs:
     expect(rules.has("agentci/ai-shell-access")).toBe(false);
   });
 
+  it("stops action capability options at a bare terminator", () => {
+    const rules = rulesFor(`
+on: push
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          claude_args: '-- --allowedTools=Bash'
+`);
+    expect(rules.has("agentci/ai-shell-access")).toBe(false);
+  });
+
+  it("keeps explicit Bash allow entries in settings JSON", () => {
+    const rules = rulesFor(`
+on: push
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          claude_args: >-
+            --allowedTools Read --settings '{"permissions":{"allow":["Bash"]}}'
+`);
+    expect(rules).toContain("agentci/ai-shell-access");
+  });
+
+  it("preserves parent shell detection when settings JSON is malformed", () => {
+    const rules = rulesFor(`
+on: push
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          claude_args: >-
+            --allowedTools Read --settings '{"permissions":{"allow":["Bash"]}'
+`);
+    expect(rules).toContain("agentci/ai-shell-access");
+  });
+
+  it.each([
+    [
+      "skip-permissions flag",
+      { claude_args: "--dangerously-skip-permissions" },
+      true,
+    ],
+    [
+      "flag after terminator",
+      { claude_args: "-- --dangerously-skip-permissions" },
+      false,
+    ],
+    ["separate tool input", { allowed_tools: "Bash" }, true],
+    ["separate shell input", { allow_shell: true }, true],
+    [
+      "inline settings",
+      { claude_args: `--settings='{"permissions":{"allow":["Bash(git:*)"]}}'` },
+      true,
+    ],
+    [
+      "settings after terminator",
+      { claude_args: `-- --settings='{"permissions":{"allow":["Bash"]}}'` },
+      false,
+    ],
+    [
+      "deny entry",
+      {
+        claude_args: `--allowedTools Read --settings '{"permissions":{"deny":["Bash"]}}'`,
+      },
+      false,
+    ],
+    [
+      "non-shell allow entry",
+      {
+        claude_args: `--allowedTools Read --settings '{"permissions":{"allow":["Read(Bash)"]}}'`,
+      },
+      false,
+    ],
+    [
+      "malformed settings without allow-list",
+      { claude_args: `--settings '{"permissions":{"allow":["Bash"]}'` },
+      false,
+    ],
+    [
+      "multiline malformed settings",
+      {
+        claude_args: `--allowedTools Read\n--settings '{"permissions":{"allow":["Bash"]}'`,
+      },
+      false,
+    ],
+  ])(
+    "preserves Action capability boundaries: %s",
+    (_name, inputs, expected) => {
+      const rules = rulesFor(
+        YAML.stringify({
+          on: "push",
+          jobs: {
+            review: {
+              "runs-on": "ubuntu-latest",
+              steps: [
+                {
+                  uses: "anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567",
+                  with: inputs,
+                },
+              ],
+            },
+          },
+        }),
+      );
+      expect(rules.has("agentci/ai-shell-access")).toBe(expected);
+    },
+  );
+
+  it.each([
+    '--allowedTools Read --append-system-prompt "Describe Bash"',
+    "--allowedTools Read --disallowedTools Bash",
+    '--allowed-tools=Read --append-system-prompt "Describe Shell"',
+    '--allowedTools Read --append-system-prompt "--allowedTools=Bash"',
+  ])("limits shell capability to allow-list values: %s", (args) => {
+    const rules = rulesFor(`
+on: push
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          claude_args: '${args}'
+`);
+    expect(rules.has("agentci/ai-shell-access")).toBe(false);
+  });
+
+  it.each([
+    "--allowedTools Bash",
+    "--allowedTools=Read,Bash",
+    '--allowed-tools "Read Shell(git:*)" --disallowedTools Write',
+    "--allowed-tools=Read Bash --append-system-prompt fixed",
+  ])("keeps shell capability from real allow-list entries: %s", (args) => {
+    const rules = rulesFor(`
+on: push
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          claude_args: '${args}'
+`);
+    expect(rules).toContain("agentci/ai-shell-access");
+  });
+
   it("propagates untrusted workflow environment into an AI step", () => {
     const rules = rulesFor(`
 on: issue_comment
@@ -486,6 +644,74 @@ jobs:
 `);
     expect(rules.has("agentci/unsafe-checkout")).toBe(false);
   });
+});
+
+describe("checkout ref protection", () => {
+  function scanCheckout(actionRef: string) {
+    const raw = `
+on: pull_request_target
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@${actionRef}
+        with:
+          ref: \${{ github.event.pull_request.head.sha }}
+`;
+    return scanWorkflowFiles(
+      [
+        {
+          path: `${ROOT}/.github/workflows/test.yml`,
+          raw,
+          document: YAML.parse(raw),
+        },
+      ],
+      ROOT,
+      { ignore: [], ignorePaths: [] },
+    );
+  }
+
+  it.each([
+    "v7.custom",
+    "v1.custom",
+    "v7.1.custom",
+    "v7.1.0.custom",
+    "v7.1.0.1",
+    "v1.1.custom",
+    "v2.1.0",
+    "0123456789abcdef0123456789abcdef01234567",
+  ])("leaves ambiguous or indeterminate checkout refs unknown: %s", (ref) => {
+    const result = scanCheckout(ref);
+    expect(result.diagnostics.map((item) => item.code)).toContain(
+      "agentci/analysis-checkout-protection-unknown",
+    );
+    expect(result.analysis_complete).toBe(false);
+    expect(result.findings.map((item) => item.rule_id)).not.toContain(
+      "agentci/unsafe-checkout",
+    );
+  });
+
+  it.each(["v2", "v3", "v4", "v5", "v6", "v7", "v7.1", "v7.1.0"])(
+    "keeps known checkout refs protected: %s",
+    (ref) => {
+      const result = scanCheckout(ref);
+      expect(result.findings).toEqual([]);
+      expect(result.diagnostics).toEqual([]);
+      expect(result.analysis_complete).toBe(true);
+    },
+  );
+
+  it.each(["v1", "v1.1", "v1.2.3"])(
+    "keeps checkout %s known-unprotected",
+    (ref) => {
+      const result = scanCheckout(ref);
+      expect(result.findings.map((item) => item.rule_id)).toContain(
+        "agentci/unsafe-checkout",
+      );
+      expect(result.diagnostics).toEqual([]);
+      expect(result.analysis_complete).toBe(true);
+    },
+  );
 });
 
 describe("no false positives", () => {

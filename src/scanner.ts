@@ -2082,9 +2082,9 @@ function assessPullRequestTargetCheckout(
   if (!requestsPullRequestCode) return "not-applicable";
 
   const actionRef = step.uses.slice(step.uses.lastIndexOf("@") + 1);
-  const protection = /^v1(?:$|\.)/i.test(actionRef)
+  const protection = /^v1(?:\.\d+){0,2}$/i.test(actionRef)
     ? "absent"
-    : /^v[2-7]$/i.test(actionRef) || /^v7\./i.test(actionRef)
+    : /^v[2-7]$/i.test(actionRef) || /^v7\.\d+(?:\.\d+)?$/i.test(actionRef)
       ? "present"
       : "unknown";
   const optOut = literalBoolean(inputs["allow-unsafe-pr-checkout"]);
