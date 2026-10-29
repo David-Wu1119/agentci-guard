@@ -136,11 +136,6 @@ jobs:
       "env:\n          REQUEST: \${{ github.event.issue.body }}\n        run: claude -p fixed",
       "agentci/analysis-run-dataflow-unknown",
     ],
-    [
-      "a run step expanding untrusted text",
-      'run: echo "\${{ github.event.issue.body }}"',
-      undefined,
-    ],
   ])(
     "keeps a proven gated comment path when %s runs only on issues",
     (_name, secondStep, diagnostic) => {
@@ -174,6 +169,37 @@ jobs:
       if (diagnostic) expect(diagnostics(result)).toContain(diagnostic);
     },
   );
+
+  it("reports only the critical rule when a run step expanding untrusted text runs only on issues", () => {
+    const raw = `
+on: [issue_comment, issues]
+permissions:
+  contents: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - if: github.event_name == 'issue_comment'
+        uses: anthropics/claude-code-action@${VERIFIED}
+        with:
+          prompt: "Reply to \${{ github.event.comment.body }}"
+      - if: github.event_name == 'issues'
+        run: echo "\${{ github.event.issue.body }}"
+`;
+    const result = scanWorkflowFiles(
+      [parseWorkflowFile(".github/workflows/review.yml", raw)],
+      ".",
+      { ignore: [], ignorePaths: [] },
+    );
+    // A confirmed run: expansion defeats the whole-job gated exception even
+    // on an event the agent does not ingest (W1c, owner decision A04-D1).
+    expect(rules(result)).not.toContain("agentci/gated-ai-write-token");
+    expect(
+      result.findings.find(
+        (finding) => finding.rule_id === "agentci/untrusted-ai-write-token",
+      )?.reachable_events,
+    ).toEqual(["issue_comment"]);
+  });
 
   it("does not claim every path is gated when another Action may fetch the Issue through a tool", () => {
     const raw = `
@@ -397,9 +423,10 @@ jobs:
     );
     expect(
       result.findings.find(
-        (finding) => finding.rule_id === "agentci/gated-ai-write-token",
+        (finding) => finding.rule_id === "agentci/untrusted-ai-write-token",
       )?.reachable_events,
     ).toEqual(["issue_comment"]);
+    expect(rules(result)).not.toContain("agentci/gated-ai-write-token");
     expect(diagnostics(result)).toContain(
       "agentci/analysis-run-dataflow-unknown",
     );

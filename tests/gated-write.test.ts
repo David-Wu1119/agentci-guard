@@ -156,6 +156,34 @@ jobs:
     ).toEqual(["pull_request"]);
   });
 
+  it("reports only the critical rule when a non-AI run: step expands untrusted text on another event", () => {
+    const raw = `
+on:
+  issue_comment:
+    types: [created]
+  pull_request:
+permissions:
+  contents: write
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - if: github.event_name == 'issue_comment'
+        uses: anthropics/claude-code-action@${VERIFIED_TAG_REF}
+        with:
+          prompt: "Answer: \${{ github.event.comment.body }}"
+      - if: github.event_name == 'pull_request'
+        run: 'echo "\${{ github.event.pull_request.title }}"'
+`;
+    const result = findings(raw);
+    // The gated exception requires that no run: step in the job expands
+    // untrusted event text, whichever event that step runs on.
+    expect(result.find((finding) => finding.rule_id === GATED)).toBeUndefined();
+    const critical = result.find((finding) => finding.rule_id === CRITICAL);
+    expect(critical?.reachable_events).toEqual(["issue_comment"]);
+    expect(critical?.uncertain_reachable_events ?? []).toEqual([]);
+  });
+
   it("keeps the bare tag-mode template critical for attacker-authored parent issues", () => {
     const rules = rulesOf(BARE());
     expect(rules).toContain(CRITICAL);

@@ -195,10 +195,13 @@ its ingested source text is attributable to the actor checked by an inspected
 Action's intact write-access gate, the event is modeled as checked, no
 same-event agent path has unresolved input flow, and no same-event `run:` step
 expands untrusted text. `gated-ai-write-token` is reported at high only when
-every ingesting event path qualifies. If any ingesting path is critical or
+every ingesting event path qualifies and no `run:` step in the job expands
+untrusted text on any reachable event. If any ingesting path is critical or
 has unresolved input flow, the whole-job gated exception fails: the job reports only
 `untrusted-ai-write-token`, on the critical events, or neither rule while the
-path stays unresolved. The two rules never appear on the same job.
+path stays unresolved. A `run:` expansion only on an event no agent ingests
+also fails the exception; the job then reports `untrusted-ai-write-token` on
+its ingesting events. The two rules never appear on the same job.
 If a trusted actor activates an agent on someone else's parent Issue/PR, the
 gate does not justify that path's downgrade. This is a static severity
 heuristic, not proof that the Action accepted or rejected a runtime trigger.
