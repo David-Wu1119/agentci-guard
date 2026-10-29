@@ -28,6 +28,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   152-case development benchmark, 0 cases change. The case was found by an
   independent review of the amended-contract draft and is now a regression
   test in `tests/gated-write.test.ts`.
+- An unresolved AI input path now defeats the gated write-token exception for
+  the whole job, even when it runs only on an untrusted event with no
+  established ingestion. Such a job previously reported `gated-ai-write-token`
+  (high); absent a confirmed critical path, it now reports neither write-token
+  rule, keeps its diagnostic, and marks analysis incomplete, as the frozen
+  whole-job truth table requires. On the 152-case development benchmark, 0
+  cases change. Regression tests are in
+  `tests/implicit-ingestion-evidence.test.ts`. Known limitation: the opaque
+  AI-call detector also matches `$(claude ...)` inside a shell comment or a
+  provably dead branch, so such a job abstains (diagnostic, analysis
+  incomplete) where a gated finding was possible. A segment-based fix was
+  tried and dropped because it missed executable calls in function bodies,
+  loop word lists and `case` operands.
 - `SECURITY.md` now gives one private reporting route, GitHub private
   vulnerability reporting, which is enabled for this repository. It names the
   latest GitHub release as the supported version and states that npm `0.1.0`

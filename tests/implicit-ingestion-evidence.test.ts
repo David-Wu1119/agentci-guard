@@ -137,7 +137,7 @@ jobs:
       "agentci/analysis-run-dataflow-unknown",
     ],
   ])(
-    "keeps a proven gated comment path when %s runs only on issues",
+    "abstains for the whole job when %s runs only on issues",
     (_name, secondStep, diagnostic) => {
       const raw = `
 on: [issue_comment, issues]
@@ -159,14 +159,10 @@ jobs:
         ".",
         { ignore: [], ignorePaths: [] },
       );
-      expect(rules(result)).toContain("agentci/gated-ai-write-token");
+      expect(rules(result)).not.toContain("agentci/gated-ai-write-token");
       expect(rules(result)).not.toContain("agentci/untrusted-ai-write-token");
-      expect(
-        result.findings.find(
-          (finding) => finding.rule_id === "agentci/gated-ai-write-token",
-        )?.reachable_events,
-      ).toEqual(["issue_comment"]);
-      if (diagnostic) expect(diagnostics(result)).toContain(diagnostic);
+      expect(diagnostics(result)).toContain(diagnostic);
+      expect(result.analysis_complete).toBe(false);
     },
   );
 
@@ -300,7 +296,7 @@ jobs:
     );
   });
 
-  it("limits inherited CLI input uncertainty to the event carrying that input", () => {
+  it("abstains for the whole job when inherited CLI input is unresolved on another event", () => {
     const raw = `
 on:
   issues:
@@ -326,14 +322,12 @@ jobs:
       ".",
       { ignore: [], ignorePaths: [] },
     );
-    expect(
-      result.findings.find(
-        (finding) => finding.rule_id === "agentci/gated-ai-write-token",
-      )?.reachable_events,
-    ).toEqual(["issues"]);
+    expect(rules(result)).not.toContain("agentci/gated-ai-write-token");
+    expect(rules(result)).not.toContain("agentci/untrusted-ai-write-token");
     expect(diagnostics(result)).toContain(
       "agentci/analysis-run-dataflow-unknown",
     );
+    expect(result.analysis_complete).toBe(false);
   });
 
   it("does not let a direct comment input hide an unresolved inherited Issue input", () => {
