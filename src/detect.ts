@@ -1275,6 +1275,10 @@ export function aiCliInvocations(value: string): AiCliInvocation[] {
     if (segment.reach === false) continue;
     const words = shellWords(segment.command);
     const commandIndex = leadingRedirectionWordCount(words);
+    // A command that starts with a redirection is left undetected, as before:
+    // skipping redirect words misread chained targets (`> a> claude echo`) as
+    // the command. Known limitation: `>out.txt claude -p` is not observed.
+    if (commandIndex > 0) continue;
     const afterLeadingRedirections = words
       .slice(commandIndex)
       .map((word) => word.raw ?? word.text)

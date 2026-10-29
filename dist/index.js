@@ -8385,6 +8385,7 @@ function aiCliInvocations(value) {
     if (segment.reach === false) continue;
     const words = shellWords(segment.command);
     const commandIndex = leadingRedirectionWordCount(words);
+    if (commandIndex > 0) continue;
     const afterLeadingRedirections = words.slice(commandIndex).map((word) => word.raw ?? word.text).join(" ");
     const redirection = firstUnquotedRedirection(afterLeadingRedirections);
     const command = redirection >= 0 ? afterLeadingRedirections.slice(0, redirection) : afterLeadingRedirections;
