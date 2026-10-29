@@ -31,13 +31,39 @@ function rules(result: ReturnType<typeof scan>) {
 }
 
 describe("local CLI run-step input flow", () => {
+  it("keeps help-shaped option operands as CLI input", () => {
+    const result = scan('claude --system-prompt "--help"');
+    expect(result.agent_usages).toHaveLength(1);
+    expect(rules(result)).toContain("agentci/ai-shell-access");
+  });
+
+  it("does not execute a chained leading-redirection target", () => {
+    const result = scan(">out.txt> claude echo harmless");
+    expect(result.agent_usages).toEqual([]);
+    expect(result.findings).toEqual([]);
+  });
+
+  it("keeps dataflow unknown for prompts after a help redirection", () => {
+    const result = scan('codex exec --help >out.txt "review this patch"');
+    expect(result.diagnostics.map((item) => item.code)).toContain(
+      "agentci/analysis-run-dataflow-unknown",
+    );
+    expect(result.agent_usages).toHaveLength(1);
+    expect(rules(result)).toContain("agentci/ai-shell-access");
+    expect(result.analysis_complete).toBe(false);
+  });
+
   it.each([
     "codex exec --help",
     "codex run -h",
     "codex exec --version",
+    "codex exec --help >out.txt",
+    "codex exec --help > out.txt",
+    "codex exec --help >first.txt>second.txt",
     "claude --help",
     "claude --verbose --help",
     "claude --model sonnet --help",
+    'claude --system-prompt "--help" --help',
     "codex exec --model example --help",
     'claude --append-system-prompt "Describe Bash" --help',
     "claude --allowedTools Read Bash --help",
@@ -77,6 +103,8 @@ describe("local CLI run-step input flow", () => {
     ">>output.txt",
     "&>output.txt",
     ">output.txt 2>errors.txt",
+    '>output.txt">"',
+    ">output.txt\\>",
   ])("recognizes CLI execution after leading redirection: %s", (redirect) => {
     const result = scan(`${redirect} claude -p review`);
     expect(result.agent_usages).toHaveLength(1);
@@ -88,6 +116,8 @@ describe("local CLI run-step input flow", () => {
     ">output.txt claude --help",
     '">output.txt" claude -p review',
     "echo fixed &>output.txt claude -p review",
+    ">out.txt>> claude echo harmless",
+    '>"out>file"> claude echo harmless',
   ])(
     "does not promote prose or checks after leading redirection: %s",
     (run) => {

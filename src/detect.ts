@@ -182,18 +182,41 @@ const SECRET_PATTERNS = [
 ];
 const SHELL_TOOL_PATTERN = /(?:^|[\s,[("'`])(?:Bash|Shell)(?=$|[\s,(\])}"'`])/i;
 const SHELL_ARGUMENT_PATTERN = /--dangerously-skip-permissions\b/i;
+const LEGACY_SHELL_ARGUMENT_PATTERN =
+  /(?:--allowedTools?\s+[^\n]*(?:Bash|Shell)|--dangerously-skip-permissions)\b/i;
 
 function argumentsAllowShell(value: string): boolean {
-  if (SHELL_ARGUMENT_PATTERN.test(value)) return true;
   const words = shellWords(value);
-  for (let index = 0; index < words.length; index++) {
-    if (/^--(?:append-system-prompt|system-prompt)$/.test(words[index].text)) {
+  let malformedSettings = false;
+  let index = 0;
+  for (; index < words.length; index++) {
+    const argument = words[index].text;
+    if (argument === "--") break;
+    if (/^--(?:append-system-prompt|system-prompt)$/.test(argument)) {
       index++;
       continue;
     }
-    const flag = /^--allowed(?:Tools?|-tools)(?:=(.*))?$/i.exec(
-      words[index].text,
-    );
+    const settings = /^--settings(?:=(.*))?$/.exec(argument);
+    if (settings) {
+      const json = settings[1] ?? words[++index]?.text ?? "";
+      try {
+        const allow = JSON.parse(json)?.permissions?.allow;
+        if (
+          Array.isArray(allow) &&
+          allow.some(
+            (tool) =>
+              typeof tool === "string" &&
+              /^(?:Bash|Shell)(?:\(|$)/i.test(tool.trim()),
+          )
+        )
+          return true;
+      } catch {
+        malformedSettings = true;
+      }
+      continue;
+    }
+    if (SHELL_ARGUMENT_PATTERN.test(argument)) return true;
+    const flag = /^--allowed(?:Tools?|-tools)(?:=(.*))?$/i.exec(argument);
     if (!flag) continue;
     const tools = [flag[1] ?? ""];
     while (index + 1 < words.length && !words[index + 1].text.startsWith("-")) {
@@ -201,7 +224,13 @@ function argumentsAllowShell(value: string): boolean {
     }
     if (SHELL_TOOL_PATTERN.test(tools.join(" "))) return true;
   }
-  return false;
+  // Unparseable settings retain the parent's result, bounded by `--`.
+  return (
+    malformedSettings &&
+    LEGACY_SHELL_ARGUMENT_PATTERN.test(
+      value.slice(0, words[index]?.start ?? value.length),
+    )
+  );
 }
 
 /**
@@ -299,7 +328,12 @@ export function looksLikeAiHttpDispatch(value: string): boolean {
   );
 }
 
-type ShellWord = { text: string; expandableText: string; raw?: string };
+type ShellWord = {
+  text: string;
+  expandableText: string;
+  raw?: string;
+  start?: number;
+};
 export type AiCliInvocation = {
   command: string;
   expandableCommand: string;
@@ -326,7 +360,12 @@ function shellWords(value: string): ShellWord[] {
   let wordStart = 0;
   const push = (end: number) => {
     if (started)
-      words.push({ text, expandableText, raw: value.slice(wordStart, end) });
+      words.push({
+        text,
+        expandableText,
+        raw: value.slice(wordStart, end),
+        start: wordStart,
+      });
     text = "";
     expandableText = "";
     started = false;
@@ -1199,13 +1238,8 @@ function isCliHelpCheck(args: ShellWord[], cli: string): boolean {
         argument,
       )
     ) {
-      // These operands configure the CLI; they are not positional prompts.
-      if (
-        !argument.includes("=") &&
-        args[index + 1] &&
-        !args[index + 1].text.startsWith("-")
-      )
-        index++;
+      // A required operand is a value even when it starts with `-`.
+      if (!argument.includes("=") && args[index + 1]) index++;
     } else if (!argument.startsWith("-")) {
       // Preserve possible prompts after options whose arity is not modeled.
       prompt = true;
@@ -1214,19 +1248,33 @@ function isCliHelpCheck(args: ShellWord[], cli: string): boolean {
   return help && !prompt;
 }
 
+function leadingRedirectionWordCount(words: ShellWord[]): number {
+  let index = 0;
+  while (index < words.length) {
+    const raw = words[index].raw ?? "";
+    const redirect = /^(?:\d*>>?|\d*<|&>)(?![<>])/.exec(raw);
+    if (!redirect) break;
+    let target = raw.slice(redirect[0].length);
+    for (
+      let next = firstUnquotedRedirection(target);
+      next >= 0;
+      next = firstUnquotedRedirection(target)
+    ) {
+      target = target.slice(next + 1);
+    }
+    // A chained trailing operator still needs the next word as its target.
+    index += /^(?:[&|])?$/.test(target) ? 2 : 1;
+  }
+  return index;
+}
+
 /** Direct local CLI commands, excluding sibling commands and shell comments. */
 export function aiCliInvocations(value: string): AiCliInvocation[] {
   const invocations: AiCliInvocation[] = [];
   for (const segment of shellExecutableSegments(value)) {
     if (segment.reach === false) continue;
     const words = shellWords(segment.command);
-    let commandIndex = 0;
-    while (commandIndex < words.length) {
-      const raw = words[commandIndex].raw ?? "";
-      const redirect = /^(?:\d*>>?|\d*<|&>)(?![<>])/.exec(raw);
-      if (!redirect) break;
-      commandIndex += raw.length === redirect[0].length ? 2 : 1;
-    }
+    const commandIndex = leadingRedirectionWordCount(words);
     const afterLeadingRedirections = words
       .slice(commandIndex)
       .map((word) => word.raw ?? word.text)
@@ -1245,7 +1293,16 @@ export function aiCliInvocations(value: string): AiCliInvocation[] {
     ).find((match) => match?.index === 0);
     if (!cli) continue;
     const args = commandWords.slice(shellWords(cli[0]).length);
-    if (isCliHelpCheck(args, cli[0])) continue;
+    const redirectTail =
+      redirection >= 0
+        ? shellWords(afterLeadingRedirections.slice(redirection))
+        : [];
+    // Redirect targets are not prompts; remaining tail arguments can be.
+    const helpArgs = [
+      ...args,
+      ...redirectTail.slice(leadingRedirectionWordCount(redirectTail)),
+    ];
+    if (isCliHelpCheck(helpArgs, cli[0])) continue;
     // The shell also accepts arguments *after* a redirect. We intentionally
     // exclude the redirect tail from proven prompt material, but cannot call
     // the command complete without parsing that tail's remaining arguments.

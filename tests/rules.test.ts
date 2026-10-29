@@ -387,6 +387,122 @@ jobs:
     expect(rules.has("agentci/ai-shell-access")).toBe(false);
   });
 
+  it("stops action capability options at a bare terminator", () => {
+    const rules = rulesFor(`
+on: push
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          claude_args: '-- --allowedTools=Bash'
+`);
+    expect(rules.has("agentci/ai-shell-access")).toBe(false);
+  });
+
+  it("keeps explicit Bash allow entries in settings JSON", () => {
+    const rules = rulesFor(`
+on: push
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          claude_args: >-
+            --allowedTools Read --settings '{"permissions":{"allow":["Bash"]}}'
+`);
+    expect(rules).toContain("agentci/ai-shell-access");
+  });
+
+  it("preserves parent shell detection when settings JSON is malformed", () => {
+    const rules = rulesFor(`
+on: push
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          claude_args: >-
+            --allowedTools Read --settings '{"permissions":{"allow":["Bash"]}'
+`);
+    expect(rules).toContain("agentci/ai-shell-access");
+  });
+
+  it.each([
+    [
+      "skip-permissions flag",
+      { claude_args: "--dangerously-skip-permissions" },
+      true,
+    ],
+    [
+      "flag after terminator",
+      { claude_args: "-- --dangerously-skip-permissions" },
+      false,
+    ],
+    ["separate tool input", { allowed_tools: "Bash" }, true],
+    ["separate shell input", { allow_shell: true }, true],
+    [
+      "inline settings",
+      { claude_args: `--settings='{"permissions":{"allow":["Bash(git:*)"]}}'` },
+      true,
+    ],
+    [
+      "settings after terminator",
+      { claude_args: `-- --settings='{"permissions":{"allow":["Bash"]}}'` },
+      false,
+    ],
+    [
+      "deny entry",
+      {
+        claude_args: `--allowedTools Read --settings '{"permissions":{"deny":["Bash"]}}'`,
+      },
+      false,
+    ],
+    [
+      "non-shell allow entry",
+      {
+        claude_args: `--allowedTools Read --settings '{"permissions":{"allow":["Read(Bash)"]}}'`,
+      },
+      false,
+    ],
+    [
+      "malformed settings without allow-list",
+      { claude_args: `--settings '{"permissions":{"allow":["Bash"]}'` },
+      false,
+    ],
+    [
+      "multiline malformed settings",
+      {
+        claude_args: `--allowedTools Read\n--settings '{"permissions":{"allow":["Bash"]}'`,
+      },
+      false,
+    ],
+  ])(
+    "preserves Action capability boundaries: %s",
+    (_name, inputs, expected) => {
+      const rules = rulesFor(
+        YAML.stringify({
+          on: "push",
+          jobs: {
+            review: {
+              "runs-on": "ubuntu-latest",
+              steps: [
+                {
+                  uses: "anthropics/claude-code-action@0123456789abcdef0123456789abcdef01234567",
+                  with: inputs,
+                },
+              ],
+            },
+          },
+        }),
+      );
+      expect(rules.has("agentci/ai-shell-access")).toBe(expected);
+    },
+  );
+
   it.each([
     '--allowedTools Read --append-system-prompt "Describe Bash"',
     "--allowedTools Read --disallowedTools Bash",

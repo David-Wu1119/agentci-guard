@@ -18,11 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `analysis-checkout-protection-unknown`. Previously `v7.custom` counted as a
   protected v7 release and `v1.custom` as a known-unprotected v1 release.
   Numeric v1 refs stay known-unprotected.
-- `ai-shell-access` for an Action now reads only the values of the
-  `--allowedTools` / `--allowed-tools` flag, up to the next flag. A `Bash`
-  entry after `--disallowedTools`, or in prose such as a system-prompt
-  argument, no longer counts. The hyphenated `--allowed-tools` spelling is
-  now recognized, which adds correct `ai-shell-access` findings in 3 of the
+- `ai-shell-access` for an Action reads `--allowedTools` / `--allowed-tools`
+  values up to the next flag and explicit shell entries in `--settings` JSON
+  `permissions.allow`. Argument options stop at a bare `--`; malformed settings
+  retain the previous argument detection. Separate capability inputs and
+  `--dangerously-skip-permissions` still count. A `Bash` entry after
+  `--disallowedTools`, or in prose such as a system-prompt argument, no longer
+  counts when settings are parseable or absent. The hyphenated `--allowed-tools`
+  spelling is now recognized, which adds correct `ai-shell-access` findings in 3 of the
   152 development cases.
 - These four fixes come from a frozen-contract audit of 29 October 2026.
 

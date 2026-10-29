@@ -7627,17 +7627,34 @@ var SECRET_PATTERNS = [
 ];
 var SHELL_TOOL_PATTERN = /(?:^|[\s,[("'`])(?:Bash|Shell)(?=$|[\s,(\])}"'`])/i;
 var SHELL_ARGUMENT_PATTERN = /--dangerously-skip-permissions\b/i;
+var LEGACY_SHELL_ARGUMENT_PATTERN = /(?:--allowedTools?\s+[^\n]*(?:Bash|Shell)|--dangerously-skip-permissions)\b/i;
 function argumentsAllowShell(value) {
-  if (SHELL_ARGUMENT_PATTERN.test(value)) return true;
   const words = shellWords(value);
-  for (let index = 0; index < words.length; index++) {
-    if (/^--(?:append-system-prompt|system-prompt)$/.test(words[index].text)) {
+  let malformedSettings = false;
+  let index = 0;
+  for (; index < words.length; index++) {
+    const argument = words[index].text;
+    if (argument === "--") break;
+    if (/^--(?:append-system-prompt|system-prompt)$/.test(argument)) {
       index++;
       continue;
     }
-    const flag = /^--allowed(?:Tools?|-tools)(?:=(.*))?$/i.exec(
-      words[index].text
-    );
+    const settings = /^--settings(?:=(.*))?$/.exec(argument);
+    if (settings) {
+      const json = settings[1] ?? words[++index]?.text ?? "";
+      try {
+        const allow = JSON.parse(json)?.permissions?.allow;
+        if (Array.isArray(allow) && allow.some(
+          (tool) => typeof tool === "string" && /^(?:Bash|Shell)(?:\(|$)/i.test(tool.trim())
+        ))
+          return true;
+      } catch {
+        malformedSettings = true;
+      }
+      continue;
+    }
+    if (SHELL_ARGUMENT_PATTERN.test(argument)) return true;
+    const flag = /^--allowed(?:Tools?|-tools)(?:=(.*))?$/i.exec(argument);
     if (!flag) continue;
     const tools = [flag[1] ?? ""];
     while (index + 1 < words.length && !words[index + 1].text.startsWith("-")) {
@@ -7645,7 +7662,9 @@ function argumentsAllowShell(value) {
     }
     if (SHELL_TOOL_PATTERN.test(tools.join(" "))) return true;
   }
-  return false;
+  return malformedSettings && LEGACY_SHELL_ARGUMENT_PATTERN.test(
+    value.slice(0, words[index]?.start ?? value.length)
+  );
 }
 function isSelfGatingAgentAction(uses) {
   return /^anthropics\/claude-code-action(?:@|$)/i.test(uses.trim());
@@ -7686,7 +7705,12 @@ function shellWords(value) {
   let wordStart = 0;
   const push = (end) => {
     if (started)
-      words.push({ text, expandableText, raw: value.slice(wordStart, end) });
+      words.push({
+        text,
+        expandableText,
+        raw: value.slice(wordStart, end),
+        start: wordStart
+      });
     text = "";
     expandableText = "";
     started = false;
@@ -8331,26 +8355,33 @@ function isCliHelpCheck(args, cli) {
     } else if (/^(?:-m|--(?:model|system-prompt|append-system-prompt|input-format|output-format|permission-mode))(?:=|$)/.test(
       argument
     )) {
-      if (!argument.includes("=") && args[index + 1] && !args[index + 1].text.startsWith("-"))
-        index++;
+      if (!argument.includes("=") && args[index + 1]) index++;
     } else if (!argument.startsWith("-")) {
       prompt = true;
     }
   }
   return help && !prompt;
 }
+function leadingRedirectionWordCount(words) {
+  let index = 0;
+  while (index < words.length) {
+    const raw = words[index].raw ?? "";
+    const redirect = /^(?:\d*>>?|\d*<|&>)(?![<>])/.exec(raw);
+    if (!redirect) break;
+    let target = raw.slice(redirect[0].length);
+    for (let next = firstUnquotedRedirection(target); next >= 0; next = firstUnquotedRedirection(target)) {
+      target = target.slice(next + 1);
+    }
+    index += /^(?:[&|])?$/.test(target) ? 2 : 1;
+  }
+  return index;
+}
 function aiCliInvocations(value) {
   const invocations = [];
   for (const segment of shellExecutableSegments(value)) {
     if (segment.reach === false) continue;
     const words = shellWords(segment.command);
-    let commandIndex = 0;
-    while (commandIndex < words.length) {
-      const raw = words[commandIndex].raw ?? "";
-      const redirect = /^(?:\d*>>?|\d*<|&>)(?![<>])/.exec(raw);
-      if (!redirect) break;
-      commandIndex += raw.length === redirect[0].length ? 2 : 1;
-    }
+    const commandIndex = leadingRedirectionWordCount(words);
     const afterLeadingRedirections = words.slice(commandIndex).map((word) => word.raw ?? word.text).join(" ");
     const redirection = firstUnquotedRedirection(afterLeadingRedirections);
     const command = redirection >= 0 ? afterLeadingRedirections.slice(0, redirection) : afterLeadingRedirections;
@@ -8363,7 +8394,12 @@ function aiCliInvocations(value) {
     ).find((match) => match?.index === 0);
     if (!cli) continue;
     const args = commandWords.slice(shellWords(cli[0]).length);
-    if (isCliHelpCheck(args, cli[0])) continue;
+    const redirectTail = redirection >= 0 ? shellWords(afterLeadingRedirections.slice(redirection)) : [];
+    const helpArgs = [
+      ...args,
+      ...redirectTail.slice(leadingRedirectionWordCount(redirectTail))
+    ];
+    if (isCliHelpCheck(helpArgs, cli[0])) continue;
     const opaqueInput = commandIndex > 0 || redirection >= 0 || commandWords.some((word) => /\$\(|`/.test(word.text)) || prefixWords.some((word) => /\$/.test(word.expandableText));
     invocations.push({
       command: executable,
