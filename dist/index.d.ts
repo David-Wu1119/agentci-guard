@@ -196,13 +196,14 @@ declare const AI_AGENT_ACTION_PATTERNS: RegExp[];
 declare const AI_AGENT_CLI_PATTERNS: RegExp[];
 declare const AI_AGENT_API_PATTERNS: RegExp[];
 declare const AI_AGENT_PATTERNS: RegExp[];
-declare const UNTRUSTED_CONTEXT_PATTERNS: Array<{
+declare const UNTRUSTED_EVENT_CONTEXT_PATTERNS: Array<{
     pattern: RegExp;
     events: string[];
     parentEvents?: string[];
     source: "issue" | "pull_request" | "pr_head_ref" | "discussion" | "comment" | "review" | "commit" | "other";
     wholeEvent?: boolean;
 }>;
+declare const UNTRUSTED_CONTEXT_PATTERNS: typeof UNTRUSTED_EVENT_CONTEXT_PATTERNS;
 /**
  * anthropics/claude-code-action refuses to run for users without repository
  * write access by default (docs/security.md: "The action can only be
