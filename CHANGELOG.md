@@ -19,6 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   synthetic regression tests in `tests/gated-write.test.ts` fail before this
   change and pass after it. This is a contract alignment found by a synthetic
   check of owner decision A04-D1 (28 October 2026), not an accuracy result.
+- A `run:` step that expands untrusted event text now defeats the gated
+  write-token exception for the whole job, even when it runs only on an event
+  the agent does not ingest. Such a job previously reported
+  `gated-ai-write-token` (high) with complete analysis; it now reports
+  `untrusted-ai-write-token` (critical) on its ingesting events, as the rule
+  contract's "no `run:` step in the job" condition states. On the frozen
+  152-case development benchmark, 0 cases change. The case was found by an
+  independent review of the amended-contract draft and is now a regression
+  test in `tests/gated-write.test.ts`.
 - `SECURITY.md` now gives one private reporting route, GitHub private
   vulnerability reporting, which is enabled for this repository. It names the
   latest GitHub release as the supported version and states that npm `0.1.0`

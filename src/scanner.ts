@@ -1562,12 +1562,23 @@ function analyzeWorkflow(
       const reachableUntrusted = unionEvents(
         ingesting.flatMap((step) => step.ingestionEvents),
       ).filter((event) => UNTRUSTED_EVENTS.has(event));
-      const criticalEvents = reachableUntrusted.filter(
+      const eventCriticalEvents = reachableUntrusted.filter(
         (event) =>
           ingesting.some((step) =>
             step.ungatedIngestionEvents.includes(event),
           ) || untrustedRunPaths.some((run) => run.events.includes(event)),
       );
+      // The gated exception requires that no run: step in the job expands
+      // untrusted event text, on any event. A run: expansion only on events
+      // the agent does not ingest still defeats it for the whole job.
+      const crossEventRuns =
+        eventCriticalEvents.length === 0
+          ? untrustedRunPaths.filter((run) =>
+              run.events.some((event) => UNTRUSTED_EVENTS.has(event)),
+            )
+          : [];
+      const criticalEvents =
+        crossEventRuns.length > 0 ? reachableUntrusted : eventCriticalEvents;
       // An unresolved input path affects only the event on which it can run.
       const unknownEvents = reachableUntrusted.filter(
         (event) =>
@@ -1618,11 +1629,18 @@ function analyzeWorkflow(
                         !step.uncertainEvents.includes(event),
                     ) &&
                     !(
-                      untrustedRunPaths.some(
+                      (untrustedRunPaths.some(
                         (run) =>
                           run.events.includes(event) &&
                           !run.uncertainEvents.includes(event),
-                      ) &&
+                      ) ||
+                        crossEventRuns.some((run) =>
+                          run.events.some(
+                            (runEvent) =>
+                              UNTRUSTED_EVENTS.has(runEvent) &&
+                              !run.uncertainEvents.includes(runEvent),
+                          ),
+                        )) &&
                       ingesting.some(
                         (step) =>
                           step.ingestionEvents.includes(event) &&

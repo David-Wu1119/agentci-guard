@@ -13734,11 +13734,15 @@ ${writerInput.material}`,
       const reachableUntrusted = unionEvents(
         ingesting.flatMap((step) => step.ingestionEvents)
       ).filter((event) => UNTRUSTED_EVENTS.has(event));
-      const criticalEvents = reachableUntrusted.filter(
+      const eventCriticalEvents = reachableUntrusted.filter(
         (event) => ingesting.some(
           (step) => step.ungatedIngestionEvents.includes(event)
         ) || untrustedRunPaths.some((run2) => run2.events.includes(event))
       );
+      const crossEventRuns = eventCriticalEvents.length === 0 ? untrustedRunPaths.filter(
+        (run2) => run2.events.some((event) => UNTRUSTED_EVENTS.has(event))
+      ) : [];
+      const criticalEvents = crossEventRuns.length > 0 ? reachableUntrusted : eventCriticalEvents;
       const unknownEvents = reachableUntrusted.filter(
         (event) => aiSteps.some(
           (step) => step.implicitIngestionUnknown && step.events.includes(event) || step.toolFetchUnknownEvents.includes(event) || step.remoteHttp && step.ingestionEvents.includes(event)
@@ -13767,9 +13771,13 @@ ${writerInput.material}`,
             ) : events.filter(
               (event) => !ingesting.some(
                 (step) => step.ungatedIngestionEvents.includes(event) && !step.uncertainEvents.includes(event)
-              ) && !(untrustedRunPaths.some(
+              ) && !((untrustedRunPaths.some(
                 (run2) => run2.events.includes(event) && !run2.uncertainEvents.includes(event)
-              ) && ingesting.some(
+              ) || crossEventRuns.some(
+                (run2) => run2.events.some(
+                  (runEvent) => UNTRUSTED_EVENTS.has(runEvent) && !run2.uncertainEvents.includes(runEvent)
+                )
+              )) && ingesting.some(
                 (step) => step.ingestionEvents.includes(event) && !step.uncertainEvents.includes(event)
               ))
             ),

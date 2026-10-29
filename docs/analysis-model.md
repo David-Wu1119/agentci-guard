@@ -126,10 +126,11 @@ an explicit `github_token` input; the candidate checks for that input before
 modeling a bypass, but cannot resolve whether a dynamic token expression is
 empty. `allowed_bots` entries are not permission-checked.
 
-The candidate classifies each reachable event path independently. When the
-untrusted-trigger, agent, write-token pattern is present and **all** of the
-following hold on that event, the finding is `agentci/gated-ai-write-token` at
-high rather than `agentci/untrusted-ai-write-token` at critical:
+The candidate classifies each reachable event path, then applies the two
+write-token rules at the job. When the untrusted-trigger, agent, write-token
+pattern is present and **all** of the following hold on every ingesting event,
+the job's finding is `agentci/gated-ai-write-token` at high rather than
+`agentci/untrusted-ai-write-token` at critical:
 
 - every AI step that ingests untrusted content on that event is an inspected immutable
   `anthropics/claude-code-action` revision (not `-base-action`) with neither
@@ -144,11 +145,14 @@ high rather than `agentci/untrusted-ai-write-token` at critical:
   or CLI input flow. Parent Issue,
   PR, or discussion content may have a different author on comment, review, or
   label activity and therefore prevents the downgrade;
-- no `run:` step reachable on that event expands untrusted event text, because that path
-  bypasses the agent's gate entirely. If another agent's inherited input is
+- no `run:` step in the job expands untrusted event text on any reachable
+  event, including events no agent ingests, because that path bypasses the
+  agent's gate entirely. If another agent's inherited input is
   unresolved, neither the high nor the critical write-token finding is
-  asserted from that unknown path. A job can have high and critical findings
-  on different events without attributing either severity to the other event.
+  asserted from that unknown path. The two rules never appear on the same job:
+  a failed condition on any event makes the job critical, reported on the
+  critical events, or on every ingesting event when only a `run:` expansion
+  on another event fails it.
 
 The Action's gate answers "who activated this run?", not "who authored every
 piece of text the agent reads?" A trusted maintainer can label an attacker
