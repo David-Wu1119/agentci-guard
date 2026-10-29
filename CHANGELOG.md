@@ -29,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fourth finding, an agent CLI after a leading redirection
   (`>out.txt claude -p review`) going unobserved, is kept as a known
   limitation: an attempted fix misread chained redirection targets as commands.
+- `RULES.md` now lists `analysis-shell-control-flow-unknown` and
+  `analysis-secret-env-transfer-unknown`, two diagnostics the scanner already
+  emitted. A test now fails if any emitted `agentci/` code is missing from
+  `RULES.md`. Scanner output is unchanged.
 
 ### Changed
 

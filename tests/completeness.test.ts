@@ -202,3 +202,25 @@ describe("CLI and Action surface completeness", () => {
     expect(await fs.readFile(summary, "utf8")).toMatch(/incomplete/i);
   });
 });
+
+describe("RULES.md documents every diagnostic", () => {
+  it("lists every agentci code the scanner can emit", async () => {
+    const rules = await fs.readFile(
+      new URL("../RULES.md", import.meta.url),
+      "utf8",
+    );
+    const srcDir = new URL("../src/", import.meta.url);
+    const emitted = new Set<string>();
+    for (const name of await fs.readdir(srcDir)) {
+      if (!name.endsWith(".ts")) continue;
+      const source = await fs.readFile(new URL(name, srcDir), "utf8");
+      for (const match of source.matchAll(/code: "(agentci\/[a-z-]+)"/g)) {
+        emitted.add(match[1]);
+      }
+    }
+    expect(emitted.size).toBeGreaterThan(0);
+    expect(
+      [...emitted].filter((code) => !rules.includes(`\`${code}\``)),
+    ).toEqual([]);
+  });
+});
