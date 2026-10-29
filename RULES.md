@@ -280,6 +280,8 @@ The following are not security findings:
 - `agentci/analysis-agent-event-unknown`
 - `agentci/analysis-agent-event-unsupported`
 - `agentci/analysis-run-dataflow-unknown`
+- `agentci/analysis-shell-control-flow-unknown` — an AI CLI or HTTP call sits in a shell branch or group whose reachability cannot be resolved statically; findings at that step describe a possible path, not guaranteed execution
+- `agentci/analysis-secret-env-transfer-unknown` — an earlier step may write a secret to `GITHUB_ENV`; exposure to the later AI step is not modeled, so that route alone does not produce `ai-with-secrets`
 - `agentci/analysis-output-provenance-unknown`
 - `agentci/analysis-matrix-provenance-unknown`
 - `agentci/analysis-reusable-input-provenance-unknown`
