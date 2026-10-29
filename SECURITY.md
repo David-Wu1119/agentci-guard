@@ -6,13 +6,19 @@ in public issues.
 
 ## Supported Versions
 
-During the `0.x` research phase, fixes target the latest `main` branch and
-latest published package. No service-level or security-detection guarantee is
-provided.
+During the `0.x` research phase, fixes target `main` and the latest GitHub
+release (https://github.com/David-Wu1119/agentci-guard/releases/latest). The
+npm package `agentci-guard@0.1.0`, a June 2026 prototype, is not supported.
+No service-level or security-detection guarantee is provided.
 
 ## Reporting a Vulnerability
 
-Use GitHub Security Advisories when available. If private reporting is unavailable, open a minimal public issue asking for a disclosure channel without including exploit details.
+Report vulnerabilities in AgentCI Guard itself privately through GitHub:
+https://github.com/David-Wu1119/agentci-guard/security/advisories/new
+
+If you believe a workflow in another project is exploitable, report it to
+that project's maintainers through its own security policy, not here. AgentCI
+Guard findings are review hypotheses, not proof of exploitability.
 
 A useful report includes:
 

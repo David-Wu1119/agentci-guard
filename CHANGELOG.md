@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   synthetic regression tests in `tests/gated-write.test.ts` fail before this
   change and pass after it. This is a contract alignment found by a synthetic
   check of owner decision A04-D1 (28 October 2026), not an accuracy result.
+- `SECURITY.md` now gives one private reporting route, GitHub private
+  vulnerability reporting, which is enabled for this repository. It names the
+  latest GitHub release as the supported version and states that npm `0.1.0`
+  is not supported. The false-positive issue template now sends reports about
+  other projects' workflows to those projects' maintainers.
 
 ## [0.7.0] - 2026-10-28
 

@@ -20,8 +20,8 @@ body:
         ⚠️ **Please sanitize before posting.** Remove secrets, tokens, internal
         hostnames, and anything private. **Do not name any repository as
         vulnerable** — if you believe a real, exploitable case exists, report it
-        privately per [SECURITY.md](../../SECURITY.md) instead of opening a public
-        issue.
+        to that repository's maintainers through its security policy; for a
+        vulnerability in AgentCI Guard itself, see [SECURITY.md](../../SECURITY.md).
   - type: checkboxes
     id: prechecks
     attributes:
