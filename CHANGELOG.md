@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A help or version check after a subcommand, such as `codex exec --help`,
+  is no longer reported as AI usage with `ai-shell-access`.
+- A leading shell redirection, as in `>out.txt claude -p review`, no longer
+  hides an agent CLI invocation.
+- A checkout ref that is neither a numeric release nor a full commit SHA, such
+  as `actions/checkout@v7.custom` or `@v1.custom`, is now reported as
+  `analysis-checkout-protection-unknown`. Previously `v7.custom` counted as a
+  protected v7 release and `v1.custom` as a known-unprotected v1 release.
+  Numeric v1 refs stay known-unprotected.
+- `ai-shell-access` for an Action now reads only the values of the
+  `--allowedTools` / `--allowed-tools` flag, up to the next flag. A `Bash`
+  entry after `--disallowedTools`, or in prose such as a system-prompt
+  argument, no longer counts. The hyphenated `--allowed-tools` spelling is
+  now recognized, which adds correct `ai-shell-access` findings in 3 of the
+  152 development cases.
+- These four fixes come from a frozen-contract audit of 29 October 2026.
+
 ### Changed
 
 - `untrusted-ai-write-token` and `gated-ai-write-token` are now mutually

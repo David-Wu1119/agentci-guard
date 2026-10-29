@@ -31,6 +31,72 @@ function rules(result: ReturnType<typeof scan>) {
 }
 
 describe("local CLI run-step input flow", () => {
+  it.each([
+    "codex exec --help",
+    "codex run -h",
+    "codex exec --version",
+    "claude --help",
+    "claude --verbose --help",
+    "claude --model sonnet --help",
+    "codex exec --model example --help",
+    'claude --append-system-prompt "Describe Bash" --help',
+    "claude --allowedTools Read Bash --help",
+    "cursor-agent --verbose --help",
+    "aider --yes --version",
+    "npx --yes @anthropic-ai/claude-code --verbose -h",
+  ])("excludes help/version checks throughout CLI arguments: %s", (run) => {
+    const result = scan(run);
+    expect(result.agent_usages).toEqual([]);
+    expect(rules(result)).not.toContain("agentci/ai-shell-access");
+  });
+
+  it.each([
+    'claude -p "x"',
+    'claude --help -p "x"',
+    'claude --help "review this patch"',
+    'claude --help -- "review this patch"',
+    'claude --model sonnet --help -p "x"',
+    'claude --verbose "review this patch" --help',
+    'codex exec --help "review this patch"',
+    'codex exec "review this patch" --version',
+    'aider --version --message "review this patch"',
+  ])(
+    "keeps prompt-bearing CLI runs despite help/version arguments: %s",
+    (run) => {
+      const result = scan(run);
+      expect(result.agent_usages).toHaveLength(1);
+      expect(rules(result)).toContain("agentci/ai-shell-access");
+    },
+  );
+
+  it.each([
+    ">output.txt",
+    "> output.txt",
+    "2>output.txt",
+    "<input.txt",
+    ">>output.txt",
+    "&>output.txt",
+    ">output.txt 2>errors.txt",
+  ])("recognizes CLI execution after leading redirection: %s", (redirect) => {
+    const result = scan(`${redirect} claude -p review`);
+    expect(result.agent_usages).toHaveLength(1);
+    expect(rules(result)).toContain("agentci/ai-shell-access");
+  });
+
+  it.each([
+    '>output.txt echo "claude -p review"',
+    ">output.txt claude --help",
+    '">output.txt" claude -p review',
+    "echo fixed &>output.txt claude -p review",
+  ])(
+    "does not promote prose or checks after leading redirection: %s",
+    (run) => {
+      const result = scan(run);
+      expect(result.agent_usages).toEqual([]);
+      expect(result.findings).toEqual([]);
+    },
+  );
+
   it("recognizes an env-launched agent without treating env-only input as its prompt", () => {
     const direct = scan('env CI=1 claude -p "\${{ github.event.issue.body }}"');
     expect(direct.agent_usages).toHaveLength(1);
