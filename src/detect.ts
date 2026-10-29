@@ -1268,6 +1268,19 @@ function leadingRedirectionWordCount(words: ShellWord[]): number {
   return index;
 }
 
+/**
+ * Move a redirection index back over a file-descriptor number (`2>`) or `&`
+ * (`&>`) that starts the same word, so the prefix is not left behind as an
+ * argument of the command.
+ */
+function redirectionWordStart(command: string, index: number): number {
+  if (index <= 0) return index;
+  let start = index;
+  while (start > 0 && /\d/.test(command[start - 1])) start--;
+  if (start === index && command[start - 1] === "&") start--;
+  return start === 0 || /\s/.test(command[start - 1]) ? start : index;
+}
+
 /** Direct local CLI commands, excluding sibling commands and shell comments. */
 export function aiCliInvocations(value: string): AiCliInvocation[] {
   const invocations: AiCliInvocation[] = [];
@@ -1283,7 +1296,10 @@ export function aiCliInvocations(value: string): AiCliInvocation[] {
       .slice(commandIndex)
       .map((word) => word.raw ?? word.text)
       .join(" ");
-    const redirection = firstUnquotedRedirection(afterLeadingRedirections);
+    const redirection = redirectionWordStart(
+      afterLeadingRedirections,
+      firstUnquotedRedirection(afterLeadingRedirections),
+    );
     const command =
       redirection >= 0
         ? afterLeadingRedirections.slice(0, redirection)

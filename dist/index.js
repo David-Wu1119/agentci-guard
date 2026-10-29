@@ -8379,6 +8379,13 @@ function leadingRedirectionWordCount(words) {
   }
   return index;
 }
+function redirectionWordStart(command, index) {
+  if (index <= 0) return index;
+  let start = index;
+  while (start > 0 && /\d/.test(command[start - 1])) start--;
+  if (start === index && command[start - 1] === "&") start--;
+  return start === 0 || /\s/.test(command[start - 1]) ? start : index;
+}
 function aiCliInvocations(value) {
   const invocations = [];
   for (const segment of shellExecutableSegments(value)) {
@@ -8387,7 +8394,10 @@ function aiCliInvocations(value) {
     const commandIndex = leadingRedirectionWordCount(words);
     if (commandIndex > 0) continue;
     const afterLeadingRedirections = words.slice(commandIndex).map((word) => word.raw ?? word.text).join(" ");
-    const redirection = firstUnquotedRedirection(afterLeadingRedirections);
+    const redirection = redirectionWordStart(
+      afterLeadingRedirections,
+      firstUnquotedRedirection(afterLeadingRedirections)
+    );
     const command = redirection >= 0 ? afterLeadingRedirections.slice(0, redirection) : afterLeadingRedirections;
     const { commandWords, prefixWords } = envLaunchedCommand(
       shellWords(command)

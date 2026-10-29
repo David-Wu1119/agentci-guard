@@ -43,6 +43,21 @@ describe("local CLI run-step input flow", () => {
     expect(result.findings).toEqual([]);
   });
 
+  it.each(["claude --help 2>/dev/null", "claude --help &>/dev/null"])(
+    "keeps a redirected help check excluded: %s",
+    (run) => {
+      const result = scan(run);
+      expect(result.agent_usages).toEqual([]);
+      expect(result.findings).toEqual([]);
+    },
+  );
+
+  it("still observes a redirected real run", () => {
+    const result = scan("claude -p review 2>/dev/null");
+    expect(result.agent_usages).toHaveLength(1);
+    expect(rules(result)).toContain("agentci/ai-shell-access");
+  });
+
   it("keeps dataflow unknown for prompts after a help redirection", () => {
     const result = scan('codex exec --help >out.txt "review this patch"');
     expect(result.diagnostics.map((item) => item.code)).toContain(
