@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A standalone `toJSON(github.event)` now counts as every supported event-field
+  source on all untrusted events, lifting the `issue_comment`-only restriction.
+  Local AI CLIs and the two verified Anthropic Action pins keep their existing
+  prompt and gate rules. Subobjects, `toJSON(github)`, round trips, and `push`
+  remain outside this fix.
 - A help or version check after a subcommand, such as `codex exec --help`,
   is no longer reported as AI usage with `ai-shell-access`.
 - A checkout ref that is neither a numeric release nor a full commit SHA, such

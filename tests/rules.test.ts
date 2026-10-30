@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import YAML from "yaml";
-import { untrustedGitHubContextEvents } from "../src/detect.js";
+import {
+  untrustedGitHubContextEvents,
+  untrustedGitHubContextMatches,
+} from "../src/detect.js";
+import { UNTRUSTED_EVENTS } from "../src/workflow-model.js";
 import {
   scanWorkflow,
   scanWorkflowFiles,
@@ -93,6 +97,122 @@ jobs:
 `);
     expect(rules).toContain("agentci/untrusted-input-in-prompt");
     expect(rules).toContain("agentci/untrusted-ai-write-token");
+  });
+
+  describe("standalone event serialization", () => {
+    const eventFields: Record<string, string[]> = {
+      pull_request: [
+        "github.event.pull_request.body",
+        "github.event.pull_request.head.ref",
+      ],
+      pull_request_target: [
+        "github.event.pull_request.title",
+        "github.event.pull_request.head.ref",
+      ],
+      issue_comment: ["github.event.issue.body", "github.event.comment.body"],
+      issues: ["github.event.issue.body"],
+      pull_request_review: [
+        "github.event.pull_request.body",
+        "github.event.pull_request.head.ref",
+        "github.event.review.body",
+      ],
+      pull_request_review_comment: [
+        "github.event.pull_request.body",
+        "github.event.pull_request.head.ref",
+        "github.event.comment.body",
+      ],
+      discussion: ["github.event.discussion.body"],
+      discussion_comment: [
+        "github.event.discussion.body",
+        "github.event.comment.body",
+      ],
+    };
+
+    function resultFor(raw: string) {
+      const result = scanWorkflowFiles(
+        [
+          {
+            path: `${ROOT}/.github/workflows/test.yml`,
+            raw,
+            document: YAML.parse(raw),
+          },
+        ],
+        ROOT,
+        { ignore: [], ignorePaths: [] },
+      );
+      return {
+        rules: [
+          ...new Set(
+            result.findings.map(
+              ({ rule_id, severity }) => `${rule_id}/${severity}`,
+            ),
+          ),
+        ].sort(),
+        analysis_complete: result.analysis_complete,
+      };
+    }
+
+    it.each([...UNTRUSTED_EVENTS])("matches field inputs on %s", (event) => {
+      const whole = "${{ toJSON(github.event) }}";
+      const fields = eventFields[event]
+        .map((field) => `\${{ ${field} }}`)
+        .join(" ");
+      const workflow = (prompt: string) => `
+on: ${event}
+permissions:
+  contents: write
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - run: claude -p "${prompt}"
+`;
+      expect(resultFor(workflow(whole))).toEqual(resultFor(workflow(fields)));
+      const matches = (prompt: string) =>
+        untrustedGitHubContextMatches(prompt)
+          .filter((match) => match.event === event)
+          .sort((left, right) => left.source.localeCompare(right.source));
+      expect(matches(whole)).toEqual(
+        matches(fields).map((match) => ({ ...match, wholeEvent: true })),
+      );
+      expect(untrustedGitHubContextEvents(whole, true).includes(event)).toBe(
+        untrustedGitHubContextEvents(fields, true).includes(event),
+      );
+    });
+
+    it.each([
+      [
+        "d4i",
+        "pull_request_target",
+        "1d6de8cb0c237e7c15e9e1bdf973826ebae490cc",
+        "github.event.pull_request.body",
+      ],
+      [
+        "d4a",
+        "issues",
+        "787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251",
+        "github.event.issue.body",
+      ],
+    ])(
+      "matches field input for Action probe %s",
+      (_probe, event, pin, field) => {
+        const workflow = (expression: string) => `
+on: ${event}
+permissions:
+  contents: write
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@${pin}
+        with:
+          prompt: \${{ ${expression} }}
+`;
+        expect(resultFor(workflow("toJSON(github.event)"))).toEqual(
+          resultFor(workflow(field)),
+        );
+      },
+    );
   });
 
   it("does not generalize serialized event payload matching to push", () => {

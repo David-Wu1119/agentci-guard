@@ -10993,7 +10993,7 @@ var AI_AGENT_PATTERNS = [
   ...AI_AGENT_ACTION_PATTERNS,
   ...AI_AGENT_CLI_PATTERNS
 ];
-var UNTRUSTED_CONTEXT_PATTERNS = [
+var UNTRUSTED_EVENT_CONTEXT_PATTERNS = [
   {
     pattern: /(?:^|[^A-Za-z0-9_.])github\.event\.pull_request\.(body|title)(?![A-Za-z0-9_-])/i,
     source: "pull_request",
@@ -11038,24 +11038,19 @@ var UNTRUSTED_CONTEXT_PATTERNS = [
     ]
   },
   {
-    // shortcut: recognize only standalone serialization; nested expressions need result-aware dataflow.
-    pattern: /^\s*toJSON\s*\(\s*github\.event\s*\)\s*$/i,
-    source: "comment",
-    events: ["issue_comment"],
-    wholeEvent: true
-  },
-  {
-    pattern: /^\s*toJSON\s*\(\s*github\.event\s*\)\s*$/i,
-    source: "issue",
-    events: ["issue_comment"],
-    parentEvents: ["issue_comment"],
-    wholeEvent: true
-  },
-  {
     pattern: /(?:^|[^A-Za-z0-9_.])github\.event\.review\.body(?![A-Za-z0-9_-])/i,
     source: "review",
     events: ["pull_request_review"]
-  },
+  }
+];
+var UNTRUSTED_CONTEXT_PATTERNS = [
+  ...UNTRUSTED_EVENT_CONTEXT_PATTERNS,
+  ...UNTRUSTED_EVENT_CONTEXT_PATTERNS.map((candidate) => ({
+    ...candidate,
+    // shortcut: recognize only standalone serialization; nested expressions need result-aware dataflow.
+    pattern: /^\s*toJSON\s*\(\s*github\.event\s*\)\s*$/i,
+    wholeEvent: true
+  })),
   {
     pattern: /(?:^|[^A-Za-z0-9_.])github\.event\.head_commit\.message(?![A-Za-z0-9_-])/i,
     source: "commit",
