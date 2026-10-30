@@ -38,13 +38,14 @@ export const AI_AGENT_ACTION_PATTERNS = [
 // A command boundary is deliberately required. This prevents package names,
 // comments, paths, e-mail addresses, and prose from becoming observations.
 // Pure installation/help/version checks are not agent executions.
-// npx -y/--yes are supported only for the known Claude Code npm package.
+// npx -y/--yes are supported only for the known Claude Code and Codex npm packages.
 export const AI_AGENT_CLI_PATTERNS = [
   /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|npx|uvx)\s+)*claude(?=[\s;&|)]|$)/im,
   /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|uvx)\s+|npx\s+(?:(?:-y|--yes)\s+)*)*@anthropic-ai\/claude-code(?:@[A-Za-z0-9^~][A-Za-z0-9._+^~-]*)?(?=[\s;&|)]|$)/im,
   /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|npx|uvx)\s+)*(?:python3?\s+-m\s+)?aider(?=[\s;&|)]|$)/im,
   /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|npx|uvx)\s+)*cursor-agent(?=[\s;&|)]|$)/im,
-  /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|npx|uvx)\s+)*codex[ \t]+(?:exec|run)(?:[\s]|$)/im,
+  /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|npx|uvx)\s+)*codex[ \t]+(?:exec|e|review|run)(?:[\s]|$)/im,
+  /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|uvx)\s+|npx\s+(?:(?:-y|--yes)\s+)*)*@openai\/codex(?:@[A-Za-z0-9^~][A-Za-z0-9._+^~-]*)?[ \t]+(?:exec|e|review)(?:[\s]|$)/im,
 ];
 
 // Hosted agents are also dispatched straight over HTTP, with no action and no
