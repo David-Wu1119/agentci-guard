@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `npx @openai/codex exec`, including the package's `e` and `review` forms,
   `npx -y` / `npx --yes`, an `npx --` separator, and version suffixes. Global options before the
   subcommand remain unrecognized.
+- `npx -- @anthropic-ai/claude-code`, with or without `-y` / `--yes` before the
+  `--` separator, is now recognized as a Claude Code run, matching the Codex
+  package form. Previously it was silently missed.
+- `docs/rules.md` now states that `gated-ai-write-token` and
+  `untrusted-ai-write-token` are mutually exclusive at a job. It still said
+  the same job could carry a critical finding on a different event.
 - A standalone `toJSON(github.event)` now counts as every supported event-field
   source on all untrusted events, lifting the `issue_comment`-only restriction.
   Local AI CLIs and the two verified Anthropic Action pins keep their existing

@@ -386,8 +386,12 @@ describe("local CLI run-step input flow", () => {
     for (const launcher of [
       "npx -y",
       "npx --yes",
+      "npx --",
+      "npx -y --",
+      "npx --yes --",
       "sudo npx -y",
       "env CI=1 npx --yes",
+      "env CI=1 npx --yes --",
     ]) {
       for (const packageRef of [
         "@anthropic-ai/claude-code",
@@ -412,6 +416,8 @@ describe("local CLI run-step input flow", () => {
       "npx -y echo @anthropic-ai/claude-code -p fixed",
       "npx --yes @anthropic-ai/claude-code --help",
       "npx --yes @anthropic-ai/claude-code@latest --version",
+      "npx --yes -- @anthropic-ai/claude-code --help",
+      "npx -- echo @anthropic-ai/claude-code -p fixed",
       "npx --yes @anthropic-ai/claude-code-fork -p fixed",
       'npx --yes claude -p "\${{ github.event.issue.body }}"',
     ]) {

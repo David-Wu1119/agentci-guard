@@ -22,10 +22,12 @@ does not establish remote write capability; that path emits
 
 Untrusted content reaches a write-capable, inspected immutable Claude Code
 Action revision whose default actor write-access gate is modeled as intact.
-Every relevant text source must be attributable to the checked actor, with no
-unresolved implicit ingestion, tool fetch, or CLI input flow in another AI path
-reachable on the reported event. The same job may have a critical finding on a
-different event.
+Every relevant text source must be attributable to the checked actor. No AI
+step in the job may have unresolved implicit ingestion, tool fetch, or CLI
+input flow on any reachable untrusted event, and no `run:` step may expand
+untrusted event text on any reachable event. This rule and
+`untrusted-ai-write-token` are mutually exclusive at a job: if any ingesting
+path is critical, the job reports only the critical rule.
 
 ## `agentci/pull-request-target-ai`
 
