@@ -47,6 +47,22 @@ accuracy requires a fresh, sealed, human-labeled evaluation.
 
 ## Vendor-event compatibility
 
+At the two inspected immutable `anthropics/claude-code-action` pins,
+`1d6de8cb0c237e7c15e9e1bdf973826ebae490cc` and
+`787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251`, `pull_request_target` is write-gated
+like `pull_request`. Both context parsers normalize it to the `pull_request`
+entity event
+([1d6de8c mapping](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/github/context.ts#L191-L200),
+[787c5a0 mapping](https://github.com/anthropics/claude-code-action/blob/787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251/src/github/context.ts#L191-L200)),
+and the entity run path checks `context.actor` with `checkWritePermissions`
+([1d6de8c check](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/entrypoints/run.ts#L196),
+[787c5a0 check](https://github.com/anthropics/claude-code-action/blob/787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251/src/entrypoints/run.ts#L185)).
+Qualifying `pull_request_target` jobs therefore report `gated-ai-write-token`
+(high) instead of `untrusted-ai-write-token` (critical). Source attribution and
+gate-bypass restrictions still apply; mutable or unverified refs do not qualify.
+The independent `pull-request-target-ai` rule stays critical and is suppressed
+only by recognized YAML actor gates. Checkout rules are unchanged.
+
 Vendor event reachability is version-aware for one verified immutable Action
 revision: `anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc`
 [rejects](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/github/context.ts#L250-L251)
@@ -67,7 +83,7 @@ arbitrary literal login or login allowlist: YAML names the account but cannot
 verify its repository role. Nor does it authenticate an
 existing parent Issue, PR, or discussion that a maintainer later comments on,
 labels, or reviews. An explicit creation-only
-subscription (`issues`/`pull_request` with `types: [opened]`, or `discussion`
+subscription (`issues`/`pull_request`/`pull_request_target` with `types: [opened]`, or `discussion`
 with `types: [created]`) lets the actor gate cover the new parent body because
 the actor created that entity. PR title/body and PR-head branch or changed-file
 paths are different sources: the opener need not have authored `head.ref`,

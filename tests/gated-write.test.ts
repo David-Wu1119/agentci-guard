@@ -14,6 +14,31 @@ const rulesOf = (raw: string) => new Set(findings(raw).map((f) => f.rule_id));
 const CRITICAL = "agentci/untrusted-ai-write-token";
 const GATED = "agentci/gated-ai-write-token";
 const VERIFIED_TAG_REF = "1d6de8cb0c237e7c15e9e1bdf973826ebae490cc";
+const VERIFIED_AGENT_REF = "787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251";
+
+const PR_REVIEW = (
+  trigger: string,
+  ref = VERIFIED_TAG_REF,
+  source = "github.event.pull_request.title",
+  extra = "",
+) => `
+on:
+  ${trigger}
+permissions:
+  contents: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@${ref}
+        with:
+          prompt: "Review PR: \${{ ${source} }}"${extra}
+`;
+
+const writeTokenPairs = (raw: string) =>
+  findings(raw)
+    .filter(({ rule_id }) => rule_id === CRITICAL || rule_id === GATED)
+    .map(({ rule_id, severity }) => [rule_id, severity]);
 
 // The Action's actor check cannot authenticate a parent Issue written by
 // someone else. A direct prompt containing only the triggering comment can
@@ -208,7 +233,7 @@ jobs:
     expect(rules).not.toContain(GATED);
   });
 
-  it("stays critical on pull_request_target regardless of the gate", () => {
+  it("stays critical on pull_request_target when tracking fetches PR-head content", () => {
     const rules = rulesOf(
       BARE(
         "\n          track_progress: true",
@@ -254,6 +279,72 @@ jobs:
 `);
     expect(rules).toContain(GATED);
     expect(rules).not.toContain(CRITICAL);
+  });
+
+  it.each([
+    { probe: "d6b", ref: VERIFIED_TAG_REF },
+    { probe: "d6e", ref: VERIFIED_AGENT_REF },
+  ])("$probe: gates pull_request_target at $ref", ({ ref }) => {
+    const raw = PR_REVIEW("pull_request_target:\n    types: [opened]", ref);
+    expect(writeTokenPairs(raw)).toEqual([[GATED, "high"]]);
+    expect(rulesOf(raw)).not.toContain(CRITICAL);
+    expect(rulesOf(raw)).toContain("agentci/pull-request-target-ai");
+  });
+
+  it.each(
+    [VERIFIED_TAG_REF, VERIFIED_AGENT_REF].flatMap((ref) =>
+      ["opened", "default"].flatMap((types) =>
+        [
+          "github.event.pull_request.title",
+          "github.event.pull_request.head.ref",
+          "github.head_ref",
+        ].map((source) => ({ ref, types, source })),
+      ),
+    ),
+  )(
+    "matches PR and PRT write-token pairs at $ref / $types / $source",
+    ({ ref, types, source }) => {
+      const settings = types === "opened" ? "\n    types: [opened]" : "";
+      const pr = PR_REVIEW(`pull_request:${settings}`, ref, source);
+      const prt = PR_REVIEW(`pull_request_target:${settings}`, ref, source);
+      expect(writeTokenPairs(prt)).toEqual(writeTokenPairs(pr));
+      expect(writeTokenPairs(pr)).toHaveLength(1);
+    },
+  );
+
+  it.each([
+    { name: "mutable @v1", ref: "v1", extra: "" },
+    {
+      name: "unverified SHA",
+      ref: "abcdef0123456789abcdef0123456789abcdef01",
+      extra: "",
+    },
+    {
+      name: "allowed_bots",
+      ref: VERIFIED_TAG_REF,
+      extra: '\n          allowed_bots: "*"',
+    },
+    {
+      name: "allowed_non_write_users with github_token",
+      ref: VERIFIED_TAG_REF,
+      extra:
+        '\n          allowed_non_write_users: "*"\n          github_token: ${{ github.token }}',
+    },
+  ])("keeps PRT critical with $name", ({ ref, extra }) => {
+    const raw = PR_REVIEW(
+      "pull_request_target:\n    types: [opened]",
+      ref,
+      "github.event.pull_request.title",
+      extra,
+    );
+    expect(writeTokenPairs(raw)).toEqual([[CRITICAL, "critical"]]);
+    expect(rulesOf(raw)).toContain("agentci/pull-request-target-ai");
+  });
+
+  it("d6c: keeps the pull_request control gated", () => {
+    expect(
+      writeTokenPairs(PR_REVIEW("pull_request:\n    types: [opened]")),
+    ).toEqual([[GATED, "high"]]);
   });
 
   it("stays critical when untrusted text is expanded into a run: step in the same job", () => {
