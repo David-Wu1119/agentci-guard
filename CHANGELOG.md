@@ -41,6 +41,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `pull_request_target` now qualifies for the actor write-access gate at the
+  verified `anthropics/claude-code-action` pins
+  `1d6de8cb0c237e7c15e9e1bdf973826ebae490cc` and
+  `787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251`, like `pull_request`. This changes
+  results: some PRT jobs move from `untrusted-ai-write-token` (critical) to
+  `gated-ai-write-token` (high). Source-attribution and bypass restrictions
+  still apply; `pull-request-target-ai` and all checkout rules are unchanged.
 - `untrusted-ai-write-token` and `gated-ai-write-token` are now mutually
   exclusive at a job, as the rule contract states. A job with one gated event
   path and one critical path previously reported both rules, high on one event

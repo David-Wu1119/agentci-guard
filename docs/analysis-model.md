@@ -115,9 +115,18 @@ for provenance. Completeness does not prove the workflow is safe.
 
 ## The agent's own gate
 
-At [the pinned Anthropic revision](https://github.com/anthropics/claude-code-action/tree/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc),
-`anthropics/claude-code-action` checks the triggering actor's repository write
-access for issue, pull request, comment, and review events by default. Its
+At the two inspected immutable Anthropic pins,
+`1d6de8cb0c237e7c15e9e1bdf973826ebae490cc` and
+`787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251`, `claude-code-action` checks the
+triggering actor's repository write access for issue, pull request, comment,
+and review events by default. This includes `pull_request_target`: both pins
+normalize it to the `pull_request` entity event
+([1d6de8c mapping](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/github/context.ts#L191-L200),
+[787c5a0 mapping](https://github.com/anthropics/claude-code-action/blob/787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251/src/github/context.ts#L191-L200))
+and check `context.actor` on the entity run path
+([1d6de8c check](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/entrypoints/run.ts#L196),
+[787c5a0 check](https://github.com/anthropics/claude-code-action/blob/787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251/src/entrypoints/run.ts#L185)).
+Its
 [security guidance](https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/docs/security.md)
 documents `allowed_non_write_users` and `allowed_bots` as ways to admit actors
 without that check. The lower-level `claude-code-base-action` is not modeled as
@@ -135,11 +144,10 @@ the job's finding is `agentci/gated-ai-write-token` at high rather than
 - every AI step that ingests untrusted content on that event is an inspected immutable
   `anthropics/claude-code-action` revision (not `-base-action`) with neither
   `allowed_non_write_users` nor `allowed_bots` set to a non-empty value;
-- the event is one the docs list as checked — `issues`,
-  `issue_comment`, `pull_request`, `pull_request_review`,
-  `pull_request_review_comment`; `pull_request_target` and the discussion events
-  are not listed and keep potential critical findings when Action event support
-  is unverified;
+- the event has a verified write check — `issues`, `issue_comment`,
+  `pull_request`, `pull_request_target`, `pull_request_review`, or
+  `pull_request_review_comment`; discussion handling remains version-aware,
+  and mutable or unverified Action refs do not qualify for the gate;
 - every relevant text source belongs to the actor checked by that gate. Parent Issue,
   PR, or discussion content may have a different author on comment, review, or
   label activity and therefore prevents the downgrade;
@@ -162,6 +170,10 @@ the candidate keeps `untrusted-ai-write-token` critical if a sensitive write
 capability is modeled. `broad-write-permissions`, `unpinned-ai-action`, and
 `ai-with-secrets` are independent of the downgrade. The gate itself is a runtime
 implementation detail, not a static proof of safety.
+
+The independent `pull-request-target-ai` finding remains critical unless a
+recognized YAML actor gate suppresses it; the Action's runtime write check
+does not suppress that rule or change any checkout rule.
 
 The v0.1.1 downgrade was set on 2026-09-05 and historically moved 24 of 30
 critical benchmark findings to high. Those counts describe the **old

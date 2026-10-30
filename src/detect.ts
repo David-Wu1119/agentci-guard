@@ -230,11 +230,12 @@ function argumentsAllowShell(value: string): boolean {
 }
 
 /**
- * anthropics/claude-code-action refuses to run for users without repository
- * write access by default (docs/security.md: "The action can only be
- * triggered by users with write access to the repository. This is checked for
- * issue, pull request, comment, and review events"). The lower-level
- * claude-code-base-action performs no such check and is deliberately excluded.
+ * At the scanner's verified pins, anthropics/claude-code-action checks the
+ * triggering actor's write access for entity events, including
+ * pull_request_target (normalized to pull_request; see SELF_GATED_EVENTS).
+ * Sources: https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/entrypoints/run.ts#L196
+ * https://github.com/anthropics/claude-code-action/blob/787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251/src/entrypoints/run.ts#L185
+ * The lower-level claude-code-base-action performs no such check and is excluded.
  */
 export function isSelfGatingAgentAction(uses: string): boolean {
   return /^anthropics\/claude-code-action(?:@|$)/i.test(uses.trim());
@@ -262,15 +263,20 @@ export function hasAgentGateBypass(withBlock: unknown): boolean {
 }
 
 /**
- * Events on which the action's docs state the write-access check applies.
- * `discussion`, `discussion_comment`, and `pull_request_target` are not listed;
- * paths that can reach the Action on those events keep full severity. The
- * scanner separately excludes events rejected by a verified pinned revision.
+ * Events with a triggering-actor write check at the scanner's verified pins.
+ * Both normalize pull_request_target to pull_request, an ENTITY_EVENT_NAMES
+ * member, so pull_request_target is checked too. Discussion handling stays
+ * version-aware in the scanner.
+ * Sources: https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/github/context.ts#L191-L200
+ * https://github.com/anthropics/claude-code-action/blob/1d6de8cb0c237e7c15e9e1bdf973826ebae490cc/src/github/context.ts#L55-L61
+ * https://github.com/anthropics/claude-code-action/blob/787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251/src/github/context.ts#L191-L200
+ * https://github.com/anthropics/claude-code-action/blob/787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251/src/github/context.ts#L55-L61
  */
 export const SELF_GATED_EVENTS = new Set([
   "issues",
   "issue_comment",
   "pull_request",
+  "pull_request_target",
   "pull_request_review",
   "pull_request_review_comment",
 ]);
