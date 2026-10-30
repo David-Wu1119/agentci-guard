@@ -15,7 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   subcommand remain unrecognized.
 - `npx -- @anthropic-ai/claude-code`, with or without `-y` / `--yes` before the
   `--` separator, is now recognized as a Claude Code run, matching the Codex
-  package form. Previously it was silently missed.
+  package form. Previously it was silently missed. The launcher form
+  `npx --package=<pkg> -- <bin>` remains unrecognized for both the Claude Code
+  and Codex packages.
 - `docs/rules.md` now states that `gated-ai-write-token` and
   `untrusted-ai-write-token` are mutually exclusive at a job. It still said
   the same job could carry a critical finding on a different event.
