@@ -38,12 +38,13 @@ describe("Codex CLI forms", () => {
   const forms = [
     "codex e",
     "codex review",
-    ...["npx", "npx -y", "npx --yes"].flatMap((launcher) =>
-      ["@openai/codex", "@openai/codex@0.50.0"].flatMap((packageRef) =>
-        ["exec", "e", "review"].map(
-          (subcommand) => `${launcher} ${packageRef} ${subcommand}`,
+    ...["npx", "npx -y", "npx --yes", "npx --", "npx --yes --"].flatMap(
+      (launcher) =>
+        ["@openai/codex", "@openai/codex@0.50.0"].flatMap((packageRef) =>
+          ["exec", "e", "review"].map(
+            (subcommand) => `${launcher} ${packageRef} ${subcommand}`,
+          ),
         ),
-      ),
     ),
   ];
   const prompt = '"${{ github.event.comment.body }}"';

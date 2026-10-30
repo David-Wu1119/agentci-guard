@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Agent detection now recognizes `codex e`, `codex review`, and
   `npx @openai/codex exec`, including the package's `e` and `review` forms,
-  `npx -y` / `npx --yes`, and version suffixes. Global options before the
+  `npx -y` / `npx --yes`, an `npx --` separator, and version suffixes. Global options before the
   subcommand remain unrecognized.
 - A standalone `toJSON(github.event)` now counts as every supported event-field
   source on all untrusted events, lifting the `issue_comment`-only restriction.

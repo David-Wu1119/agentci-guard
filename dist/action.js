@@ -7527,7 +7527,7 @@ var AI_AGENT_CLI_PATTERNS = [
   /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|npx|uvx)\s+)*(?:python3?\s+-m\s+)?aider(?=[\s;&|)]|$)/im,
   /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|npx|uvx)\s+)*cursor-agent(?=[\s;&|)]|$)/im,
   /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|npx|uvx)\s+)*codex[ \t]+(?:exec|e|review|run)(?:[\s]|$)/im,
-  /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|uvx)\s+|npx\s+(?:(?:-y|--yes)\s+)*)*@openai\/codex(?:@[A-Za-z0-9^~][A-Za-z0-9._+^~-]*)?[ \t]+(?:exec|e|review)(?:[\s]|$)/im
+  /(?:^|[\n;&|()]\s*)(?:(?:sudo|command|exec|uvx)\s+|npx\s+(?:(?:-y|--yes)\s+)*(?:--\s+)?)*@openai\/codex(?:@[A-Za-z0-9^~][A-Za-z0-9._+^~-]*)?[ \t]+(?:exec|e|review)(?:[\s]|$)/im
 ];
 var AI_AGENT_API_PATTERNS = [
   /https?:\/\/api\.cursor\.com\/v1\/agents(?:\/[^/\s"'?#]+\/runs)?(?=$|[\s"'?#\\])/i,
