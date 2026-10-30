@@ -3,9 +3,9 @@ import YAML from "yaml";
 import { looksLikeAiUsage } from "../src/detect.js";
 import { scanWorkflowFiles } from "../src/index.js";
 
-function scan(run: string, environment = "") {
+function scan(run: string, environment = "", event = "issues") {
   const raw = `
-on: issues
+on: ${event}
 permissions:
   contents: write
 ${environment}jobs:
@@ -29,6 +29,149 @@ ${run
 function rules(result: ReturnType<typeof scan>) {
   return result.findings.map((finding) => finding.rule_id);
 }
+
+function ruleSeverities(result: ReturnType<typeof scan>) {
+  return result.findings.map(({ rule_id, severity }) => [rule_id, severity]);
+}
+
+describe("Codex CLI forms", () => {
+  const forms = [
+    "codex e",
+    "codex review",
+    ...["npx", "npx -y", "npx --yes", "npx --", "npx --yes --"].flatMap(
+      (launcher) =>
+        ["@openai/codex", "@openai/codex@0.50.0"].flatMap((packageRef) =>
+          ["exec", "e", "review"].map(
+            (subcommand) => `${launcher} ${packageRef} ${subcommand}`,
+          ),
+        ),
+    ),
+  ];
+  const prompt = '"${{ github.event.comment.body }}"';
+
+  it.each(forms)("matches codex exec for an untrusted prompt: %s", (form) => {
+    const baseline = scan(`codex exec ${prompt}`, "", "issue_comment");
+    const result = scan(`${form} ${prompt}`, "", "issue_comment");
+    expect(result.agent_usages).toHaveLength(1);
+    expect(ruleSeverities(baseline)).toEqual(
+      expect.arrayContaining([
+        ["agentci/untrusted-input-in-prompt", "high"],
+        ["agentci/untrusted-ai-write-token", "critical"],
+        ["agentci/ai-shell-access", "high"],
+      ]),
+    );
+    expect(ruleSeverities(result)).toEqual(ruleSeverities(baseline));
+    expect(result.diagnostics).toEqual(baseline.diagnostics);
+    expect(result.analysis_complete).toBe(baseline.analysis_complete);
+  });
+
+  it("recognizes codex review without a prompt", () => {
+    const baseline = scan('codex exec "check this"', "", "issue_comment");
+    for (const form of forms.filter((form) => form.endsWith("review"))) {
+      const result = scan(form, "", "issue_comment");
+      expect(result.agent_usages, form).toHaveLength(1);
+      expect(ruleSeverities(result), form).toEqual(ruleSeverities(baseline));
+      expect(result.analysis_complete, form).toBe(baseline.analysis_complete);
+    }
+  });
+
+  it("preserves Codex argument, stdin, redirection and control flow handling", () => {
+    const scenarios: Array<[string, string?]> = [
+      [`CODEX --model example ${prompt}`],
+      [
+        'CODEX "$REQUEST"',
+        "env:\n  REQUEST: ${{ github.event.comment.body }}\n",
+      ],
+      [`printf "%s" ${prompt} | CODEX -`],
+      [`printf "%s" ${prompt} |&\nCODEX -`],
+      [`CODEX ${prompt} >out.txt`],
+      [`CODEX fixed > ${prompt}`],
+      [`CODEX --help >out.txt ${prompt}`],
+      [`CODEX --help ${prompt}`],
+      [`CODEX ${prompt} --version`],
+      [`CODEX fixed && echo ${prompt}`],
+      [`if true; then CODEX ${prompt}; fi`],
+      [`if false; then CODEX ${prompt}; fi`],
+      [`if test "$RUN_AGENT" = yes; then CODEX ${prompt}; fi`],
+      [`env CI=1 CODEX ${prompt}`],
+      ["bash -c 'CODEX fixed'"],
+      ['echo "$(CODEX fixed)"'],
+      [">out.txt CODEX fixed"],
+    ];
+    for (const [run, environment] of scenarios) {
+      const baseline = scan(
+        run.replaceAll("CODEX", "codex exec"),
+        environment,
+        "issue_comment",
+      );
+      for (const form of forms) {
+        const command = run.replaceAll("CODEX", form);
+        const result = scan(command, environment, "issue_comment");
+        expect(result.agent_usages.length, command).toBe(
+          baseline.agent_usages.length,
+        );
+        expect(ruleSeverities(result), command).toEqual(
+          ruleSeverities(baseline),
+        );
+        expect(
+          result.diagnostics.map(({ code }) => code),
+          command,
+        ).toEqual(baseline.diagnostics.map(({ code }) => code));
+        expect(result.analysis_complete, command).toBe(
+          baseline.analysis_complete,
+        );
+      }
+    }
+  });
+
+  it("excludes Codex help/version checks including redirects", () => {
+    for (const form of forms) {
+      for (const argument of [
+        "--help",
+        "-h",
+        "--version",
+        "--model example --help",
+        "--help >out.txt",
+        "--help >first.txt>second.txt",
+      ]) {
+        const run = `${form} ${argument}`;
+        const result = scan(run);
+        expect(result.agent_usages, run).toEqual([]);
+        expect(result.findings, run).toEqual([]);
+      }
+    }
+  });
+
+  it.each([
+    "codex apply",
+    "codex login",
+    "codex resume",
+    "codex",
+    "codex --version",
+    "npm install -g @openai/codex",
+    'echo "run codex review later"',
+    'echo "npx @openai/codex exec later"',
+    "npx -y @openai/codex-fork exec fixed",
+    "npx @openai/codex",
+    "npx @openai/codex run fixed",
+    "codex -m o3 exec fixed",
+    "codex -m o3 e fixed",
+    "codex -m o3 review fixed",
+    "npx @openai/codex -m o3 exec fixed",
+  ])("keeps non-agent and unsupported forms excluded: %s", (run) => {
+    const result = scan(run);
+    expect(result.agent_usages).toEqual([]);
+    expect(result.findings).toEqual([]);
+  });
+
+  it("keeps codex run unchanged", () => {
+    expect(
+      ruleSeverities(scan(`codex run ${prompt}`, "", "issue_comment")),
+    ).toEqual(
+      ruleSeverities(scan(`codex exec ${prompt}`, "", "issue_comment")),
+    );
+  });
+});
 
 describe("local CLI run-step input flow", () => {
   it("keeps help-shaped option operands as CLI input", () => {
